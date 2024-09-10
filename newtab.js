@@ -36,15 +36,22 @@ function applySidebarState() {
 applySidebarState();
 
 function deleteTab(id) {
+    if (!Array.isArray(id)) {
+        id = [id];
+    }
+
     chrome.storage.local.get("savedTabs", (data) => {
         const tabs = data.savedTabs || [];
-        const index = tabs.findIndex(tab => tab.id === id);
-        if (index !== -1) {
-            tabs.splice(index, 1); // Remove the tab at the specified index
-            chrome.storage.local.set({ savedTabs: tabs }), () => {
-                console.log('Tab deleted:', id);
+        id.forEach(tabId => {
+            const index = tabs.findIndex(tab => tab.id === tabId);
+            if (index !== -1) {
+                tabs.splice(index, 1); // Remove the tab at the specified index
+                console.log('Tab deleted:', tabId);
             }
-        }
+        });
+        chrome.storage.local.set({ savedTabs: tabs }, () => {
+            console.log('Updated storage with remaining tabs');
+        });
     });
 }
 function saveTabNote(id, note) {
@@ -97,9 +104,16 @@ function createColumn(title, id) {
     column.addEventListener("dragover", handleDragOver);
     column.addEventListener("drop", handleDrop);
 
-    // Create a container for the title and delete button
+    // Create a container for the title and buttons
     const headerContainer = document.createElement("div");
     headerContainer.classList.add("header-container");
+
+    // Add open all button to the column
+    const openAllButton = document.createElement("button");
+    openAllButton.classList.add("open-all");
+    openAllButton.title = "Open All";
+    openAllButton.innerHTML = `<img src="../icons/openall.svg" width="24" height="24" class="main-grid-item-icon" />`;
+    openAllButton.addEventListener("click", openAllInColumn);
 
     // Add title input to the column
     const titleInput = document.createElement("input");
@@ -142,7 +156,8 @@ function createColumn(title, id) {
         titleInput.focus();
     });
 
-    // Append title and delete button to the header container
+    // Append open all button, title, and delete button to the header container
+    headerContainer.appendChild(openAllButton);
     headerContainer.appendChild(titleInput);
     headerContainer.appendChild(titleSpan);
     headerContainer.appendChild(deleteButton);
@@ -154,8 +169,20 @@ function createColumn(title, id) {
 }
 function deleteColumn(event) {
     const column = event.target.closest(".column");
+    const tabItems = column.querySelectorAll('.tab-item');
+    const tabIds = Array.from(tabItems).map(tabItem => tabItem.id);
+    deleteTab(tabIds.map(id => parseInt(id.replace('tab-', ''))));
     column.remove();
     saveColumnState();
+}
+function openAllInColumn(event) {
+    const column = event.target.closest(".column");
+    const tabItems = column.querySelectorAll('.tab-item');
+    const urls = Array.from(tabItems).map(tabItem => tabItem.dataset.url);
+
+    urls.forEach(url => {
+        window.open(url, '_blank');
+    });
 }
 
 function saveTab(tabId) {
@@ -337,6 +364,7 @@ function displaySavedTabs(tabs) {
                         li.id = `tab-${tab.id}`;
                         li.style.backgroundColor = tab.color; 
                         li.classList.add("tab-item");
+                        li.dataset.url = tab.url;
                 
                         const dragHandle = document.createElement("div");
                         dragHandle.classList.add("drag-handle");
@@ -349,19 +377,23 @@ function displaySavedTabs(tabs) {
                         li.appendChild(dragHandle);
                 
                         li.innerHTML += `
-                            <div class="tab-info">
-                                <a href="${tab.url}" target="_self">
-                                    <img src="${tab.favIconUrl}" width="16" height="16"> 
-                                    <span class="tab-title-display" id="title-display-${tab.id}">${tab.title}</span>
-                                    <input type="text" class="tab-title-input hidden" id="title-input-${tab.id}" value="${tab.title}">
-                                </a>
-                                <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note || ''}</div>
-                                <textarea class="tab-note hidden" id="note-input-${tab.id}" rows="1">${tab.note || ''}</textarea>
-                            </div>
-                            <div class="tab-actions">
-                                <button class="more-options" data-index="${tab.id}">
-                                    <img src="../icons/morevertical.svg" width="24" height="24" class="main-grid-item-icon" />
-                                </button>
+                            <div class="tab-info-container">
+                                <div class="tab-info-left">
+                                    <img src="${tab.favIconUrl}" width="24" height="24">
+                                </div>
+                                <div class="tab-info-right">
+                                    <a href="${tab.url}" target="_self">
+                                        <span class="tab-title-display" id="title-display-${tab.id}">${tab.title}</span>
+                                        <input type="text" class="tab-title-input hidden" id="title-input-${tab.id}" value="${tab.title}">
+                                    </a>
+                                    <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note || ''}</div>
+                                    <textarea class="tab-note hidden" id="note-input-${tab.id}" rows="1">${tab.note || ''}</textarea>
+                                </div>
+                                <div class="tab-actions">
+                                    <button class="more-options" data-index="${tab.id}">
+                                        <img src="../icons/morevertical.svg" class="main-grid-item-icon" />
+                                    </button>
+                                </div>
                             </div>
                         `;
                         

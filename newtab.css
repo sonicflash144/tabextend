@@ -135,19 +135,30 @@ h1, h2 {
     flex-direction: column;
     margin-right: 20px;
 }
-.tab-actions {
+    .tab-info-left {
+        display: flex;
+        align-items: center;
+        margin-right: 10px;
+    }
+.tab-info-container {
     display: flex;
-    gap: 10px;
+    justify-content: space-between;
+    width: 100%;
 }
-    .tab-actions button {
-        background: none;
-        border: none;
-        cursor: pointer;
+    .tab-actions {
+        flex: 0 0 10%;
+        margin-left: auto;
+        gap: 10px;
     }
-    .tab-actions img {
-        width: 24px;
-        height: 24px;
-    }
+        .tab-actions button {
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+        .tab-actions img {
+            width: 24px;
+            height: 24px;
+        }
 
 #columns-container {
     display: flex;
