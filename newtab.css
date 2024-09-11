@@ -3,7 +3,13 @@ body {
     font-family: Arial, sans-serif;
     padding: 0;
     margin: 0;
+    overflow-x: auto;
+    -ms-overflow-style: none;
 }
+    body::-webkit-scrollbar {
+        display: none;
+    }
+    
 h1, h2 {
     text-align: center;
 }
@@ -37,7 +43,7 @@ h1, h2 {
 }
 
 #sidebar {
-    width: 25%;
+    width: 400px;
     background-color: #f0f0f0;
     padding: 20px;
     border-right: 1px solid #ddd;
@@ -194,6 +200,7 @@ h1, h2 {
     width: 400px;
     min-height: 400px;
     background-color: #f0f0f0;
+    flex-shrink: 0;
 }
     .column-title {
         width: 50%;
@@ -292,6 +299,7 @@ h1, h2 {
     justify-content: center;
     align-items: center;
     border-radius: 5px;
+    flex-shrink: 0;
 }
     .new-column-indicator.new-column-indicator-active {
         background-color: rgba(0, 255, 0, 0.6);

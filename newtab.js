@@ -294,6 +294,14 @@ function handleDragLeave(event) {
 function handleDragOver(event) {
     event.preventDefault();
 
+    const scrollThreshold = 100;
+    const scrollSpeed = 36;
+    if (event.clientX < scrollThreshold) {
+        window.scrollBy({ left: -scrollSpeed, behavior: 'smooth' });
+    } else if (window.innerWidth - event.clientX < scrollThreshold) {
+        window.scrollBy({ left: scrollSpeed, behavior: 'smooth' });
+    }
+
     newColumnIndicator.style.display = 'flex';
     deletionArea.style.display = 'flex';
     if(event.target === deletionArea) {
@@ -325,7 +333,7 @@ function handleDragOver(event) {
 
         dropIndicator.style.width = `${rect.width}px`;
         dropIndicator.style.height = '2px';
-        dropIndicator.style.left = `${rect.left}px`;
+        dropIndicator.style.left = `${rect.left + window.scrollX}px`;
 
         if (dropPosition === listItems.length) {
             const lastItem = listItems[listItems.length - 1];
@@ -346,11 +354,11 @@ function handleDragOver(event) {
 
         if (dropPosition === columns.length) {
             const lastColumn = columns[columns.length - 1];
-            dropIndicator.style.left = lastColumn ? `${lastColumn.getBoundingClientRect().right}px` : `${rect.left}px`;
+            dropIndicator.style.left = lastColumn ? `${lastColumn.getBoundingClientRect().right + window.scrollX}px` : `${rect.left + window.scrollX}px`;
         } else {
             const targetColumn = columns[dropPosition];
             const targetRect = targetColumn.getBoundingClientRect();
-            dropIndicator.style.left = `${targetRect.left}px`;
+            dropIndicator.style.left = `${targetRect.left + window.scrollX}px`;
         }
         newColumnIndicator.style.display = 'none';
     } 
@@ -369,11 +377,11 @@ function handleDrop(event) {
         if(event.target === deletionArea) {
             deleteColumn(droppedColumn);
             deletionArea.style.display = 'none';
+            deletionArea.classList.remove('deletion-area-active');
             return;
         }
-        else if(event.target === newColumnIndicator){
-
-        }
+        deletionArea.style.display = 'none';
+        deletionArea.classList.remove('deletion-area-active');
         // Handle column drop
         const columns = Array.from(columnsContainer.querySelectorAll('.column'));
         const dropPosition = calculateColumnDropPosition(event, columns);
@@ -390,20 +398,20 @@ function handleDrop(event) {
         saveColumnState();
         return; // Exit since we handled a column drop
     }
+    deletionArea.style.display = 'none';
+    deletionArea.classList.remove('deletion-area-active');
 
     // Continue with tab drop logic
     const column = event.target.closest('.column') || event.target.closest('#open-tabs-list');
     if (!column && event.target !== deletionArea && event.target !== newColumnIndicator) {
+        if (dropIndicator) dropIndicator.style.display = 'none';
+        if (newColumnIndicator) newColumnIndicator.style.display = 'none';
         return;
     }
 
     let tabId = event.dataTransfer.getData("text/plain");
     const tabItem = document.getElementById(tabId);
     if (!tabItem || !tabItem.classList.contains('tab-item')) return;
-
-    // Hide deletion area after drop
-    deletionArea.style.display = 'none';
-    deletionArea.classList.remove('deletion-area-active');
 
     // Check if the dragged item is selected and if there are multiple selected items
     const selectedItems = document.querySelectorAll('.selected');
@@ -900,6 +908,7 @@ chrome.tabs.onUpdated.addListener(fetchOpenTabs);
 chrome.tabs.onRemoved.addListener(fetchOpenTabs);
 chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes.savedTabs) {
+        const tabs = changes.savedTabs.newValue.filter(tab => !(tab.temp === null));
         displaySavedTabs(changes.savedTabs.newValue);
     }
 });
@@ -925,7 +934,23 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
         });
     }
 });
-fetchOpenTabs();
-chrome.storage.local.get("savedTabs", (data) => {
-    displaySavedTabs(data.savedTabs || []);
+chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
+    let columnState = data.columnState || [];
+    const bgTabs = data.bgTabs || [];
+    let savedTabs = data.savedTabs || [];
+    const tabIds = bgTabs.map(tab => tab.id);
+
+    if (columnState.length === 0) {
+        columnState.push({ id: "defaultColumn", tabIds: [], title: "New Column" });
+    }
+    const firstColumn = columnState[0];
+    const formattedIds = tabIds.map(id => `tab-${id}`);
+    firstColumn.tabIds = firstColumn.tabIds.concat(formattedIds);
+    savedTabs = savedTabs.concat(bgTabs);
+    savedTabs.push({"temp": null});
+
+    chrome.storage.local.set({ columnState: columnState, bgTabs: [], savedTabs: savedTabs }, () => {
+        console.log("Migrated bgTabs");
+    });
 });
+fetchOpenTabs();
