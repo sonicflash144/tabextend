@@ -1,13 +1,38 @@
 document.getElementById("create-column").addEventListener("click", () => {
     createColumn("New Column");
     saveColumnState();
+    chrome.storage.local.get("savedTabs", (data) => {
+        displaySavedTabs(data.savedTabs || []);
+    });
 });
 document.getElementById("toggle-sidebar").addEventListener("click", toggleSidebar);
 let dropIndicator = null;
+let dropType = null;
+let deletionArea;
+let newColumnIndicator;
 let lastSelectedIndex = null;
 let activeOptionsMenu = null;
 let activeColorMenu = null;
 
+function createDeletionArea() {
+    deletionArea = document.createElement('div');
+    deletionArea.id = 'deletion-area';
+
+    // Create an img element for the SVG icon
+    const deleteIcon = document.createElement('img');
+    deleteIcon.src = '../icons/delete-icon.svg';
+    deleteIcon.alt = 'Delete Icon';
+    deleteIcon.classList.add('delete-icon');
+
+    // Append the img element to the deletionArea
+    deletionArea.appendChild(deleteIcon);
+
+    deletionArea.addEventListener('dragover', handleDragOver);
+    deletionArea.addEventListener('drop', handleDrop);
+    deletionArea.addEventListener('dragleave', handleDragLeave);
+    document.body.appendChild(deletionArea);
+}
+createDeletionArea();
 function closeAllMenus() {
     if (activeOptionsMenu) {
         activeOptionsMenu.remove();
@@ -54,6 +79,42 @@ function deleteTab(id) {
         });
     });
 }
+function saveTab(tabId) {
+    const tabIds = Array.isArray(tabId) ? tabId : [tabId];
+    const newTabs = [];
+
+    tabIds.forEach(id => {
+        const numericId = parseInt(id.replace('tab-', ''));
+        chrome.tabs.get(numericId, (tab) => {
+            const newTab = {
+                title: tab.title,
+                url: tab.url,
+                favIconUrl: tab.favIconUrl || '',
+                id: numericId,
+                color: '#FFFFFF'
+            };
+            newTabs.push(newTab);
+
+            if (newTabs.length === tabIds.length) {
+                chrome.storage.local.get("savedTabs", (data) => {
+                    const existingTabs = data.savedTabs || [];
+                    const updatedTabs = [...existingTabs, ...newTabs];
+                    chrome.storage.local.set({ savedTabs: updatedTabs }, () => {
+                        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                            let activeTab = tabs[0];
+                            
+                            // Close the specified tabs
+                            chrome.tabs.remove(tabIds.map(id => parseInt(id.replace('tab-', ''))), () => {
+                                // Optionally, you can ensure the focus remains on the active tab
+                                chrome.tabs.update(activeTab.id, { active: true });
+                            });
+                        });
+                    });
+                });
+            }
+        });
+    });
+}
 function saveTabNote(id, note) {
     chrome.storage.local.get("savedTabs", (data) => {
         const tabs = data.savedTabs || [];
@@ -77,18 +138,20 @@ function saveTabTitle(id, newTitle) {
 }
 
 function saveColumnState() {
-    const columns = document.querySelectorAll('.column');
-    const columnState = {};
+    const columnsContainer = document.getElementById('columns-container');
+    const columns = columnsContainer.querySelectorAll('.column');
+    const columnState = [];
 
     columns.forEach(column => {
         const columnId = column.id;
         const tabItems = column.querySelectorAll('.tab-item');
         const tabIds = Array.from(tabItems).map(tabItem => tabItem.id);
         const columnTitle = column.querySelector('.column-title-text').textContent;
-        columnState[columnId] = {
+        columnState.push({
+            id: columnId,
             tabIds: tabIds,
             title: columnTitle,
-        };
+        });
     });
 
     chrome.storage.local.set({ columnState }, () => {
@@ -146,14 +209,19 @@ function createColumn(title, id) {
             titleInput.style.display = "none";
             titleSpan.style.display = "inline";
         }
+        column.setAttribute("draggable", "true");
         saveColumnState();
     });
 
     // Event listener to switch to edit mode
     titleSpan.addEventListener("click", () => {
+        column.setAttribute("draggable", "false");
+        titleInput.value = titleSpan.textContent;
         titleInput.style.display = "inline";
         titleSpan.style.display = "none";
         titleInput.focus();
+        const length = titleInput.value.length;
+        titleInput.setSelectionRange(length, length);
     });
 
     // Append open all button, title, and delete button to the header container
@@ -168,7 +236,10 @@ function createColumn(title, id) {
     return column;
 }
 function deleteColumn(event) {
-    const column = event.target.closest(".column");
+    let column = event;
+    if(event instanceof Event){
+        column = event.target.closest(".column");
+    }
     const tabItems = column.querySelectorAll('.tab-item');
     const tabIds = Array.from(tabItems).map(tabItem => tabItem.id);
     deleteTab(tabIds.map(id => parseInt(id.replace('tab-', ''))));
@@ -185,51 +256,15 @@ function openAllInColumn(event) {
     });
 }
 
-function saveTab(tabId) {
-    const tabIds = Array.isArray(tabId) ? tabId : [tabId];
-    const newTabs = [];
-
-    tabIds.forEach(id => {
-        const numericId = parseInt(id.replace('tab-', ''));
-        chrome.tabs.get(numericId, (tab) => {
-            const newTab = {
-                title: tab.title,
-                url: tab.url,
-                favIconUrl: tab.favIconUrl || '',
-                id: numericId,
-                color: '#FFFFFF'
-            };
-            newTabs.push(newTab);
-
-            if (newTabs.length === tabIds.length) {
-                chrome.storage.local.get("savedTabs", (data) => {
-                    const existingTabs = data.savedTabs || [];
-                    const updatedTabs = [...existingTabs, ...newTabs];
-                    chrome.storage.local.set({ savedTabs: updatedTabs }, () => {
-                        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                            let activeTab = tabs[0];
-                            
-                            // Close the specified tabs
-                            chrome.tabs.remove(tabIds.map(id => parseInt(id.replace('tab-', ''))), () => {
-                                // Optionally, you can ensure the focus remains on the active tab
-                                chrome.tabs.update(activeTab.id, { active: true });
-                            });
-                        });
-                    });
-                });
-            }
-        });
-    });
-}
+/* Tab Drag and Drop */
 function handleDragStart(event) {
-    if (event.target.closest('.drag-handle')) {
-        const tabItem = event.target.closest('.tab-item');
-        event.dataTransfer.setData("text/plain", tabItem.id);
-        event.dataTransfer.setDragImage(tabItem, 0, 0);
-        tabItem.classList.add("dragging");
-    } else {
-        event.preventDefault();
-    }
+    event.stopPropagation();
+    const tabItem = event.target.closest('.tab-item');
+    if(!tabItem) return;
+    event.dataTransfer.setData("text/plain", tabItem.id);
+    event.dataTransfer.setDragImage(tabItem, 0, 0);
+    dropType = "list-item";
+    tabItem.classList.add("dragging");
 }
 function handleDragEnd(event) {
     event.target.closest('.tab-item').classList.remove("dragging");
@@ -248,87 +283,204 @@ function calculateDropPosition(event, tabItems) {
     }
     return dropPosition;
 }
+function handleDragLeave(event) {
+    if (!deletionArea.contains(event.relatedTarget)) {
+        deletionArea.classList.remove('deletion-area-active');
+    }
+    if (!newColumnIndicator.contains(event.relatedTarget)) {
+        newColumnIndicator.classList.remove('new-column-indicator-active');
+    }
+}
 function handleDragOver(event) {
     event.preventDefault();
+
+    newColumnIndicator.style.display = 'flex';
+    deletionArea.style.display = 'flex';
+    if(event.target === deletionArea) {
+        deletionArea.classList.add('deletion-area-active');
+        dropIndicator.style.display = 'none';
+        event.dataTransfer.dropEffect = 'move';
+        return;
+    }
+    else if(event.target === newColumnIndicator) {
+        newColumnIndicator.classList.add('new-column-indicator-active');
+        dropIndicator.style.display = 'none';
+        event.dataTransfer.dropEffect = 'move';
+        return;
+    }
     const column = event.target.closest('.column') || event.target.closest('#open-tabs-list');
-    if (!column) return;
-
-    const rect = column.getBoundingClientRect();
-    const tabItems = Array.from(column.querySelectorAll('.tab-item'));
-
+    const columnsContainer = document.getElementById('columns-container');
+    
     if (!dropIndicator) {
         dropIndicator = document.createElement('div');
         dropIndicator.className = 'drop-indicator';
         document.body.appendChild(dropIndicator);
     }
+    
+    if (dropType === "list-item" && column) {
+        // Handle list item drag over
+        const rect = column.getBoundingClientRect();
+        const listItems = Array.from(column.querySelectorAll('.tab-item'));
+        const dropPosition = calculateDropPosition(event, listItems);
 
-    dropIndicator.style.width = `${rect.width}px`;
-    dropIndicator.style.left = `${rect.left}px`;
+        dropIndicator.style.width = `${rect.width}px`;
+        dropIndicator.style.height = '2px';
+        dropIndicator.style.left = `${rect.left}px`;
 
-    const dropPosition = calculateDropPosition(event, tabItems);
-
-    if (dropPosition === tabItems.length) {
-        if (tabItems.length > 0) {
-            const lastTabRect = tabItems[tabItems.length - 1].getBoundingClientRect();
-            dropIndicator.style.top = `${lastTabRect.bottom}px`;
+        if (dropPosition === listItems.length) {
+            const lastItem = listItems[listItems.length - 1];
+            dropIndicator.style.top = lastItem ? `${lastItem.getBoundingClientRect().bottom}px` : `${rect.top}px`;
         } else {
-            dropIndicator.style.top = `${rect.bottom}px`;
+            dropIndicator.style.top = `${listItems[dropPosition].getBoundingClientRect().top}px`;
         }
-    } else {
-        dropIndicator.style.top = `${tabItems[dropPosition].getBoundingClientRect().top}px`;
-    }
+    } 
+    else if (dropType === "column" && columnsContainer) {
+        // Handle column drag over
+        const rect = columnsContainer.getBoundingClientRect();
+        const columns = Array.from(columnsContainer.querySelectorAll('.column'));
+        const dropPosition = calculateColumnDropPosition(event, columns);
 
+        dropIndicator.style.width = '2px';
+        dropIndicator.style.height = `${rect.height}px`;
+        dropIndicator.style.top = `${rect.top}px`;
+
+        if (dropPosition === columns.length) {
+            const lastColumn = columns[columns.length - 1];
+            dropIndicator.style.left = lastColumn ? `${lastColumn.getBoundingClientRect().right}px` : `${rect.left}px`;
+        } else {
+            const targetColumn = columns[dropPosition];
+            const targetRect = targetColumn.getBoundingClientRect();
+            dropIndicator.style.left = `${targetRect.left}px`;
+        }
+        newColumnIndicator.style.display = 'none';
+    } 
     dropIndicator.style.display = 'block';
     event.dataTransfer.dropEffect = 'move';
 }
 function handleDrop(event) {
     event.preventDefault();
+    
+    // Check if it's a column drop
+    const columnsContainer = document.getElementById('columns-container');
+    const columnDropData = event.dataTransfer.getData("text/plain");
+    const droppedColumn = document.getElementById(columnDropData);
+
+    if (droppedColumn && droppedColumn.classList.contains('column')) {
+        if(event.target === deletionArea) {
+            deleteColumn(droppedColumn);
+            deletionArea.style.display = 'none';
+            return;
+        }
+        else if(event.target === newColumnIndicator){
+
+        }
+        // Handle column drop
+        const columns = Array.from(columnsContainer.querySelectorAll('.column'));
+        const dropPosition = calculateColumnDropPosition(event, columns);
+
+        if (dropPosition === columns.length) {
+            columnsContainer.appendChild(droppedColumn);
+        } else {
+            columnsContainer.insertBefore(droppedColumn, columns[dropPosition]);
+        }
+
+        if (dropIndicator) dropIndicator.style.display = 'none';
+        if (newColumnIndicator) newColumnIndicator.style.display = 'none';
+
+        saveColumnState();
+        return; // Exit since we handled a column drop
+    }
+
+    // Continue with tab drop logic
     const column = event.target.closest('.column') || event.target.closest('#open-tabs-list');
-    if (!column) return;
+    if (!column && event.target !== deletionArea && event.target !== newColumnIndicator) {
+        return;
+    }
 
     let tabId = event.dataTransfer.getData("text/plain");
     const tabItem = document.getElementById(tabId);
+    if (!tabItem || !tabItem.classList.contains('tab-item')) return;
+
+    // Hide deletion area after drop
+    deletionArea.style.display = 'none';
+    deletionArea.classList.remove('deletion-area-active');
 
     // Check if the dragged item is selected and if there are multiple selected items
     const selectedItems = document.querySelectorAll('.selected');
     const isDraggedItemSelected = tabItem.classList.contains('selected');
     const itemsToProcess = isDraggedItemSelected && selectedItems.length > 1 ? selectedItems : [tabItem];
-    let tabItems = Array.from(column.querySelectorAll('.tab-item'));
-    let dropPosition = calculateDropPosition(event, tabItems);
-    
+
+    const tabIdsToDelete = [];
     const itemIdsToSave = [];
     const itemsToInsert = [];
-    
+
+    if(event.target === deletionArea) {
+        itemsToProcess.forEach(item => {
+            const itemId = item.id;
+            if (itemId.startsWith('tab-')) {
+                tabIdsToDelete.push(parseInt(itemId.replace('tab-', '')));
+            }
+            else if (itemId.startsWith('opentab')) {
+                chrome.tabs.remove(parseInt(itemId.replace('opentab-', '')), () => {
+                    console.log('Tab closed:', itemId);
+                });
+            }
+            item.parentNode.removeChild(item);
+        });
+        deleteTab(tabIdsToDelete);
+        saveColumnState();
+        return;
+    }
+    else if(event.target === newColumnIndicator) {
+        newColumnIndicator.style.display = 'none';
+        const newColumn = createColumn("New Column");
+        itemsToProcess.forEach(item => {
+            if(item.id.startsWith('opentab-')) {
+                itemIdsToSave.push(item.id.replace('opentab-', ''));
+            }
+            newColumn.appendChild(item);
+        });
+        if(itemIdsToSave.length > 0) {
+            saveTab(itemIdsToSave);
+        }
+        saveColumnState();
+        return;
+    }
+
+    let tabItems = Array.from(column.querySelectorAll('.tab-item'));
+    let dropPosition = calculateDropPosition(event, tabItems);
+
     itemsToProcess.forEach(item => {
         tabItems = Array.from(column.querySelectorAll('.tab-item'));
         let itemId = item.id;
-    
+
         if (column.id !== 'open-tabs-list' && itemId.startsWith('opentab')) {
             itemId = itemId.replace('opentab-', 'tab-');
             item.id = itemId;
             itemIdsToSave.push(itemId);
         }
-    
+
         if (column.id === 'open-tabs-list' && itemId.startsWith('tab')) {
-            window.open(item.querySelector('a').href, '_blank');
-            deleteTab(parseInt(itemId.replace('tab-', '')));
+            window.open(item.dataset.url, '_blank');
+            tabIdsToDelete.push(parseInt(itemId.replace('tab-', '')));
         }
-    
+
         itemsToInsert.push({ item, dropPosition });
-    
+
         if (column.id === 'open-tabs-list') {
             chrome.tabs.move(parseInt(itemId.split('-')[1]), { index: dropPosition }, () => {
                 console.log('Tab moved:', itemId, 'to index:', dropPosition);
             });
         }
-        dropPosition++;
     });
-    
-    // Save all tabs at once
+
     if (itemIdsToSave.length > 0) {
         saveTab(itemIdsToSave);
     }
-    
+    if (tabIdsToDelete.length > 0) {
+        deleteTab(tabIdsToDelete);
+    }
+
     // Insert all items into the column at once
     itemsToInsert.forEach(({ item, dropPosition }) => {
         if (dropPosition === tabItems.length) {
@@ -338,25 +490,62 @@ function handleDrop(event) {
         }
     });
 
-    if (dropIndicator) {
-        dropIndicator.style.display = 'none';
-    }
+    if (dropIndicator) dropIndicator.style.display = 'none';
+    if (newColumnIndicator) newColumnIndicator.style.display = 'none';
 
     saveColumnState();
 }
+
+/* Column Drag and Drop */
+function handleColumnDragStart(event) {
+    if (event.target.closest('.tab-item')) {
+        event.preventDefault();
+        return;
+    }
+    const column = event.target.closest('.column');
+    if(!column) return;
+    event.dataTransfer.setData("text/plain", column.id);
+    event.dataTransfer.setDragImage(column, 0, 0);
+    dropType = "column";
+    column.classList.add("dragging");
+}
+function handleColumnDragEnd(event) {
+    event.target.closest('.column').classList.remove("dragging");
+    if (dropIndicator) {
+        dropIndicator.style.display = 'none';
+    }
+}
+function calculateColumnDropPosition(event, columns) {
+    let dropPosition = columns.length;
+    for (let i = 0; i < columns.length; i++) {
+        const columnRect = columns[i].getBoundingClientRect();
+        if (event.clientX < columnRect.left + columnRect.width / 2) {
+            dropPosition = i;
+            break;
+        }
+    }
+    return dropPosition;
+}
+
+/* Tab Display */
 function displaySavedTabs(tabs) {
     const columnsContainer = document.getElementById("columns-container");
+    columnsContainer.addEventListener('dragover', handleDragOver);
+    columnsContainer.addEventListener('drop', handleDrop);
     columnsContainer.innerHTML = "";
 
     chrome.storage.local.get('columnState', (result) => {
-        const columnState = result.columnState || {};
-        if(Object.keys(columnState).length === 0) {
+        const columnState = result.columnState || [];
+        if(columnState.length === 0) {
             createColumn("New Column");
         } else {
             console.log(columnState);
-            for(const columnId in columnState){
-                const column = createColumn(columnState[columnId].title, columnId);
-                columnState[columnId].tabIds.forEach(tabId => {
+            columnState.forEach(columnData => {
+                const column = createColumn(columnData.title, columnData.id);
+                column.setAttribute('draggable', 'true');
+                column.addEventListener('dragstart', handleColumnDragStart);
+                column.addEventListener('dragend', handleColumnDragEnd);
+                columnData.tabIds.forEach(tabId => {
                     const tab = tabs.find(t => `${t.id}` === tabId.split('-')[1]);
                     if(tab){
                         const li = document.createElement("li");
@@ -365,16 +554,10 @@ function displaySavedTabs(tabs) {
                         li.style.backgroundColor = tab.color; 
                         li.classList.add("tab-item");
                         li.dataset.url = tab.url;
-                
-                        const dragHandle = document.createElement("div");
-                        dragHandle.classList.add("drag-handle");
-                        dragHandle.innerHTML = `<img src="../icons/drag.svg" width="24" height="24" class="main-grid-item-icon" />`;
                         
                         li.draggable = true;
                         li.addEventListener("dragstart", handleDragStart);
                         li.addEventListener("dragend", handleDragEnd);
-                
-                        li.appendChild(dragHandle);
                 
                         li.innerHTML += `
                             <div class="tab-info-container">
@@ -382,10 +565,8 @@ function displaySavedTabs(tabs) {
                                     <img src="${tab.favIconUrl}" width="24" height="24">
                                 </div>
                                 <div class="tab-info-right">
-                                    <a href="${tab.url}" target="_self">
-                                        <span class="tab-title-display" id="title-display-${tab.id}">${tab.title}</span>
-                                        <input type="text" class="tab-title-input hidden" id="title-input-${tab.id}" value="${tab.title}">
-                                    </a>
+                                    <span class="tab-title" data-url="${tab.url}" id="title-display-${tab.id}">${tab.title}</span>
+                                    <input type="text" class="hidden" id="title-input-${tab.id}" value="${tab.title}">
                                     <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note || ''}</div>
                                     <textarea class="tab-note hidden" id="note-input-${tab.id}" rows="1">${tab.note || ''}</textarea>
                                 </div>
@@ -398,6 +579,52 @@ function displaySavedTabs(tabs) {
                         `;
                         
                         column.appendChild(li);
+
+                        const favicon = li.querySelector(".tab-info-left");
+                        favicon.addEventListener("click", (event) => {
+                            event.stopPropagation();
+                            const selectedItems = document.querySelectorAll('.selected');
+                            const allItems = Array.from(document.querySelectorAll('li'));
+                            const currentIndex = allItems.indexOf(li);
+                        
+                            if (event.ctrlKey || event.metaKey) {
+                                // Toggle selection with Ctrl/Cmd click
+                                li.classList.toggle('selected');
+                            } else if (event.shiftKey && lastSelectedIndex !== null) {
+                                // Select range with Shift click
+                                const start = Math.min(lastSelectedIndex, currentIndex);
+                                const end = Math.max(lastSelectedIndex, currentIndex);
+                                for (let i = start; i <= end; i++) {
+                                    allItems[i].classList.add('selected');
+                                }
+                            } else {
+                                // Single selection
+                                if (selectedItems.length === 1 && selectedItems[0] === li) {
+                                    // Clear selection if the only selected item is clicked again
+                                    li.classList.remove('selected');
+                                } else {
+                                    selectedItems.forEach(item => item.classList.remove('selected'));
+                                    li.classList.add('selected');
+                                }
+                            }
+                        
+                            lastSelectedIndex = currentIndex;
+                        });
+
+                        const tabLink = li.querySelector('.tab-title');
+                        tabLink.addEventListener('click', () => {
+                            window.location.href = tabLink.dataset.url;
+                        });
+            
+                        // Add event listener to the document to detect clicks outside of the li elements
+                        document.addEventListener('click', (event) => {
+                            const allItems = Array.from(document.querySelectorAll('li'));
+                            const isClickInside = allItems.some(item => item.contains(event.target));
+            
+                            if (!isClickInside) {
+                                allItems.forEach(item => item.classList.remove('selected'));
+                            }
+                        });
                         
                         const moreOptionsButton = li.querySelector('.more-options');
                         moreOptionsButton.addEventListener('click', (event) => {
@@ -475,6 +702,7 @@ function displaySavedTabs(tabs) {
                             // Rename Tab option
                             const renameTabOption = optionsMenu.querySelector('.rename-tab');
                             renameTabOption.addEventListener('click', () => {
+                                li.removeEventListener('dragstart', handleDragStart);
                                 const titleDisplay = li.querySelector(`#title-display-${tab.id}`);
                                 const titleInput = li.querySelector(`#title-input-${tab.id}`);
                                 
@@ -497,11 +725,13 @@ function displaySavedTabs(tabs) {
                                 titleDisplay.textContent = newTitle;
                                 titleInput.classList.add("hidden");
                                 titleDisplay.classList.remove("hidden");
+                                li.addEventListener('dragstart', handleDragStart);
                             });
 
                             // Add Note option
                             const editTabOption = optionsMenu.querySelector('.add-note');
                             editTabOption.addEventListener('click', () => {
+                                li.removeEventListener('dragstart', handleDragStart);
                                 const noteDisplay = li.querySelector(`#note-display-${tab.id}`);
                                 const noteInput = li.querySelector(`#note-input-${tab.id}`);
                                 
@@ -527,6 +757,7 @@ function displaySavedTabs(tabs) {
                         const noteInput = li.querySelector(`#note-input-${tab.id}`);
                         
                         noteDisplay.addEventListener("click", function () {
+                            li.removeEventListener('dragstart', handleDragStart);
                             if (noteInput.classList.contains("hidden")) {
                                 noteInput.classList.remove("hidden");
                                 noteDisplay.classList.add("hidden");
@@ -543,11 +774,20 @@ function displaySavedTabs(tabs) {
                             noteDisplay.textContent = note || '';
                             noteInput.classList.add("hidden");
                             noteDisplay.classList.remove("hidden");
+                            li.addEventListener('dragstart', handleDragStart);
                         });
                     }
                 });
-            }
+            });
         }
+        newColumnIndicator = document.createElement('div');
+        newColumnIndicator.classList.add('new-column-indicator');
+        const img = document.createElement('img');
+        img.src = '../icons/newcolumn.svg';
+        img.classList.add('new-column-icon');
+        newColumnIndicator.appendChild(img);
+        newColumnIndicator.addEventListener('dragleave', handleDragLeave);
+        columnsContainer.appendChild(newColumnIndicator);
     });
 }
 function fetchOpenTabs() {
@@ -562,24 +802,28 @@ function fetchOpenTabs() {
 
         tabs.forEach((tab, index) => {
             const li = document.createElement("li");
-            const dragHandle = document.createElement("div");
-            dragHandle.classList.add("drag-handle");
-            
-            dragHandle.innerHTML = `<img src="../icons/drag.svg" width="24" height="24" class="main-grid-item-icon" />`;
-            
-            li.draggable = true;
             li.style.userSelect = "none";
+            li.draggable = true;
             li.addEventListener("dragstart", handleDragStart);
             li.addEventListener("dragend", handleDragEnd);
             li.id = `opentab-${tab.id}`;
             li.classList.add("tab-item");
 
-            li.appendChild(dragHandle);
-
-            const closeButton = document.createElement("img");
-            closeButton.src = "../icons/close.svg";
-            closeButton.alt = "Close";
-            closeButton.classList.add("close-button");                
+            li.innerHTML += `
+                <div class="tab-info-container">
+                    <div class="tab-info-left">
+                        <img src="${tab.favIconUrl}" width="24" height="24">
+                    </div>
+                    <div class="tab-info-right">
+                        <span class="tab-title">${tab.title}</span>
+                    </div>
+                    <div class="tab-actions">
+                        <img src="../icons/close.svg" alt="Close" class="close-button">
+                    </div>
+                </div>
+            `;
+            
+            const closeButton = li.querySelector(".close-button");
             closeButton.addEventListener("click", () => {
                 chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                     let activeTab = tabs[0];
@@ -592,22 +836,12 @@ function fetchOpenTabs() {
                 });
             });
 
-            li.innerHTML += `
-                <div style="display: flex; align-items: center;">
-                    <div style="flex-grow: 1; display: flex; align-items: center;">
-                        <img src="${tab.favIconUrl || ''}" width="16" height="16"> ${tab.title}
-                    </div>
-                    <div style="width: 5%; display: flex; align-items: center; justify-content: center;">
-                    </div>
-                </div>
-            `;
-
-            li.querySelector("div > div:last-child").appendChild(closeButton);
-
             li.setAttribute("data-tab-id", tab.id);
             li.setAttribute("data-index", index);
-            
-            li.addEventListener("click", (event) => {
+
+            const favicon = li.querySelector(".tab-info-left");
+            favicon.addEventListener("click", (event) => {
+                event.stopPropagation();
                 const selectedItems = document.querySelectorAll('.selected');
                 const allItems = Array.from(document.querySelectorAll('li'));
                 const currentIndex = allItems.indexOf(li);
@@ -647,7 +881,11 @@ function fetchOpenTabs() {
             });
 
             // Add click event listener to switch to the tab
-            li.addEventListener("dblclick", () => {
+            const tabTitle = li.querySelector(".tab-title");
+            tabTitle.addEventListener("click", () => {
+                const allItems = document.querySelectorAll('li');
+                allItems.forEach(item => item.classList.remove('selected'));
+
                 chrome.tabs.update(tab.id, { active: true });
             });
 
@@ -668,17 +906,17 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes.bgTabs) {
         chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
-            let columnState = data.columnState || {};
+            let columnState = data.columnState || [];
             const bgTabs = data.bgTabs || [];
             let savedTabs = data.savedTabs || [];
             const tabIds = bgTabs.map(tab => tab.id);
 
-            if (Object.keys(columnState).length === 0) {
-                columnState["defaultColumn"] = { tabIds: [], title: "New Column" };
+            if (columnState.length === 0) {
+                columnState.push({ id: "defaultColumn", tabIds: [], title: "New Column" });
             }
-            const firstColumnId = Object.keys(columnState)[0];
+            const firstColumn = columnState[0];
             const formattedIds = tabIds.map(id => `tab-${id}`);
-            columnState[firstColumnId].tabIds = columnState[firstColumnId].tabIds.concat(formattedIds);
+            firstColumn.tabIds = firstColumn.tabIds.concat(formattedIds);
             savedTabs = savedTabs.concat(bgTabs);
 
             chrome.storage.local.set({ columnState: columnState, bgTabs: [], savedTabs: savedTabs }, () => {
@@ -687,7 +925,6 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
         });
     }
 });
-
 fetchOpenTabs();
 chrome.storage.local.get("savedTabs", (data) => {
     displaySavedTabs(data.savedTabs || []);
