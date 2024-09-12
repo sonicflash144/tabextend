@@ -233,6 +233,13 @@ function createColumn(title, id) {
     // Append header container to the column
     column.appendChild(headerContainer);
     columnsContainer.appendChild(column);
+
+    // Ensure 'new-column-indicator' remains the last child
+    const newColumnIndicator = columnsContainer.querySelector('.new-column-indicator');
+    if (newColumnIndicator) {
+        columnsContainer.appendChild(newColumnIndicator);
+    }
+    
     return column;
 }
 function deleteColumn(event) {
@@ -259,6 +266,7 @@ function openAllInColumn(event) {
 /* Tab Drag and Drop */
 function handleDragStart(event) {
     event.stopPropagation();
+    closeAllMenus();
     const tabItem = event.target.closest('.tab-item');
     if(!tabItem) return;
     event.dataTransfer.setData("text/plain", tabItem.id);
@@ -382,6 +390,7 @@ function handleDrop(event) {
         }
         deletionArea.style.display = 'none';
         deletionArea.classList.remove('deletion-area-active');
+
         // Handle column drop
         const columns = Array.from(columnsContainer.querySelectorAll('.column'));
         const dropPosition = calculateColumnDropPosition(event, columns);
@@ -390,6 +399,11 @@ function handleDrop(event) {
             columnsContainer.appendChild(droppedColumn);
         } else {
             columnsContainer.insertBefore(droppedColumn, columns[dropPosition]);
+        }
+        // Ensure 'new-column-indicator' remains the last child
+        const newColumnIndicator = columnsContainer.querySelector('.new-column-indicator');
+        if (newColumnIndicator) {
+            columnsContainer.appendChild(newColumnIndicator);
         }
 
         if (dropIndicator) dropIndicator.style.display = 'none';
@@ -506,6 +520,7 @@ function handleDrop(event) {
 
 /* Column Drag and Drop */
 function handleColumnDragStart(event) {
+    closeAllMenus();
     if (event.target.closest('.tab-item')) {
         event.preventDefault();
         return;
@@ -908,8 +923,8 @@ chrome.tabs.onUpdated.addListener(fetchOpenTabs);
 chrome.tabs.onRemoved.addListener(fetchOpenTabs);
 chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes.savedTabs) {
-        const tabs = changes.savedTabs.newValue.filter(tab => !(tab.temp === null));
-        displaySavedTabs(changes.savedTabs.newValue);
+        const tabs = changes.savedTabs.newValue.filter(tab => !('temp' in tab));
+        displaySavedTabs(tabs);
     }
 });
 chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -934,6 +949,8 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
         });
     }
 });
+
+fetchOpenTabs();
 chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
     let columnState = data.columnState || [];
     const bgTabs = data.bgTabs || [];
@@ -947,10 +964,10 @@ chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
     const formattedIds = tabIds.map(id => `tab-${id}`);
     firstColumn.tabIds = firstColumn.tabIds.concat(formattedIds);
     savedTabs = savedTabs.concat(bgTabs);
-    savedTabs.push({"temp": null});
+    savedTabs = savedTabs.filter(tab => !('temp' in tab));
+    savedTabs.push({"temp": Date.now()});
 
     chrome.storage.local.set({ columnState: columnState, bgTabs: [], savedTabs: savedTabs }, () => {
         console.log("Migrated bgTabs");
     });
 });
-fetchOpenTabs();
