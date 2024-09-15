@@ -1,10 +1,3 @@
-document.getElementById("create-column").addEventListener("click", () => {
-    createColumn("New Column");
-    saveColumnState();
-    chrome.storage.local.get("savedTabs", (data) => {
-        displaySavedTabs(data.savedTabs || []);
-    });
-});
 document.getElementById("toggle-sidebar").addEventListener("click", toggleSidebar);
 let dropIndicator = null;
 let dropType = null;
