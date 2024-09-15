@@ -1,4 +1,3 @@
-document.getElementById("toggle-sidebar").addEventListener("click", toggleSidebar);
 let dropIndicator = null;
 let dropType = null;
 let deletionArea;
@@ -35,11 +34,6 @@ function closeAllMenus() {
         activeColorMenu.remove();
         activeColorMenu = null;
     }
-}
-function toggleSidebar() {
-    const sidebar = document.getElementById("sidebar");
-    const isCollapsed = sidebar.classList.toggle("collapsed");
-    chrome.storage.local.set({ sidebarCollapsed: isCollapsed });
 }
 function applySidebarState() {
     chrome.storage.local.get("sidebarCollapsed", (data) => {
