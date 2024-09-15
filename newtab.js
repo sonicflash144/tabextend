@@ -804,6 +804,10 @@ function fetchOpenTabs() {
     chrome.tabs.query({ currentWindow: true }, (tabs) => {
         tabs = tabs.filter(tab => 
             !tab.url.startsWith("chrome://") && 
+            !tab.url.startsWith("edge://") &&
+            !tab.url.startsWith("opera://") &&
+            !tab.url.startsWith("vivaldi://") &&
+            !tab.url.startsWith("brave://") &&
             !tab.url.startsWith("about:") && 
             !tab.url.startsWith("file://")
         );
