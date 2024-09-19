@@ -211,6 +211,13 @@ function createColumn(title, id) {
         titleInput.setSelectionRange(length, length);
     });
 
+    // Event listener to save on Enter key press
+    titleInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            titleInput.blur();
+        }
+    });
+
     // Append open all button, title, and delete button to the header container
     headerContainer.appendChild(openAllButton);
     headerContainer.appendChild(titleInput);
@@ -695,8 +702,7 @@ function displaySavedTabs(tabs) {
                                         chrome.storage.local.set({ savedTabs: tabs }, () => {
                                             console.log('Tab color saved:', tab.id, tab.color);
                                         });
-                                        colorMenu.remove();
-                                        optionsMenu.remove();
+                                        closeAllMenus();
                                         document.removeEventListener('click', handleClickOutside);
                                     });
                                     colorMenu.appendChild(colorOption);
@@ -722,8 +728,17 @@ function displaySavedTabs(tabs) {
                                 
                                 const length = titleInput.value.length;
                                 titleInput.setSelectionRange(length, length);
+
+                                titleInput.addEventListener('keydown', function handleKeydown(event) {
+                                    if (event.key === 'Enter') {
+                                        titleDisplay.textContent = titleInput.value;
+                                        titleInput.classList.add("hidden");
+                                        titleDisplay.classList.remove("hidden");
+                                        titleInput.removeEventListener('keydown', handleKeydown);
+                                    }
+                                });
                                 
-                                optionsMenu.remove();
+                                closeAllMenus();
                             });
 
                             const titleDisplay = li.querySelector(`#title-display-${tab.id}`);
@@ -752,14 +767,14 @@ function displaySavedTabs(tabs) {
                                 const length = noteInput.value.length;
                                 noteInput.setSelectionRange(length, length);
                                 
-                                optionsMenu.remove();
+                                closeAllMenus();
                             });
                         
                             // Delete Tab option
                             const deleteTabOption = optionsMenu.querySelector('.delete-tab');
                             deleteTabOption.addEventListener('click', () => {
                                 deleteTab(tab.id);
-                                optionsMenu.remove();
+                                closeAllMenus();
                             });
                         });
                         
@@ -785,6 +800,12 @@ function displaySavedTabs(tabs) {
                             noteInput.classList.add("hidden");
                             noteDisplay.classList.remove("hidden");
                             li.addEventListener('dragstart', handleDragStart);
+                        });
+
+                        noteInput.addEventListener("keydown", function (event) {
+                            if (event.key === "Enter") {
+                                noteInput.blur();
+                            }
                         });
                     }
                 });
