@@ -43,7 +43,7 @@ h1, h2 {
 }
 
 #sidebar {
-    width: 400px;
+    width: 20vw;
     background-color: #f0f0f0;
     padding: 20px;
     border-right: 1px solid #ddd;
@@ -198,8 +198,8 @@ h1, h2 {
     border: 1px solid #ccc;
     border-radius: 5px;
     padding: 10px;
-    width: 400px;
-    min-height: 400px;
+    width: 20vw;
+    min-height: 20vw;
     background-color: #f0f0f0;
     flex-shrink: 0;
 }
@@ -294,8 +294,8 @@ h1, h2 {
 
 .new-column-indicator {
     background-color: rgba(0, 255, 0, 0.3);
-    width: 400px;
-    min-height: 400px;
+    width: 20vw;
+    min-height: 20vw;
     display: none;
     justify-content: center;
     align-items: center;
