@@ -6,6 +6,11 @@ let lastSelectedIndex = null;
 let activeOptionsMenu = null;
 let activeColorMenu = null;
 
+document.getElementById("add-column").addEventListener("click", () => {
+    createColumn("New Column");
+    saveColumnState();
+});
+
 function createDeletionArea() {
     deletionArea = document.createElement('div');
     deletionArea.id = 'deletion-area';

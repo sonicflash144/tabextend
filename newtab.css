@@ -1,15 +1,11 @@
 body {
-    display: flex;
     font-family: 'Roboto';
     padding: 0;
     margin: 0;
-    overflow-x: auto;
-    -ms-overflow-style: none;
+    display: flex;
+    overflow: auto;
+    box-sizing: border-box;
 }
-    body::-webkit-scrollbar {
-        display: none;
-    }
-    
 h1, h2 {
     text-align: center;
 }
@@ -62,7 +58,7 @@ h1, h2 {
         width: 100%;
     }
 
-#open-tabs-list, #column {
+#open-tabs-list {
     list-style-type: none;
     padding: 0;
     height: 100%;
@@ -189,6 +185,15 @@ h1, h2 {
     align-items: center;
     height: 50px;
 }
+#space-container {
+    display: flex;
+    justify-content: flex-start;
+}
+    #space-div {
+        flex-shrink: 0;
+        width: 10px;
+        height: 8px;
+    }
 
 #columns-container {
     display: flex;
@@ -202,6 +207,9 @@ h1, h2 {
     min-height: 20vw;
     background-color: #f0f0f0;
     flex-shrink: 0;
+    margin-right: 10px;
+    list-style-type: none;
+    height: 100%;
 }
     .column-title {
         width: 50%;
