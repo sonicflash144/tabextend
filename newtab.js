@@ -5,10 +5,12 @@ let newColumnIndicator;
 let lastSelectedIndex = null;
 let activeOptionsMenu = null;
 let activeColorMenu = null;
+let tabs_in_storage = [];
 
 document.getElementById("add-column").addEventListener("click", () => {
     createColumn("New Column");
     saveColumnState();
+    displaySavedTabs(tabs_in_storage);
 });
 
 function createDeletionArea() {
@@ -940,8 +942,8 @@ chrome.tabs.onUpdated.addListener(fetchOpenTabs);
 chrome.tabs.onRemoved.addListener(fetchOpenTabs);
 chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes.savedTabs) {
-        const tabs = changes.savedTabs.newValue.filter(tab => !('temp' in tab));
-        displaySavedTabs(tabs);
+        tabs_in_storage = changes.savedTabs.newValue.filter(tab => !('temp' in tab));
+        displaySavedTabs(tabs_in_storage);
     }
 });
 chrome.storage.onChanged.addListener((changes, areaName) => {
