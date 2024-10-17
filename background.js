@@ -7,6 +7,10 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+chrome.action.onClicked.addListener((tab) => {
+  chrome.tabs.create({ url: "newtab.html" });
+});
+
 // Listen for the context menu item click event
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "saveTab") {
