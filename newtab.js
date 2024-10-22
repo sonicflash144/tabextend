@@ -131,10 +131,26 @@ function parseAndFormatDate(note) {
     const chrono = new Chrono();
     const parsedDate = chrono.parseDate(note);
     if (parsedDate) {
-        const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
-        const day = String(parsedDate.getDate()).padStart(2, '0');
-        const year = parsedDate.getFullYear();
-        return `${month}/${day}/${year}`;
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+
+        const diffTime = parsedDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) {
+            return 'Today';
+        } else if (diffDays === 1) {
+            return 'Tomorrow';
+        } else if (diffDays >= 2 && diffDays <= 7) {
+            const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            return weekdayNames[parsedDate.getDay()];
+        } else {
+            const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+            const day = String(parsedDate.getDate()).padStart(2, '0');
+            const year = String(parsedDate.getFullYear()).slice(-2);
+            return `${month}/${day}/${year}`;
+        }
     }
     return null;
 }
@@ -620,6 +636,14 @@ function displaySavedTabs(tabs) {
                                 </div>
                             </div>
                         `;
+                        const dateDisplay = li.querySelector(`#date-display-${tab.id}`);
+                        if (tab.formattedDate === 'Today') {
+                            dateDisplay.style.color = 'green';
+                        } else if (tab.formattedDate === 'Tomorrow') {
+                            dateDisplay.style.color = "#C76E00";
+                        } else {
+                            dateDisplay.style.color = 'grey';
+                        }
                         
                         column.appendChild(li);
 
@@ -684,9 +708,11 @@ function displaySavedTabs(tabs) {
                             const optionsMenu = document.createElement('div');
                             optionsMenu.className = 'options-menu';
                             optionsMenu.dataset.tabId = tab.id.toString();
+                            // Determine whether to show "Add Note" or "Edit Note" based on the note content
+                            const noteButtonText = tab.note && tab.note.trim() !== '' ? 'Edit Note' : 'Add Note';
                             optionsMenu.innerHTML = `
                                 <button class="menu-option rename-tab" data-index="${tab.id}">Rename</button>
-                                <button class="menu-option add-note" data-index="${tab.id}">Add Note</button>
+                                <button class="menu-option add-note" data-index="${tab.id}">${noteButtonText}</button>
                                 <button class="menu-option color-tab" data-index="${tab.id}">Color</button>
                                 <button class="menu-option delete-tab" data-index="${tab.id}">Delete</button>
                             `;
@@ -826,11 +852,6 @@ function displaySavedTabs(tabs) {
                             noteInput.classList.add("hidden");
                             noteDisplay.classList.remove("hidden");
                             li.addEventListener('dragstart', handleDragStart);
-
-                            // Update the date display
-                            const dateDisplay = li.querySelector(`#date-display-${tab.id}`);
-                            const parsedDate = parseAndFormatDate(note);
-                            dateDisplay.textContent = parsedDate || '';
                         });
 
                         noteInput.addEventListener("keydown", function (event) {

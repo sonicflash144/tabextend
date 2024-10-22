@@ -99,7 +99,9 @@ h1, h2 {
     width: 100%;
     word-wrap: break-word;
 }
-
+.date-display {
+    margin-top: 5px;
+}
 .tab-note {
     margin-top: 5px;
     width: 100%;
