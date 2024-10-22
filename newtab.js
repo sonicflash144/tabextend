@@ -1,3 +1,4 @@
+import { Chrono } from 'chrono-node';
 let dropIndicator = null;
 let dropType = null;
 let deletionArea;
@@ -115,10 +116,27 @@ function saveTabNote(id, note) {
         const index = tabs.findIndex(tab => tab.id === id);
         tabs[index].note = note; // Update the note for the tab
 
+        // Parse and format the date
+        const parsedDate = parseAndFormatDate(note);
+        if (parsedDate) {
+            tabs[index].formattedDate = parsedDate;
+        }
+
         chrome.storage.local.set({ savedTabs: tabs }, () => {
             console.log('Tab note saved:', id, note);
         });
     });
+}
+function parseAndFormatDate(note) {
+    const chrono = new Chrono();
+    const parsedDate = chrono.parseDate(note);
+    if (parsedDate) {
+        const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(parsedDate.getDate()).padStart(2, '0');
+        const year = parsedDate.getFullYear();
+        return `${month}/${day}/${year}`;
+    }
+    return null;
 }
 function saveTabTitle(id, newTitle) {
     chrome.storage.local.get("savedTabs", (data) => {
@@ -593,6 +611,7 @@ function displaySavedTabs(tabs) {
                                     <input type="text" class="hidden" id="title-input-${tab.id}" value="${tab.title}">
                                     <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note || ''}</div>
                                     <textarea class="tab-note hidden" id="note-input-${tab.id}" rows="1">${tab.note || ''}</textarea>
+                                    <div class="date-display" id="date-display-${tab.id}">${tab.formattedDate || ''}</div>
                                 </div>
                                 <div class="tab-actions">
                                     <button class="more-options" data-index="${tab.id}">
@@ -807,6 +826,11 @@ function displaySavedTabs(tabs) {
                             noteInput.classList.add("hidden");
                             noteDisplay.classList.remove("hidden");
                             li.addEventListener('dragstart', handleDragStart);
+
+                            // Update the date display
+                            const dateDisplay = li.querySelector(`#date-display-${tab.id}`);
+                            const parsedDate = parseAndFormatDate(note);
+                            dateDisplay.textContent = parsedDate || '';
                         });
 
                         noteInput.addEventListener("keydown", function (event) {
