@@ -114,45 +114,28 @@ function saveTabNote(id, note) {
     chrome.storage.local.get("savedTabs", (data) => {
         const tabs = data.savedTabs || [];
         const index = tabs.findIndex(tab => tab.id === id);
-        tabs[index].note = note; // Update the note for the tab
 
-        // Parse and format the date
-        const parsedDate = parseAndFormatDate(note);
+        // Parse the date but do not format it yet
+        const { parsedDate, remainingNote } = parseAndSaveDate(note);
+        tabs[index].note = remainingNote; // Update the note for the tab
+
         if (parsedDate) {
-            tabs[index].formattedDate = parsedDate;
+            tabs[index].parsedDate = parsedDate.getTime(); // Save the timestamp of the date
         }
 
         chrome.storage.local.set({ savedTabs: tabs }, () => {
-            console.log('Tab note saved:', id, note);
+            console.log('Tab note saved:', id, remainingNote);
         });
     });
 }
-function parseAndFormatDate(note) {
+function parseAndSaveDate(note) {
     const chrono = new Chrono();
     const parsedDate = chrono.parseDate(note);
-    if (parsedDate) {
-        const today = new Date();
-        const tomorrow = new Date(today);
-        tomorrow.setDate(today.getDate() + 1);
-
-        const diffTime = parsedDate.getTime() - today.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays === 0) {
-            return 'Today';
-        } else if (diffDays === 1) {
-            return 'Tomorrow';
-        } else if (diffDays >= 2 && diffDays <= 7) {
-            const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-            return weekdayNames[parsedDate.getDay()];
-        } else {
-            const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
-            const day = String(parsedDate.getDate()).padStart(2, '0');
-            const year = String(parsedDate.getFullYear()).slice(-2);
-            return `${month}/${day}/${year}`;
-        }
-    }
-    return null;
+    
+    // Remove the parsed date from the note
+    const remainingNote = parsedDate ? note.replace(chrono.parse(note)[0].text, '').trim() : note;
+    
+    return { parsedDate, remainingNote };
 }
 function saveTabTitle(id, newTitle) {
     chrome.storage.local.get("savedTabs", (data) => {
@@ -617,6 +600,33 @@ function displaySavedTabs(tabs) {
                         li.addEventListener("dragstart", handleDragStart);
                         li.addEventListener("dragend", handleDragEnd);
                 
+                        // Calculate the formatted date when displaying
+                        let formattedDate = '';
+                        let diffDays = -1;
+                        if (tab.parsedDate) {
+                            const today = new Date();
+                            const tomorrow = new Date(today);
+                            tomorrow.setDate(today.getDate() + 1);
+
+                            const parsedDate = new Date(tab.parsedDate);
+                            const diffTime = parsedDate.getTime() - today.getTime();
+                            diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                            if (diffDays === 0) {
+                                formattedDate = 'Today';
+                            } else if (diffDays === 1) {
+                                formattedDate = 'Tomorrow';
+                            } else if (diffDays >= 2 && diffDays <= 7) {
+                                const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                                formattedDate = weekdayNames[parsedDate.getDay()];
+                            } else {
+                                const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                                const day = String(parsedDate.getDate()).padStart(2, '0');
+                                const year = String(parsedDate.getFullYear()).slice(-2);
+                                formattedDate = `${month}/${day}/${year}`;
+                            }
+                        }
+
                         li.innerHTML += `
                             <div class="tab-info-container">
                                 <div class="tab-info-left">
@@ -627,7 +637,7 @@ function displaySavedTabs(tabs) {
                                     <input type="text" class="hidden" id="title-input-${tab.id}" value="${tab.title}">
                                     <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note || ''}</div>
                                     <textarea class="tab-note hidden" id="note-input-${tab.id}" rows="1">${tab.note || ''}</textarea>
-                                    <div class="date-display" id="date-display-${tab.id}">${tab.formattedDate || ''}</div>
+                                    <div class="date-display" id="date-display-${tab.id}">${formattedDate || ''}</div>
                                 </div>
                                 <div class="tab-actions">
                                     <button class="more-options" data-index="${tab.id}">
@@ -636,10 +646,13 @@ function displaySavedTabs(tabs) {
                                 </div>
                             </div>
                         `;
+
                         const dateDisplay = li.querySelector(`#date-display-${tab.id}`);
-                        if (tab.formattedDate === 'Today') {
+                        if (diffDays < 0) {
+                            dateDisplay.style.color = '#e63c30';
+                        } else if (formattedDate === 'Today') {
                             dateDisplay.style.color = 'green';
-                        } else if (tab.formattedDate === 'Tomorrow') {
+                        } else if (formattedDate === 'Tomorrow') {
                             dateDisplay.style.color = "#C76E00";
                         } else {
                             dateDisplay.style.color = 'grey';
