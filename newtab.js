@@ -640,7 +640,7 @@ function displaySavedTabs(tabs) {
                                     <input type="text" class="hidden" id="title-input-${tab.id}" value="${tab.title}">
                                     <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note || ''}</div>
                                     <textarea class="tab-note hidden" id="note-input-${tab.id}" rows="1">${tab.note || ''}</textarea>
-                                    <div class="date-display" id="date-display-${tab.id}">${formattedDate || ''}</div>
+                                    <div class="date-display ${formattedDate ? '' : 'hidden'}" id="date-display-${tab.id}">${formattedDate || ''}</div>
                                 </div>
                                 <div class="tab-actions">
                                     <button class="more-options" data-index="${tab.id}">
