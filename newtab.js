@@ -7,7 +7,17 @@ let lastSelectedIndex = null;
 let activeOptionsMenu = null;
 let activeColorMenu = null;
 let tabs_in_storage = [];
+function getToday(tabDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to start of the day
 
+    const parsedDate = new Date(tabDate);
+    parsedDate.setHours(0, 0, 0, 0); // Normalize to start of the day
+
+    const diffTime = parsedDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+}
 document.getElementById("add-column").addEventListener("click", () => {
     createColumn("New Column");
     saveColumnState();
@@ -604,14 +614,8 @@ function displaySavedTabs(tabs) {
                         let formattedDate = '';
                         let diffDays = -1;
                         if (tab.parsedDate) {
-                            const today = new Date();
-                            const tomorrow = new Date(today);
-                            tomorrow.setDate(today.getDate() + 1);
-
                             const parsedDate = new Date(tab.parsedDate);
-                            const diffTime = parsedDate.getTime() - today.getTime();
-                            diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
+                            diffDays = getToday(parsedDate);
                             if (diffDays === 0) {
                                 formattedDate = 'Today';
                             } else if (diffDays === 1) {
@@ -626,7 +630,6 @@ function displaySavedTabs(tabs) {
                                 formattedDate = `${month}/${day}/${year}`;
                             }
                         }
-
                         li.innerHTML += `
                             <div class="tab-info-container">
                                 <div class="tab-info-left">
