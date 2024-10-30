@@ -406,6 +406,7 @@ function handleDrop(event) {
     
     // Check if it's a column drop
     const columnsContainer = document.getElementById('columns-container');
+    const newColumnIndicator = columnsContainer.querySelector('.new-column-indicator');
     const columnDropData = event.dataTransfer.getData("text/plain");
     const droppedColumn = document.getElementById(columnDropData);
 
@@ -414,6 +415,7 @@ function handleDrop(event) {
             deleteColumn(droppedColumn);
             deletionArea.style.display = 'none';
             deletionArea.classList.remove('deletion-area-active');
+            if (newColumnIndicator) newColumnIndicator.style.display = 'none';
             return;
         }
         deletionArea.style.display = 'none';
@@ -429,7 +431,6 @@ function handleDrop(event) {
             columnsContainer.insertBefore(droppedColumn, columns[dropPosition]);
         }
         // Ensure 'new-column-indicator' remains the last child
-        const newColumnIndicator = columnsContainer.querySelector('.new-column-indicator');
         if (newColumnIndicator) {
             columnsContainer.appendChild(newColumnIndicator);
         }
