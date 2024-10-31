@@ -54,7 +54,7 @@ function closeAllMenus() {
     }
 }
 function applySidebarState() {
-    chrome.storage.local.get("sidebarCollapsed", (data) => {
+    browser.storage.local.get("sidebarCollapsed", (data) => {
         const sidebar = document.getElementById("sidebar");
         if (data.sidebarCollapsed) {
             sidebar.classList.add("collapsed");
@@ -70,7 +70,7 @@ function deleteTab(id) {
         id = [id];
     }
 
-    chrome.storage.local.get("savedTabs", (data) => {
+    browser.storage.local.get("savedTabs", (data) => {
         const tabs = data.savedTabs || [];
         id.forEach(tabId => {
             const index = tabs.findIndex(tab => tab.id === tabId);
@@ -79,7 +79,7 @@ function deleteTab(id) {
                 console.log('Tab deleted:', tabId);
             }
         });
-        chrome.storage.local.set({ savedTabs: tabs }, () => {
+        browser.storage.local.set({ savedTabs: tabs }, () => {
             console.log('Updated storage with remaining tabs');
         });
     });
@@ -90,7 +90,7 @@ function saveTab(tabId) {
 
     tabIds.forEach(id => {
         const numericId = parseInt(id.replace('tab-', ''));
-        chrome.tabs.get(numericId, (tab) => {
+        browser.tabs.get(numericId, (tab) => {
             const newTab = {
                 title: tab.title,
                 url: tab.url,
@@ -101,17 +101,17 @@ function saveTab(tabId) {
             newTabs.push(newTab);
 
             if (newTabs.length === tabIds.length) {
-                chrome.storage.local.get("savedTabs", (data) => {
+                browser.storage.local.get("savedTabs", (data) => {
                     const existingTabs = data.savedTabs || [];
                     const updatedTabs = [...existingTabs, ...newTabs];
-                    chrome.storage.local.set({ savedTabs: updatedTabs }, () => {
-                        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                    browser.storage.local.set({ savedTabs: updatedTabs }, () => {
+                        browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                             let activeTab = tabs[0];
                             
                             // Close the specified tabs
-                            chrome.tabs.remove(tabIds.map(id => parseInt(id.replace('tab-', ''))), () => {
+                            browser.tabs.remove(tabIds.map(id => parseInt(id.replace('tab-', ''))), () => {
                                 // Optionally, you can ensure the focus remains on the active tab
-                                chrome.tabs.update(activeTab.id, { active: true });
+                                browser.tabs.update(activeTab.id, { active: true });
                             });
                         });
                     });
@@ -121,7 +121,7 @@ function saveTab(tabId) {
     });
 }
 function saveTabNote(id, note) {
-    chrome.storage.local.get("savedTabs", (data) => {
+    browser.storage.local.get("savedTabs", (data) => {
         const tabs = data.savedTabs || [];
         const index = tabs.findIndex(tab => tab.id === id);
 
@@ -133,7 +133,7 @@ function saveTabNote(id, note) {
             tabs[index].parsedDate = parsedDate.getTime(); // Save the timestamp of the date
         }
 
-        chrome.storage.local.set({ savedTabs: tabs }, () => {
+        browser.storage.local.set({ savedTabs: tabs }, () => {
             console.log('Tab note saved:', id, remainingNote);
         });
     });
@@ -148,11 +148,11 @@ function parseAndSaveDate(note) {
     return { parsedDate, remainingNote };
 }
 function saveTabTitle(id, newTitle) {
-    chrome.storage.local.get("savedTabs", (data) => {
+    browser.storage.local.get("savedTabs", (data) => {
         const tabs = data.savedTabs || [];
         const tabIndex = tabs.findIndex(tab => tab.id === id);
         tabs[tabIndex].title = newTitle;
-        chrome.storage.local.set({ savedTabs: tabs }, () => {
+        browser.storage.local.set({ savedTabs: tabs }, () => {
             console.log('Tab title saved:', id, newTitle);
         });
     });
@@ -175,7 +175,7 @@ function saveColumnState() {
         });
     });
 
-    chrome.storage.local.set({ columnState }, () => {
+    browser.storage.local.set({ columnState }, () => {
         console.log('Column state saved:', columnState);
     });
 }
@@ -472,7 +472,7 @@ function handleDrop(event) {
                 tabIdsToDelete.push(parseInt(itemId.replace('tab-', '')));
             }
             else if (itemId.startsWith('opentab')) {
-                chrome.tabs.remove(parseInt(itemId.replace('opentab-', '')), () => {
+                browser.tabs.remove(parseInt(itemId.replace('opentab-', '')), () => {
                     console.log('Tab closed:', itemId);
                 });
             }
@@ -519,7 +519,7 @@ function handleDrop(event) {
         itemsToInsert.push({ item, dropPosition });
 
         if (column.id === 'open-tabs-list') {
-            chrome.tabs.move(parseInt(itemId.split('-')[1]), { index: dropPosition }, () => {
+            browser.tabs.move(parseInt(itemId.split('-')[1]), { index: dropPosition }, () => {
                 console.log('Tab moved:', itemId, 'to index:', dropPosition);
             });
         }
@@ -586,7 +586,7 @@ function displaySavedTabs(tabs) {
     columnsContainer.addEventListener('drop', handleDrop);
     columnsContainer.innerHTML = "";
 
-    chrome.storage.local.get('columnState', (result) => {
+    browser.storage.local.get('columnState', (result) => {
         const columnState = result.columnState || [];
         if(columnState.length === 0) {
             createColumn("New Column");
@@ -768,7 +768,7 @@ function displaySavedTabs(tabs) {
                                     colorOption.addEventListener('click', () => {
                                         tab.color = color;
                                         li.style.backgroundColor = color;
-                                        chrome.storage.local.set({ savedTabs: tabs }, () => {
+                                        browser.storage.local.set({ savedTabs: tabs }, () => {
                                             console.log('Tab color saved:', tab.id, tab.color);
                                         });
                                         closeAllMenus();
@@ -891,7 +891,7 @@ function displaySavedTabs(tabs) {
     });
 }
 function fetchOpenTabs() {
-    chrome.tabs.query({ currentWindow: true }, (tabs) => {
+    browser.tabs.query({ currentWindow: true }, (tabs) => {
         tabs = tabs.filter(tab => 
             !tab.url.startsWith("chrome://") && 
             !tab.url.startsWith("edge://") &&
@@ -899,6 +899,7 @@ function fetchOpenTabs() {
             !tab.url.startsWith("vivaldi://") &&
             !tab.url.startsWith("brave://") &&
             !tab.url.startsWith("about:") && 
+            !tab.url.startsWith("moz-extension://") &&
             !tab.url.startsWith("file://")
         );
         const openTabsList = document.getElementById("open-tabs-list");
@@ -929,13 +930,13 @@ function fetchOpenTabs() {
             
             const closeButton = li.querySelector(".close-button");
             closeButton.addEventListener("click", () => {
-                chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                     let activeTab = tabs[0];
                     
                     // Close the specified tab
-                    chrome.tabs.remove(tab.id, () => {
+                    browser.tabs.remove(tab.id, () => {
                         // Optionally, you can ensure the focus remains on the active tab
-                        chrome.tabs.update(activeTab.id, { active: true });
+                        browser.tabs.update(activeTab.id, { active: true });
                     });
                 });
             });
@@ -990,7 +991,7 @@ function fetchOpenTabs() {
                 const allItems = document.querySelectorAll('li');
                 allItems.forEach(item => item.classList.remove('selected'));
 
-                chrome.tabs.update(tab.id, { active: true });
+                browser.tabs.update(tab.id, { active: true });
             });
 
             openTabsList.appendChild(li);
@@ -1000,39 +1001,45 @@ function fetchOpenTabs() {
     });
 }
 
-chrome.tabs.onUpdated.addListener(fetchOpenTabs);
-chrome.tabs.onRemoved.addListener(fetchOpenTabs);
-chrome.storage.onChanged.addListener((changes, areaName) => {
+browser.tabs.onUpdated.addListener(fetchOpenTabs);
+browser.tabs.onRemoved.addListener(fetchOpenTabs);
+browser.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes.savedTabs) {
         tabs_in_storage = changes.savedTabs.newValue.filter(tab => !('temp' in tab));
         displaySavedTabs(tabs_in_storage);
     }
 });
-chrome.storage.onChanged.addListener((changes, areaName) => {
+browser.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes.bgTabs) {
-        chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
-            let columnState = data.columnState || [];
-            const bgTabs = data.bgTabs || [];
-            let savedTabs = data.savedTabs || [];
-            const tabIds = bgTabs.map(tab => tab.id);
+        const oldBgTabs = changes.bgTabs.oldValue || [];
+        const newBgTabs = changes.bgTabs.newValue || [];
 
-            if (columnState.length === 0) {
-                columnState.push({ id: "defaultColumn", tabIds: [], title: "New Column" });
-            }
-            const firstColumn = columnState[0];
-            const formattedIds = tabIds.map(id => `tab-${id}`);
-            firstColumn.tabIds = firstColumn.tabIds.concat(formattedIds);
-            savedTabs = savedTabs.concat(bgTabs);
+        // Check if bgTabs has actually changed
+        if (JSON.stringify(oldBgTabs) !== JSON.stringify(newBgTabs)) {
+            browser.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
+                let columnState = data.columnState || [];
+                const bgTabs = data.bgTabs || [];
+                let savedTabs = data.savedTabs || [];
+                const tabIds = bgTabs.map(tab => tab.id);
 
-            chrome.storage.local.set({ columnState: columnState, bgTabs: [], savedTabs: savedTabs }, () => {
-                console.log("Migrated bgTabs");
+                if (columnState.length === 0) {
+                    columnState.push({ id: "defaultColumn", tabIds: [], title: "New Column" });
+                }
+                const firstColumn = columnState[0];
+                const formattedIds = tabIds.map(id => `tab-${id}`);
+                firstColumn.tabIds = firstColumn.tabIds.concat(formattedIds);
+                savedTabs = savedTabs.concat(bgTabs);
+
+                browser.storage.local.set({ columnState: columnState, bgTabs: [], savedTabs: savedTabs }, () => {
+                    console.log("Migrated bgTabs");
+                });
             });
-        });
+        }
     }
 });
 
 fetchOpenTabs();
-chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
+browser.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
     let columnState = data.columnState || [];
     const bgTabs = data.bgTabs || [];
     let savedTabs = data.savedTabs || [];
@@ -1048,7 +1055,7 @@ chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
     savedTabs = savedTabs.filter(tab => !('temp' in tab));
     savedTabs.push({"temp": Date.now()});
 
-    chrome.storage.local.set({ columnState: columnState, bgTabs: [], savedTabs: savedTabs }, () => {
+    browser.storage.local.set({ columnState: columnState, bgTabs: [], savedTabs: savedTabs }, () => {
         console.log("Migrated bgTabs");
     });
 });
