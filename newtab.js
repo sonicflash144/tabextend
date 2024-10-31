@@ -338,7 +338,6 @@ function handleDragOver(event) {
         window.scrollBy({ left: scrollSpeed, behavior: 'smooth' });
     }
 
-    newColumnIndicator.style.display = 'flex';
     deletionArea.style.display = 'flex';
     if(event.target === deletionArea) {
         deletionArea.classList.add('deletion-area-active');
@@ -363,6 +362,7 @@ function handleDragOver(event) {
     
     if (dropType === "list-item" && column) {
         // Handle list item drag over
+        newColumnIndicator.style.display = 'flex';
         const rect = column.getBoundingClientRect();
         const listItems = Array.from(column.querySelectorAll('.tab-item'));
         const dropPosition = calculateDropPosition(event, listItems);
@@ -495,6 +495,7 @@ function handleDrop(event) {
             saveTab(itemIdsToSave);
         }
         saveColumnState();
+        displaySavedTabs(tabs_in_storage);
         return;
     }
 
