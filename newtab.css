@@ -150,7 +150,7 @@ h2 {
     .tab-info-left {
         width: 36px;
         display: flex;
-        align-items: center;
+        align-items: left;
         justify-content: center;
         margin-right: 10px;
         cursor: pointer;
