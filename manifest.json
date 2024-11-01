@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tabs Magic",
-  "version": "1.0.15.1",
+  "version": "1.0.15.2",
   "description": "Save and manage your tabs into visual columns.",
   "permissions": ["tabs", "storage", "activeTab", "contextMenus"],
   "icons": {
@@ -11,6 +11,9 @@
   },
   "chrome_url_overrides": {
     "newtab": "newtab.html"
+  },
+  "chrome_settings_overrides" : {
+    "homepage": "newtab.html"
   },
   "browser_specific_settings": {
     "gecko": {
