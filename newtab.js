@@ -814,6 +814,13 @@ function displaySavedTabs(tabs) {
                             const titleDisplay = li.querySelector(`#title-display-${tab.id}`);
                             const titleInput = li.querySelector(`#title-input-${tab.id}`);
 
+                            titleInput.addEventListener("focus", function () {
+                                const parentTab = li.closest('.tab-item');
+                                const parentColumn = li.closest('.column');
+                                if (parentTab) parentTab.setAttribute("draggable", "false");
+                                if (parentColumn) parentColumn.setAttribute("draggable", "false");
+                            });
+
                             titleInput.addEventListener("blur", function () {
                                 const newTitle = titleInput.value;
                                 saveTabTitle(tab.id, newTitle);
@@ -821,6 +828,10 @@ function displaySavedTabs(tabs) {
                                 titleInput.classList.add("hidden");
                                 titleDisplay.classList.remove("hidden");
                                 li.addEventListener('dragstart', handleDragStart);
+                                const parentTab = li.closest('.tab-item');
+                                const parentColumn = li.closest('.column');
+                                if (parentTab) parentTab.setAttribute("draggable", "true");
+                                if (parentColumn) parentColumn.setAttribute("draggable", "true");
                             });
 
                             // Add Note option
@@ -862,6 +873,13 @@ function displaySavedTabs(tabs) {
                                 noteInput.setSelectionRange(length, length);
                             }
                         });
+
+                        noteInput.addEventListener("focus", function () {
+                            const parentTab = li.closest('.tab-item');
+                            const parentColumn = li.closest('.column');
+                            if (parentTab) parentTab.setAttribute("draggable", "false");
+                            if (parentColumn) parentColumn.setAttribute("draggable", "false");
+                        });
                         
                         noteInput.addEventListener("blur", function () {
                             const note = noteInput.value;
@@ -870,6 +888,10 @@ function displaySavedTabs(tabs) {
                             noteInput.classList.add("hidden");
                             noteDisplay.classList.remove("hidden");
                             li.addEventListener('dragstart', handleDragStart);
+                            const parentTab = li.closest('.tab-item');
+                            const parentColumn = li.closest('.column');
+                            if (parentTab) parentTab.setAttribute("draggable", "true");
+                            if (parentColumn) parentColumn.setAttribute("draggable", "true");
                         });
 
                         noteInput.addEventListener("keydown", function (event) {

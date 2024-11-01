@@ -116,7 +116,8 @@ h2 {
     overflow: scroll;
     resize: none; 
     box-sizing: border-box;
-    min-height: 48px; 
+    min-height: 48px;
+    scrollbar-width: none; 
 }
     .tab-note::-webkit-scrollbar {
         display: none;
