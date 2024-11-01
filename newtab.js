@@ -1007,7 +1007,9 @@ browser.tabs.onRemoved.addListener(fetchOpenTabs);
 browser.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes.savedTabs) {
         tabs_in_storage = changes.savedTabs.newValue.filter(tab => !('temp' in tab));
-        displaySavedTabs(tabs_in_storage);
+        if(tabs_in_storage.length > 0){
+            displaySavedTabs(tabs_in_storage);
+        }
     }
 });
 browser.storage.onChanged.addListener((changes, areaName) => {
@@ -1060,3 +1062,4 @@ browser.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
         console.log("Migrated bgTabs");
     });
 });
+displaySavedTabs(tabs_in_storage);
