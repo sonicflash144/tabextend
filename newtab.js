@@ -1007,9 +1007,11 @@ chrome.tabs.onRemoved.addListener(fetchOpenTabs);
 chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes.savedTabs) {
         tabs_in_storage = changes.savedTabs.newValue.filter(tab => !('temp' in tab));
-        if(tabs_in_storage.length > 0){
-            displaySavedTabs(tabs_in_storage);
-        }
+        chrome.storage.local.get('columnState', (data) => {
+            if(data.columnState.length > 0){
+                displaySavedTabs(tabs_in_storage);
+            }
+        });
     }
 });
 chrome.storage.onChanged.addListener((changes, areaName) => {
