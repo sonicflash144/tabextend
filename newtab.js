@@ -81,7 +81,6 @@ function deleteTab(id) {
         });
         browser.storage.local.set({ savedTabs: tabs }, () => {
             console.log('Updated storage with remaining tabs');
-            displaySavedTabs(tabs);
         });
     });
 }
@@ -1008,9 +1007,11 @@ browser.tabs.onRemoved.addListener(fetchOpenTabs);
 browser.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes.savedTabs) {
         tabs_in_storage = changes.savedTabs.newValue.filter(tab => !('temp' in tab));
-        if(tabs_in_storage.length > 0){
-            displaySavedTabs(tabs_in_storage);
-        }
+        browser.storage.local.get('columnState', (data) => {
+            if(data.columnState.length > 0){
+                displaySavedTabs(tabs_in_storage);
+            }
+        });
     }
 });
 browser.storage.onChanged.addListener((changes, areaName) => {
