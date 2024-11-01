@@ -81,6 +81,7 @@ function deleteTab(id) {
         });
         browser.storage.local.set({ savedTabs: tabs }, () => {
             console.log('Updated storage with remaining tabs');
+            displaySavedTabs(tabs);
         });
     });
 }
