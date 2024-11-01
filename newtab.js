@@ -81,7 +81,6 @@ function deleteTab(id) {
         });
         chrome.storage.local.set({ savedTabs: tabs }, () => {
             console.log('Updated storage with remaining tabs');
-            displaySavedTabs(tabs);
         });
     });
 }
@@ -846,6 +845,7 @@ function displaySavedTabs(tabs) {
                             deleteTabOption.addEventListener('click', () => {
                                 deleteTab(tab.id);
                                 closeAllMenus();
+                                displaySavedTabs(tabs_in_storage);
                             });
                         });
                         
