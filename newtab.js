@@ -127,7 +127,7 @@ function saveTabNote(id, note) {
 
         // Parse the date but do not format it yet
         const { parsedDate, remainingNote } = parseAndSaveDate(note);
-        tabs[index].note = remainingNote; // Update the note for the tab
+        tabs[index].note = remainingNote.replace(/\n/g, '<br>'); // Update the note for the tab
 
         if (parsedDate) {
             tabs[index].parsedDate = parsedDate.getTime(); // Save the timestamp of the date
@@ -141,11 +141,12 @@ function saveTabNote(id, note) {
 function parseAndSaveDate(note) {
     const chrono = new Chrono();
     const parsedDate = chrono.parseDate(note);
+    const detectedDateText = parsedDate ? chrono.parse(note)[0].text : '';
     
     // Remove the parsed date from the note
-    const remainingNote = parsedDate ? note.replace(chrono.parse(note)[0].text, '').trim() : note;
+    const remainingNote = parsedDate ? note.replace(detectedDateText, '').trim() : note;
     
-    return { parsedDate, remainingNote };
+    return { parsedDate, remainingNote, detectedDateText };
 }
 function saveTabTitle(id, newTitle) {
     chrome.storage.local.get("savedTabs", (data) => {
@@ -209,7 +210,7 @@ function createColumn(title, id) {
     const deleteButton = document.createElement("button");
     deleteButton.classList.add("delete-column");
     deleteButton.title = "Delete Column";
-    deleteButton.innerHTML = `<img src="../icons/delete-icon.svg" width="24" height="24" class="main-grid-item-icon" />`;
+    deleteButton.innerHTML = `<img src="../icons/delete-icon.svg" class="main-grid-item-icon" width="24" height="24"/>`;
     deleteButton.addEventListener("click", deleteColumn);
 
     // Create a span to display the title in read mode
@@ -337,6 +338,11 @@ function handleDragOver(event) {
     } else if (window.innerWidth - event.clientX < scrollThreshold) {
         window.scrollBy({ left: scrollSpeed, behavior: 'smooth' });
     }
+    if (event.clientY < scrollThreshold) {
+        window.scrollBy({ top: -scrollSpeed, behavior: 'smooth' });
+    } else if (window.innerHeight - event.clientY < scrollThreshold) {
+        window.scrollBy({ top: scrollSpeed, behavior: 'smooth' });
+    }
 
     deletionArea.style.display = 'flex';
     if(event.target === deletionArea) {
@@ -370,12 +376,13 @@ function handleDragOver(event) {
         dropIndicator.style.width = `${rect.width}px`;
         dropIndicator.style.height = '2px';
         dropIndicator.style.left = `${rect.left + window.scrollX}px`;
+        dropIndicator.style.top = `${rect.top + window.scrollY}px`;
 
         if (dropPosition === listItems.length) {
             const lastItem = listItems[listItems.length - 1];
-            dropIndicator.style.top = lastItem ? `${lastItem.getBoundingClientRect().bottom}px` : `${rect.top}px`;
+            dropIndicator.style.top = lastItem ? `${lastItem.getBoundingClientRect().bottom + window.scrollY}px` : `${rect.top + window.scrollY}px`;
         } else {
-            dropIndicator.style.top = `${listItems[dropPosition].getBoundingClientRect().top}px`;
+            dropIndicator.style.top = `${listItems[dropPosition].getBoundingClientRect().top + window.scrollY}px`;
         }
     } 
     else if (dropType === "column" && columnsContainer) {
@@ -580,6 +587,40 @@ function calculateColumnDropPosition(event, columns) {
     return dropPosition;
 }
 
+function calculateFormattedDate(parsedDate) {
+    let formattedDate = '';
+    let diffDays = -1;
+    let dateDisplayColor = null;
+    if (parsedDate) {
+        parsedDate = new Date(parsedDate);
+        console.log(parsedDate);
+        diffDays = getToday(parsedDate);
+        if (diffDays === 0) {
+            formattedDate = 'Today';
+        } else if (diffDays === 1) {
+            formattedDate = 'Tomorrow';
+        } else if (diffDays >= 2 && diffDays <= 7) {
+            const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            formattedDate = weekdayNames[parsedDate.getDay()];
+        } else {
+            const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+            const day = String(parsedDate.getDate()).padStart(2, '0');
+            const year = String(parsedDate.getFullYear()).slice(-2);
+            formattedDate = `${month}/${day}/${year}`;
+        }
+    }
+    if (diffDays < 0) {
+        dateDisplayColor = '#e63c30';
+    } else if (formattedDate === 'Today') {
+        dateDisplayColor = '#058527';
+    } else if (formattedDate === 'Tomorrow') {
+        dateDisplayColor = '#C76E00';
+    } else {
+        dateDisplayColor = '#ababab';
+    }
+    return { formattedDate, dateDisplayColor };
+}
+
 /* Tab Display */
 function displaySavedTabs(tabs) {
     const columnsContainer = document.getElementById("columns-container");
@@ -613,25 +654,9 @@ function displaySavedTabs(tabs) {
                         li.addEventListener("dragend", handleDragEnd);
                 
                         // Calculate the formatted date when displaying
-                        let formattedDate = '';
-                        let diffDays = -1;
-                        if (tab.parsedDate) {
-                            const parsedDate = new Date(tab.parsedDate);
-                            diffDays = getToday(parsedDate);
-                            if (diffDays === 0) {
-                                formattedDate = 'Today';
-                            } else if (diffDays === 1) {
-                                formattedDate = 'Tomorrow';
-                            } else if (diffDays >= 2 && diffDays <= 7) {
-                                const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                                formattedDate = weekdayNames[parsedDate.getDay()];
-                            } else {
-                                const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
-                                const day = String(parsedDate.getDate()).padStart(2, '0');
-                                const year = String(parsedDate.getFullYear()).slice(-2);
-                                formattedDate = `${month}/${day}/${year}`;
-                            }
-                        }
+                        const { formattedDate, dateDisplayColor } = calculateFormattedDate(tab.parsedDate);
+                        const savedFormattedDate = formattedDate;
+                        const savedDateDisplayColor = dateDisplayColor;
                         li.innerHTML += `
                             <div class="tab-info-container">
                                 <div class="tab-info-left">
@@ -640,8 +665,8 @@ function displaySavedTabs(tabs) {
                                 <div class="tab-info-right">
                                     <span class="tab-title" data-url="${tab.url}" id="title-display-${tab.id}">${tab.title}</span>
                                     <input type="text" class="hidden" id="title-input-${tab.id}" value="${tab.title}">
-                                    <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note || ''}</div>
-                                    <textarea class="tab-note hidden" id="note-input-${tab.id}" rows="1">${tab.note || ''}</textarea>
+                                    <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note ? tab.note.replace(/\n/g, '<br>') : ''}</div>
+                                    <textarea class="tab-note hidden" id="note-input-${tab.id}" rows="1">${tab.note ? tab.note.replace(/<br>/g, '\n') : ''}</textarea>
                                     <div class="date-display ${formattedDate ? '' : 'hidden'}" id="date-display-${tab.id}">${formattedDate || ''}</div>
                                 </div>
                                 <div class="tab-actions">
@@ -653,15 +678,7 @@ function displaySavedTabs(tabs) {
                         `;
 
                         const dateDisplay = li.querySelector(`#date-display-${tab.id}`);
-                        if (diffDays < 0) {
-                            dateDisplay.style.color = '#e63c30';
-                        } else if (formattedDate === 'Today') {
-                            dateDisplay.style.color = 'green';
-                        } else if (formattedDate === 'Tomorrow') {
-                            dateDisplay.style.color = "#C76E00";
-                        } else {
-                            dateDisplay.style.color = 'grey';
-                        }
+                        dateDisplay.style.backgroundColor = savedDateDisplayColor;
                         
                         column.appendChild(li);
 
@@ -731,6 +748,7 @@ function displaySavedTabs(tabs) {
                             optionsMenu.innerHTML = `
                                 <button class="menu-option rename-tab" data-index="${tab.id}">Rename</button>
                                 <button class="menu-option add-note" data-index="${tab.id}">${noteButtonText}</button>
+                                <button class="menu-option remove-date ${formattedDate ? '' : 'hidden'}" data-index="${tab.id}">Clear Date</button>
                                 <button class="menu-option color-tab" data-index="${tab.id}">Color</button>
                                 <button class="menu-option delete-tab" data-index="${tab.id}">Delete</button>
                             `;
@@ -758,6 +776,11 @@ function displaySavedTabs(tabs) {
                             const colorTabOption = optionsMenu.querySelector('.color-tab');
                             colorTabOption.addEventListener('click', (e) => {
                                 e.stopPropagation();
+                                if (activeColorMenu) {
+                                    activeColorMenu.remove();
+                                    activeColorMenu = null;
+                                    return;
+                                }
                                 const colorOptions = ['#FFFFFF', '#f7c2d6', '#f1ffc4', '#c6e2e9', '#e9c8fa'];
                                 colorMenu = document.createElement('div');
                                 colorMenu.classList.add('color-menu');
@@ -847,6 +870,18 @@ function displaySavedTabs(tabs) {
                                 closeAllMenus();
                                 displaySavedTabs(tabs_in_storage);
                             });
+
+                             // Remove Date option
+                             const removeDateOption = optionsMenu.querySelector('.remove-date');
+                             removeDateOption.addEventListener('click', () => {
+                                 tab.parsedDate = null;
+                                 dateDisplay.textContent = '';
+                                 dateDisplay.classList.add('hidden');
+                                 chrome.storage.local.set({ savedTabs: tabs }, () => {
+                                     console.log('Tab date removed:', tab.id);
+                                 });
+                                 closeAllMenus();
+                             });
                         });
                         
                         const noteDisplay = li.querySelector(`#note-display-${tab.id}`);
@@ -867,15 +902,48 @@ function displaySavedTabs(tabs) {
                         noteInput.addEventListener("blur", function () {
                             const note = noteInput.value;
                             saveTabNote(tab.id, note);
-                            noteDisplay.textContent = note || '';
+                            noteDisplay.innerHTML = note ? note.replace(/\n/g, '<br>') : '';
                             noteInput.classList.add("hidden");
                             noteDisplay.classList.remove("hidden");
                             li.addEventListener('dragstart', handleDragStart);
                         });
 
                         noteInput.addEventListener("keydown", function (event) {
-                            if (event.key === "Enter") {
+                            if (event.key === "Enter" && !event.shiftKey) {
                                 noteInput.blur();
+                            }
+                            else if (event.key === "Enter" && event.shiftKey) {
+                                const start = noteInput.selectionStart;
+                                const end = noteInput.selectionEnd;
+                                noteInput.value = noteInput.value.substring(0, start) + "\n" + noteInput.value.substring(end);
+                                noteInput.selectionStart = noteInput.selectionEnd = start + 1;
+                                event.preventDefault();
+                            }
+                        });
+
+                        noteInput.addEventListener("input", function () {
+                            const note = noteInput.value;
+                            const { detectedDateText } = parseAndSaveDate(note);
+                            const noteHTML = note.replace(detectedDateText, `<span style="color: red;">${detectedDateText}</span>`);
+                            noteDisplay.innerHTML = noteHTML;
+
+                            // Update the date display in real-time
+                            const dateDisplay = li.querySelector(`#date-display-${tab.id}`);
+                            const chrono = new Chrono();
+                            const parsedDate = chrono.parseDate(note);
+                            if (parsedDate) {
+                                const { formattedDate, dateDisplayColor } = calculateFormattedDate(parsedDate);
+                                dateDisplay.textContent = formattedDate;
+                                dateDisplay.classList.remove('hidden');
+                                dateDisplay.style.backgroundColor = dateDisplayColor;
+                            } 
+                            else if(savedFormattedDate) {
+                                dateDisplay.textContent = savedFormattedDate;
+                                dateDisplay.classList.remove('hidden');
+                                dateDisplay.style.backgroundColor = savedDateDisplayColor;
+                            }
+                            else {
+                                dateDisplay.classList.add('hidden');
                             }
                         });
                     }
