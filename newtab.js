@@ -187,12 +187,7 @@ function createColumn(title, id, minimized = false) {
     const columnsContainer = document.getElementById("columns-container");
     const column = document.createElement("div");
     column.classList.add("column");
-    if (minimized){
-        column.classList.add("minimized");
-    }
-    else{
-        column.classList.remove("minimized");
-    }
+    if (minimized) column.classList.add("minimized");
     if(id) column.id = id;
     else column.id = `column-${Date.now()}`;
     column.addEventListener("dragover", handleDragOver);
@@ -207,7 +202,7 @@ function createColumn(title, id, minimized = false) {
     openAllButton.classList.add("open-all");
     openAllButton.title = "Open All";
     openAllButton.innerHTML = `<img src="../icons/openall.svg" width="24" height="24" class="main-grid-item-icon" />`;
-    openAllButton.addEventListener("click", openAllInColumn);
+    openAllButton.addEventListener("click", (event) => openAllInColumn(event, title));
 
     // Add minimize button to the column
     const minimizeButton = document.createElement("button");
@@ -321,28 +316,38 @@ function deleteColumn(event) {
     column.remove();
     saveColumnState();
 }
-function openAllInColumn(event) {
+function openAllInColumn(event, title) {
     const column = event.target.closest(".column");
     const tabItems = column.querySelectorAll('.tab-item');
     const urls = Array.from(tabItems).map(tabItem => tabItem.dataset.url);
-
-    urls.forEach(url => {
-        window.open(url, '_blank');
+    // Open all tabs
+    const createTabs = urls.map(url => 
+        new Promise(resolve => {
+            chrome.tabs.create({ url: url, active: false }, resolve);
+        })
+    );
+    // After all tabs are created, group them
+    Promise.all(createTabs).then(tabs => {
+        const tabIds = tabs.map(tab => tab.id); // Extract tab IDs
+        chrome.tabs.group({ tabIds: tabIds }, groupId => {
+            // Set the title of the group
+            chrome.tabGroups.update(groupId, { title: title });
+        });
     });
 }
 function minimizeColumn(column) {
     const titleSpan = column.querySelector(".column-title-text");
     const maximizeButton = column.querySelector(".maximize-column");
     const minimizeButton = column.querySelector(".minimize-column");
-    const openAllButton = column.querySelector(".open-all");
+    const titleGroup = column.querySelector(".title-group");
     const deleteButton = column.querySelector(".delete-column");
     const headerContainer = column.querySelector(".header-container");
 
     column.classList.add("minimized");
     titleSpan.classList.add("vertical-text");
+    titleGroup.classList.add("vertical");
     maximizeButton.style.display = "inline";
     minimizeButton.style.display = "none";
-    openAllButton.style.display = "none";
     deleteButton.style.display = "none";
     headerContainer.classList.add("vertical");
 
@@ -354,17 +359,17 @@ function minimizeColumn(column) {
 }
 function maximizeColumn(column) {
     const titleSpan = column.querySelector(".column-title-text");
+    const titleGroup = column.querySelector(".title-group");
     const maximizeButton = column.querySelector(".maximize-column");
     const minimizeButton = column.querySelector(".minimize-column");
-    const openAllButton = column.querySelector(".open-all");
     const deleteButton = column.querySelector(".delete-column");
     const headerContainer = column.querySelector(".header-container");
 
     column.classList.remove("minimized");
     titleSpan.classList.remove("vertical-text");
+    titleGroup.classList.remove("vertical");
     maximizeButton.style.display = "none";
     minimizeButton.style.display = "inline";
-    openAllButton.style.display = "inline";
     deleteButton.style.display = "inline";
     headerContainer.classList.remove("vertical");
 

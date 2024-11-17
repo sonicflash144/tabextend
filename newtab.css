@@ -39,12 +39,15 @@ h1, h2 {
 }
 
 #sidebar {
+    min-width: 200px;
     width: 20vw;
-    height: calc(100vh - 32px);
+    height: calc(100vh - 44px);
     background-color: #f0f0f0;
     padding: 16px;
+    margin: 12px;
     overflow-y: auto;
     box-sizing: border-box;
+    border-radius: 10px;
 }
     #sidebar.collapsed {
         width: 0;
@@ -63,7 +66,7 @@ h1, h2 {
 #open-tabs-list {
     list-style-type: none;
     padding: 0;
-    height: calc(100vh - 128px);
+    height: calc(100vh - 172px);
 }
 
 #save-selected {
@@ -162,6 +165,7 @@ h1, h2 {
         width: calc(80% - 32px);
         display: flex;
         flex-direction: column;
+        justify-content: center;
     }
     .tab-actions {
         width: 28px;
@@ -190,6 +194,11 @@ h1, h2 {
         flex-grow: 1;
         justify-content: center;
         gap: 8px;
+    }
+    .title-group.vertical {
+        flex-direction: column-reverse;
+        align-items: flex-start;
+        justify-content: flex-start;
     }
     .minimize-column,
     .maximize-column {
@@ -233,8 +242,9 @@ h1, h2 {
     border: 1px solid #ccc;
     border-radius: 5px;
     padding: 10px;
+    min-width: 240px;
     width: 20vw;
-    height: calc(100vh - 152px);
+    height: calc(100vh - 160px);
     background-color: #f0f0f0;
     flex-shrink: 0;
     margin-right: 10px;
@@ -260,8 +270,9 @@ h1, h2 {
     }
 
     .column.minimized {
-        height: calc(100vh - 140px);
-        width: 50px;
+        height: calc(100vh - 148px);
+        min-width: 48px;
+        width: 48px;
         padding: 4px;
         overflow: hidden;
         display: flex;
@@ -354,9 +365,8 @@ h1, h2 {
     }
 
 .vertical-text {
-    writing-mode: vertical-rl;
+    writing-mode: vertical-lr;
     text-orientation: mixed;
-    transform: rotate(180deg);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
