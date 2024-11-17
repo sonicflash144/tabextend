@@ -5,6 +5,7 @@ let dropType = null;
 let deletionArea;
 let newColumnIndicator;
 let lastSelectedIndex = null;
+let activeColumnMenu = null;
 let activeOptionsMenu = null;
 let activeColorMenu = null;
 let tabs_in_storage = [];
@@ -52,6 +53,10 @@ function closeAllMenus() {
     if (activeColorMenu) {
         activeColorMenu.remove();
         activeColorMenu = null;
+    }
+    if (activeColumnMenu) {
+        activeColumnMenu.remove();
+        activeColumnMenu = null;
     }
 }
 function applySidebarState() {
@@ -200,13 +205,6 @@ function createColumn(title, id, minimized = false, emoji = null) {
     const headerContainer = document.createElement("div");
     headerContainer.classList.add("header-container");
 
-    // Add open all button to the column
-    const openAllButton = document.createElement("button");
-    openAllButton.classList.add("open-all");
-    openAllButton.title = "Open All";
-    openAllButton.innerHTML = `<img src="../icons/openall.svg" width="24" height="24" class="main-grid-item-icon" />`;
-    openAllButton.addEventListener("click", (event) => openAllInColumn(event, title));
-
     // Add minimize button to the column
     const minimizeButton = document.createElement("button");
     minimizeButton.classList.add("minimize-column");
@@ -234,13 +232,6 @@ function createColumn(title, id, minimized = false, emoji = null) {
     titleInput.classList.add("column-title");
     titleInput.placeholder = "Enter column title";
 
-    // Add delete button to the column
-    const deleteButton = document.createElement("button");
-    deleteButton.classList.add("delete-column");
-    deleteButton.title = "Delete Column";
-    deleteButton.innerHTML = `<img src="../icons/delete-icon.svg" class="main-grid-item-icon" width="24" height="24"/>`;
-    deleteButton.addEventListener("click", deleteColumn);
-
     // Create a span to display the title in read mode
     const titleSpan = document.createElement("h2");
     titleSpan.classList.add("column-title-text");
@@ -251,6 +242,57 @@ function createColumn(title, id, minimized = false, emoji = null) {
         titleSpan.style.display = "inline";
         titleInput.style.display = "none";
     }
+
+    // Create three-dot menu container
+    const menuContainer = document.createElement("div");
+    menuContainer.classList.add("menu-container");
+    
+    // Create three-dot menu button
+    const menuButton = document.createElement("button");
+    menuButton.classList.add("more-options");
+    menuButton.innerHTML = `<img src="../icons/morevertical.svg" width="24" height="24" class="main-grid-item-icon" />`;
+    menuContainer.appendChild(menuButton);
+    
+    // Toggle menu on button click with dynamic positioning
+    menuButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if(activeColumnMenu){
+            closeAllMenus();
+            return;
+        }
+        closeAllMenus();
+
+        // Create menu dropdown
+        const menuDropdown = document.createElement("div");
+        menuDropdown.className = "options-menu";
+        const menuItems = [
+            { text: "Open All", icon: "../icons/openall.svg", action: () => openAllInColumn(column, title) },
+            { text: "Delete Column", icon: "../icons/delete-icon.svg", action: () => deleteColumn(column) }
+        ];
+        menuItems.forEach(item => {
+            const menuItem = document.createElement("button");
+            menuItem.classList.add("menu-option");
+            menuItem.innerHTML = `
+                <img src="${item.icon}" width="16" height="16" class="menu-item-icon" />
+                <span>${item.text}</span>
+            `;
+            menuItem.addEventListener("click", (e) => {
+                e.stopPropagation();
+                item.action(e);
+                menuDropdown.style.display = "none";
+            });
+            menuDropdown.appendChild(menuItem);
+        });
+    
+        // Position the dropdown relative to the button
+        const buttonRect = menuButton.getBoundingClientRect();
+        menuDropdown.style.position = "fixed";
+        menuDropdown.style.top = `${buttonRect.bottom + 5}px`; // 5px gap below button
+        menuDropdown.style.right = `${window.innerWidth - buttonRect.right}px`; // Align right edges
+
+        document.body.appendChild(menuDropdown);
+        activeColumnMenu = menuDropdown;
+    });
 
     // Event listener to switch to read mode
     titleInput.addEventListener("blur", () => {
@@ -274,6 +316,9 @@ function createColumn(title, id, minimized = false, emoji = null) {
         titleInput.setSelectionRange(length, length);
         if(column.classList.contains('minimized')){
             titleInput.classList.add("vertical-text");
+        }
+        else{
+            titleInput.classList.remove("vertical-text");
         }
     });
 
@@ -339,9 +384,8 @@ function createColumn(title, id, minimized = false, emoji = null) {
     titleGroup.appendChild(emojiButton);
     titleGroup.appendChild(titleInput);
     titleGroup.appendChild(titleSpan);
-    titleGroup.appendChild(openAllButton);
     headerContainer.appendChild(titleGroup);
-    headerContainer.appendChild(deleteButton);
+    headerContainer.appendChild(menuContainer);
 
     // Append header container to the column
     column.appendChild(headerContainer);
@@ -356,6 +400,7 @@ function createColumn(title, id, minimized = false, emoji = null) {
     return column;
 }
 function deleteColumn(event) {
+    closeAllMenus();
     let column = event;
     if(event instanceof Event){
         column = event.target.closest(".column");
@@ -366,8 +411,8 @@ function deleteColumn(event) {
     column.remove();
     saveColumnState();
 }
-function openAllInColumn(event, title) {
-    const column = event.target.closest(".column");
+function openAllInColumn(column, title) {
+    closeAllMenus();
     const tabItems = column.querySelectorAll('.tab-item');
     const urls = Array.from(tabItems).map(tabItem => tabItem.dataset.url);
     // Open all tabs
@@ -390,7 +435,8 @@ function minimizeColumn(column) {
     const maximizeButton = column.querySelector(".maximize-column");
     const minimizeButton = column.querySelector(".minimize-column");
     const titleGroup = column.querySelector(".title-group");
-    const deleteButton = column.querySelector(".delete-column");
+    const menuContainer = column.querySelector(".menu-container");
+    const menuButton = column.querySelector(".more-options");
     const headerContainer = column.querySelector(".header-container");
 
     column.classList.add("minimized");
@@ -398,7 +444,8 @@ function minimizeColumn(column) {
     titleGroup.classList.add("vertical");
     maximizeButton.style.display = "inline";
     minimizeButton.style.display = "none";
-    deleteButton.style.display = "inline";
+    menuContainer.classList.add("vertical");
+    menuButton.classList.add("vertical");
     headerContainer.classList.add("vertical");
 
     // Hide all tab items in the column
@@ -412,7 +459,8 @@ function maximizeColumn(column) {
     const titleGroup = column.querySelector(".title-group");
     const maximizeButton = column.querySelector(".maximize-column");
     const minimizeButton = column.querySelector(".minimize-column");
-    const deleteButton = column.querySelector(".delete-column");
+    const menuContainer = column.querySelector(".menu-container");
+    const menuButton = column.querySelector(".more-options");
     const headerContainer = column.querySelector(".header-container");
 
     column.classList.remove("minimized");
@@ -420,7 +468,8 @@ function maximizeColumn(column) {
     titleGroup.classList.remove("vertical");
     maximizeButton.style.display = "none";
     minimizeButton.style.display = "inline";
-    deleteButton.style.display = "inline";
+    menuContainer.classList.remove("vertical");
+    menuButton.classList.remove("vertical");
     headerContainer.classList.remove("vertical");
 
     // Show all tab items in the column
@@ -440,12 +489,6 @@ function handleDragStart(event) {
     event.dataTransfer.setDragImage(tabItem, 0, 0);
     dropType = "list-item";
     tabItem.classList.add("dragging");
-}
-function handleDragEnd(event) {
-    event.target.closest('.tab-item').classList.remove("dragging");
-    if (dropIndicator) {
-        dropIndicator.style.display = 'none';
-    }
 }
 function calculateDropPosition(event, tabItems, isMinimized = false) {
     if(isMinimized){
@@ -471,43 +514,50 @@ function handleDragLeave(event) {
 }
 function handleDragOver(event) {
     event.preventDefault();
+    const scrollThreshold = 200;
+    const scrollSpeed = 100;
+    const columnsContainer = document.getElementById('columns-container');
+    const containerRect = columnsContainer.getBoundingClientRect();
+    const spaceContainer = document.getElementById('space-container');
+    const spaceContainerRect = spaceContainer.getBoundingClientRect();
 
-    const scrollThreshold = 250;
-    const scrollSpeed = 72;
-    if (event.clientX < scrollThreshold) {
-        window.scrollBy({ left: -scrollSpeed, behavior: 'smooth' });
-    } else if (window.innerWidth - event.clientX < scrollThreshold) {
-        window.scrollBy({ left: scrollSpeed, behavior: 'smooth' });
+    // Handle auto-scrolling
+    if (event.clientX < containerRect.left + scrollThreshold) {
+        columnsContainer.scrollBy({ left: -scrollSpeed, behavior: 'smooth' });
+    } else if (containerRect.right - event.clientX < scrollThreshold) {
+        columnsContainer.scrollBy({ left: scrollSpeed, behavior: 'smooth' });
     }
-    if (event.clientY < scrollThreshold) {
-        window.scrollBy({ top: -scrollSpeed, behavior: 'smooth' });
-    } else if (window.innerHeight - event.clientY < scrollThreshold) {
-        window.scrollBy({ top: scrollSpeed, behavior: 'smooth' });
+    if (event.clientY < containerRect.top + scrollThreshold) {
+        columnsContainer.scrollBy({ top: -scrollSpeed, behavior: 'smooth' });
+    } else if (containerRect.bottom - event.clientY < scrollThreshold) {
+        columnsContainer.scrollBy({ top: scrollSpeed, behavior: 'smooth' });
     }
 
     deletionArea.style.display = 'flex';
-    if(event.target === deletionArea) {
+    if (event.target === deletionArea) {
         deletionArea.classList.add('deletion-area-active');
         dropIndicator.style.display = 'none';
         event.dataTransfer.dropEffect = 'move';
         return;
-    }
-    else if(event.target === newColumnIndicator) {
+    } else if (event.target === newColumnIndicator) {
         newColumnIndicator.classList.add('new-column-indicator-active');
         dropIndicator.style.display = 'none';
         event.dataTransfer.dropEffect = 'move';
         return;
     }
-    const column = event.target.closest('.column') || event.target.closest('#open-tabs-list');
-    const columnsContainer = document.getElementById('columns-container');
-    const isMinimized = column && column.classList.contains('minimized');
     
+    const column = event.target.closest('.column') || event.target.closest('#open-tabs-list');
+    const isMinimized = column && column.classList.contains('minimized');
+
     if (!dropIndicator) {
         dropIndicator = document.createElement('div');
         dropIndicator.className = 'drop-indicator';
-        document.body.appendChild(dropIndicator);
+        spaceContainer.appendChild(dropIndicator);
     }
-    
+
+    // Get the container's scroll position
+    const containerScrollTop = columnsContainer.scrollTop;
+
     if (dropType === "list-item" && column) {
         // Handle list item drag over
         newColumnIndicator.style.display = 'flex';
@@ -515,43 +565,108 @@ function handleDragOver(event) {
         const listItems = Array.from(column.querySelectorAll('.tab-item'));
         const dropPosition = calculateDropPosition(event, listItems, isMinimized);
 
-        dropIndicator.style.width = `${rect.width}px`;
-        dropIndicator.style.height = '2px';
-        dropIndicator.style.left = `${rect.left + window.scrollX}px`;
-        dropIndicator.style.top = `${rect.top + window.scrollY}px`;
+        // Calculate initial positions and dimensions
+        let indicatorLeft = rect.left;
+        let width = rect.width;
 
+        // Handle left boundary cut-off
+        if (indicatorLeft < spaceContainerRect.left) {
+            const overlap = spaceContainerRect.left - indicatorLeft;
+            indicatorLeft = spaceContainerRect.left;
+            width -= overlap;
+        }
+
+        // Handle right boundary cut-off
+        const rightEdge = indicatorLeft + width;
+        if (rightEdge > spaceContainerRect.right) {
+            const overlap = rightEdge - spaceContainerRect.right;
+            width -= overlap;
+        }
+
+        dropIndicator.style.width = `${Math.max(0, width)}px`;
+        dropIndicator.style.height = '2px';
+        dropIndicator.style.left = `${indicatorLeft}px`;
+
+        // Calculate and constrain top position
+        let indicatorTop;
         if (dropPosition === listItems.length) {
             const lastItem = listItems[listItems.length - 1];
-            if(isMinimized){
-                dropIndicator.style.top = rect.top + window.scrollY;
-            }
-            else{
-                dropIndicator.style.top = lastItem ? `${lastItem.getBoundingClientRect().bottom + window.scrollY}px` : `${rect.top + window.scrollY}px`;
+            if (isMinimized) {
+                indicatorTop = rect.top + containerScrollTop;
+            } else {
+                indicatorTop = lastItem 
+                    ? lastItem.getBoundingClientRect().bottom + containerScrollTop
+                    : rect.top + containerScrollTop;
             }
         } else {
-            dropIndicator.style.top = `${listItems[dropPosition].getBoundingClientRect().top + window.scrollY}px`;
+            indicatorTop = listItems[dropPosition].getBoundingClientRect().top + containerScrollTop;
         }
-    } 
-    else if (dropType === "column" && columnsContainer) {
+        
+        // Handle vertical boundaries
+        if (indicatorTop < spaceContainerRect.top) {
+            indicatorTop = spaceContainerRect.top;
+        }
+        if (indicatorTop + 2 > spaceContainerRect.bottom) {
+            indicatorTop = spaceContainerRect.bottom - 2;
+        }
+        
+        dropIndicator.style.top = `${indicatorTop}px`;
+        
+    } else if (dropType === "column" && columnsContainer) {
         // Handle column drag over
         const rect = columnsContainer.getBoundingClientRect();
         const columns = Array.from(columnsContainer.querySelectorAll('.column'));
         const dropPosition = calculateColumnDropPosition(event, columns);
 
-        dropIndicator.style.width = '2px';
-        dropIndicator.style.height = `${rect.height}px`;
-        dropIndicator.style.top = `${rect.top}px`;
+        // Calculate initial dimensions
+        let indicatorLeft;
+        const width = 2;
+        let height = rect.height;
 
         if (dropPosition === columns.length) {
             const lastColumn = columns[columns.length - 1];
-            dropIndicator.style.left = lastColumn ? `${lastColumn.getBoundingClientRect().right + window.scrollX}px` : `${rect.left + window.scrollX}px`;
+            indicatorLeft = lastColumn 
+                ? lastColumn.getBoundingClientRect().right
+                : rect.left;
         } else {
             const targetColumn = columns[dropPosition];
-            const targetRect = targetColumn.getBoundingClientRect();
-            dropIndicator.style.left = `${targetRect.left + window.scrollX}px`;
+            indicatorLeft = targetColumn.getBoundingClientRect().left;
         }
+
+        // Handle horizontal boundaries
+        if (indicatorLeft < spaceContainerRect.left) {
+            indicatorLeft = spaceContainerRect.left;
+        }
+        const rightEdge = indicatorLeft + width;
+        if (rightEdge > spaceContainerRect.right) {
+            indicatorLeft = spaceContainerRect.right - width;
+        }
+
+        // Calculate initial top position
+        let indicatorTop = rect.top + containerScrollTop;
+
+        // Handle top boundary cut-off
+        if (indicatorTop < spaceContainerRect.top) {
+            const overlap = spaceContainerRect.top - indicatorTop;
+            indicatorTop = spaceContainerRect.top;
+            height -= overlap;
+        }
+
+        // Handle bottom boundary cut-off
+        const bottomEdge = indicatorTop + height;
+        if (bottomEdge > spaceContainerRect.bottom) {
+            const overlap = bottomEdge - spaceContainerRect.bottom;
+            height -= overlap;
+        }
+
+        dropIndicator.style.width = `${width}px`;
+        dropIndicator.style.height = `${Math.max(0, height)}px`;
+        dropIndicator.style.left = `${indicatorLeft}px`;
+        dropIndicator.style.top = `${indicatorTop}px`;
+        
         newColumnIndicator.style.display = 'none';
-    } 
+    }
+    
     dropIndicator.style.display = 'block';
     event.dataTransfer.dropEffect = 'move';
 }
@@ -635,7 +750,6 @@ function handleDrop(event) {
         return;
     }
     else if(event.target === newColumnIndicator) {
-        newColumnIndicator.style.display = 'none';
         const newColumn = createColumn("New Column");
         itemsToProcess.forEach(item => {
             if(item.id.startsWith('opentab-')) {
@@ -701,10 +815,14 @@ function handleDrop(event) {
         });
     }
 
+    saveColumnState();
+}
+function handleDragEnd(event) {
+    event.target.closest('.tab-item')?.classList.remove("dragging");
+    event.target.closest('.column')?.classList.remove("dragging");
+    if (deletionArea) deletionArea.style.display = 'none';
     if (dropIndicator) dropIndicator.style.display = 'none';
     if (newColumnIndicator) newColumnIndicator.style.display = 'none';
-
-    saveColumnState();
 }
 
 /* Column Drag and Drop */
@@ -720,12 +838,6 @@ function handleColumnDragStart(event) {
     event.dataTransfer.setDragImage(column, 0, 0);
     dropType = "column";
     column.classList.add("dragging");
-}
-function handleColumnDragEnd(event) {
-    event.target.closest('.column').classList.remove("dragging");
-    if (dropIndicator) {
-        dropIndicator.style.display = 'none';
-    }
 }
 function calculateColumnDropPosition(event, columns) {
     let dropPosition = columns.length;
@@ -784,13 +896,14 @@ function displaySavedTabs(tabs) {
         const columnState = result.columnState || [];
         if(columnState.length === 0) {
             createColumn("New Column");
+            saveColumnState();
         } else {
             console.log(columnState);
             columnState.forEach(columnData => {
                 const column = createColumn(columnData.title, columnData.id, columnData.minimized, columnData.emoji);
                 column.setAttribute('draggable', 'true');
                 column.addEventListener('dragstart', handleColumnDragStart);
-                column.addEventListener('dragend', handleColumnDragEnd);
+                column.addEventListener('dragend', handleDragEnd);
                 columnData.tabIds.forEach(tabId => {
                     const tab = tabs.find(t => `${t.id}` === tabId.split('-')[1]);
                     if(tab){
@@ -889,7 +1002,6 @@ function displaySavedTabs(tabs) {
                                 closeAllMenus();
                                 return;
                             }
-
                             closeAllMenus();
 
                             const optionsMenu = document.createElement('div');
@@ -904,26 +1016,15 @@ function displaySavedTabs(tabs) {
                                 <button class="menu-option color-tab" data-index="${tab.id}">Color</button>
                                 <button class="menu-option delete-tab" data-index="${tab.id}">Delete</button>
                             `;
-                        
                             document.body.appendChild(optionsMenu);
                         
                             const rect = moreOptionsButton.getBoundingClientRect();
                             optionsMenu.style.top = `${rect.bottom + window.scrollY}px`;
                             optionsMenu.style.left = `${rect.left + window.scrollX}px`;
                             optionsMenu.style.display = 'flex';
-                            activeOptionsMenu = optionsMenu;
-                        
+                            activeOptionsMenu = optionsMenu;                        
                             let colorMenu = null;
-                        
-                            const handleClickOutside = (e) => {
-                                if (!optionsMenu.contains(e.target) && e.target !== moreOptionsButton) {
-                                    closeAllMenus();
-                                    document.removeEventListener('click', handleClickOutside);
-                                }
-                            };
-                        
-                            document.addEventListener('click', handleClickOutside);
-                        
+                      
                             // Color Tab option
                             const colorTabOption = optionsMenu.querySelector('.color-tab');
                             colorTabOption.addEventListener('click', (e) => {
@@ -948,7 +1049,6 @@ function displaySavedTabs(tabs) {
                                             console.log('Tab color saved:', tab.id, tab.color);
                                         });
                                         closeAllMenus();
-                                        document.removeEventListener('click', handleClickOutside);
                                     });
                                     colorMenu.appendChild(colorOption);
                                 });
@@ -1261,6 +1361,13 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 });
 
 fetchOpenTabs();
+document.querySelector('.minimize-sidebar').addEventListener('click', () => {
+    document.getElementById('sidebar').classList.add('collapsed');
+});
+document.querySelector('.maximize-sidebar').addEventListener('click', () => {
+    document.getElementById('sidebar').classList.remove('collapsed');
+});
+
 chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
     let columnState = data.columnState || [];
     const bgTabs = data.bgTabs || [];
@@ -1286,8 +1393,11 @@ displaySavedTabs(tabs_in_storage);
 document.addEventListener('dragover', function(event) {
     event.preventDefault();
 });
-document.addEventListener('drop', function(event) {
-    if (dropIndicator) dropIndicator.style.display = 'none';
-    if (newColumnIndicator) newColumnIndicator.style.display = 'none';
-    if (deletionArea) deletionArea.style.display = 'none';
-});
+const handleClickOutside = (e) => {
+    const moreOptionsButtons = document.querySelectorAll('.more-options, .menu-option');
+    const isMoreOptionsButton = Array.from(moreOptionsButtons).some(button => button === e.target);
+    if (!isMoreOptionsButton) {
+        closeAllMenus();
+    }
+};
+document.addEventListener('click', handleClickOutside);
