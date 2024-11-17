@@ -398,7 +398,7 @@ function minimizeColumn(column) {
     titleGroup.classList.add("vertical");
     maximizeButton.style.display = "inline";
     minimizeButton.style.display = "none";
-    deleteButton.style.display = "none";
+    deleteButton.style.display = "inline";
     headerContainer.classList.add("vertical");
 
     // Hide all tab items in the column
