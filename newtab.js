@@ -520,6 +520,7 @@ function handleDragOver(event) {
     const containerRect = columnsContainer.getBoundingClientRect();
     const spaceContainer = document.getElementById('space-container');
     const spaceContainerRect = spaceContainer.getBoundingClientRect();
+    const sidebar = document.getElementById('sidebar');
 
     // Handle auto-scrolling
     if (event.clientX < containerRect.left + scrollThreshold) {
@@ -546,7 +547,9 @@ function handleDragOver(event) {
         return;
     }
     
-    const column = event.target.closest('.column') || event.target.closest('#open-tabs-list');
+    const column = event.target.closest('.column');
+    const openTabsList = event.target.closest('#open-tabs-list');
+    const element = column || openTabsList;
     const isMinimized = column && column.classList.contains('minimized');
 
     if (!dropIndicator) {
@@ -555,14 +558,14 @@ function handleDragOver(event) {
         spaceContainer.appendChild(dropIndicator);
     }
 
-    // Get the container's scroll position
-    const containerScrollTop = columnsContainer.scrollTop;
+    // Get the appropriate scroll position based on container
+    const containerScrollTop = openTabsList ? sidebar.scrollTop : columnsContainer.scrollTop;
 
-    if (dropType === "list-item" && column) {
+    if (dropType === "list-item" && element) {
         // Handle list item drag over
-        newColumnIndicator.style.display = 'flex';
-        const rect = column.getBoundingClientRect();
-        const listItems = Array.from(column.querySelectorAll('.tab-item'));
+        newColumnIndicator.style.display = openTabsList ? 'none' : 'flex';
+        const rect = element.getBoundingClientRect();
+        const listItems = Array.from(element.querySelectorAll('.tab-item'));
         const dropPosition = calculateDropPosition(event, listItems, isMinimized);
 
         // Calculate initial positions and dimensions
@@ -570,17 +573,24 @@ function handleDragOver(event) {
         let width = rect.width;
 
         // Handle left boundary cut-off
-        if (indicatorLeft < spaceContainerRect.left) {
-            const overlap = spaceContainerRect.left - indicatorLeft;
-            indicatorLeft = spaceContainerRect.left;
-            width -= overlap;
-        }
+        if (openTabsList) {
+            // For open-tabs-list, use its own boundaries
+            const openTabsRect = openTabsList.getBoundingClientRect();
+            indicatorLeft = openTabsRect.left;
+            width = openTabsRect.width;
+        } else {
+            // For columns, use space container boundaries
+            if (indicatorLeft < spaceContainerRect.left) {
+                const overlap = spaceContainerRect.left - indicatorLeft;
+                indicatorLeft = spaceContainerRect.left;
+                width -= overlap;
+            }
 
-        // Handle right boundary cut-off
-        const rightEdge = indicatorLeft + width;
-        if (rightEdge > spaceContainerRect.right) {
-            const overlap = rightEdge - spaceContainerRect.right;
-            width -= overlap;
+            const rightEdge = indicatorLeft + width;
+            if (rightEdge > spaceContainerRect.right) {
+                const overlap = rightEdge - spaceContainerRect.right;
+                width -= overlap;
+            }
         }
 
         dropIndicator.style.width = `${Math.max(0, width)}px`;
@@ -602,17 +612,28 @@ function handleDragOver(event) {
             indicatorTop = listItems[dropPosition].getBoundingClientRect().top + containerScrollTop;
         }
         
-        // Handle vertical boundaries
-        if (indicatorTop < spaceContainerRect.top) {
-            indicatorTop = spaceContainerRect.top;
-        }
-        if (indicatorTop + 2 > spaceContainerRect.bottom) {
-            indicatorTop = spaceContainerRect.bottom - 2;
+        // Handle vertical boundaries based on container
+        if (openTabsList) {
+            const sidebarRect = sidebar.getBoundingClientRect();
+            if (indicatorTop < sidebarRect.top) {
+                indicatorTop = sidebarRect.top;
+            }
+            if (indicatorTop + 2 > sidebarRect.bottom) {
+                indicatorTop = sidebarRect.bottom - 2;
+            }
+        } else {
+            if (indicatorTop < spaceContainerRect.top) {
+                indicatorTop = spaceContainerRect.top;
+            }
+            if (indicatorTop + 2 > spaceContainerRect.bottom) {
+                indicatorTop = spaceContainerRect.bottom - 2;
+            }
         }
         
         dropIndicator.style.top = `${indicatorTop}px`;
         
-    } else if (dropType === "column" && columnsContainer) {
+    } 
+    else if (dropType === "column" && columnsContainer) {
         // Handle column drag over
         const rect = columnsContainer.getBoundingClientRect();
         const columns = Array.from(columnsContainer.querySelectorAll('.column'));
