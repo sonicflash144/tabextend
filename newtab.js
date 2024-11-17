@@ -214,14 +214,20 @@ function createColumn(title, id, minimized = false) {
     minimizeButton.classList.add("minimize-column");
     minimizeButton.title = "Minimize Column";
     minimizeButton.innerHTML = `<img src="../icons/minimize.svg" width="24" height="24" class="main-grid-item-icon" />`;
-    minimizeButton.addEventListener("click", () => minimizeColumn(column));
+    minimizeButton.addEventListener("click", () => {
+        minimizeColumn(column);
+        saveColumnState();
+    });
 
     // Add maximize button to the column
     const maximizeButton = document.createElement("button");
     maximizeButton.classList.add("maximize-column");
     maximizeButton.title = "Maximize Column";
     maximizeButton.innerHTML = `<img src="../icons/maximize.svg" width="24" height="24" class="main-grid-item-icon" />`;
-    maximizeButton.addEventListener("click", () => maximizeColumn(column));
+    maximizeButton.addEventListener("click", () => {
+        maximizeColumn(column);
+        saveColumnState();
+    });
     maximizeButton.style.display = minimized ? "inline" : "none"; // Initially hidden if not minimized
 
     // Add title input to the column
@@ -281,11 +287,15 @@ function createColumn(title, id, minimized = false) {
     });
 
     // Append open all button, title, and delete button to the header container
+    const titleGroup = document.createElement("div");
+    titleGroup.classList.add("title-group");
+
     headerContainer.appendChild(minimizeButton);
     headerContainer.appendChild(maximizeButton);
-    headerContainer.appendChild(openAllButton);
-    headerContainer.appendChild(titleInput);
-    headerContainer.appendChild(titleSpan);
+    titleGroup.appendChild(titleInput);
+    titleGroup.appendChild(titleSpan);
+    titleGroup.appendChild(openAllButton);
+    headerContainer.appendChild(titleGroup);
     headerContainer.appendChild(deleteButton);
 
     // Append header container to the column
@@ -341,7 +351,6 @@ function minimizeColumn(column) {
     tabItems.forEach(tabItem => {
         tabItem.style.display = "none";
     });
-    saveColumnState();
 }
 function maximizeColumn(column) {
     const titleSpan = column.querySelector(".column-title-text");
@@ -364,7 +373,6 @@ function maximizeColumn(column) {
     tabItems.forEach(tabItem => {
         tabItem.style.display = "flex";
     });
-    saveColumnState();
 }
 
 /* Tab Drag and Drop */
