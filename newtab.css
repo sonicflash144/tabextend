@@ -4,6 +4,7 @@ body {
     margin: 0;
     display: flex;
     box-sizing: border-box;
+    overflow: hidden;
 }
 h1, h2 {
     text-align: center;
@@ -262,7 +263,6 @@ h1, h2 {
     width: 100%;
     max-width: 100%;
     overflow: hidden;
-    flex-shrink: 0;
     box-sizing: border-box;
 }
     #space-div {
