@@ -40,9 +40,11 @@ h1, h2 {
 
 #sidebar {
     width: 20vw;
+    height: calc(100vh - 32px);
     background-color: #f0f0f0;
-    padding: 20px;
-    border-right: 1px solid #ddd;
+    padding: 16px;
+    overflow-y: auto;
+    box-sizing: border-box;
 }
     #sidebar.collapsed {
         width: 0;
@@ -61,7 +63,7 @@ h1, h2 {
 #open-tabs-list {
     list-style-type: none;
     padding: 0;
-    height: 100%;
+    height: calc(100vh - 128px);
 }
 
 #save-selected {
@@ -154,7 +156,6 @@ h1, h2 {
     .tab-info-left {
         width: 36px;
         margin-right: 8px;
-        display: flex;
         cursor: pointer;
     }
     .tab-info-right {
@@ -183,6 +184,14 @@ h1, h2 {
     align-items: center;
     height: 50px;
 }
+    .header-container.vertical {
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-start;
+        height: auto;
+        gap: 16px;
+    }
+    
 #space-container {
     display: flex;
     justify-content: flex-start;
@@ -202,12 +211,12 @@ h1, h2 {
     border-radius: 5px;
     padding: 10px;
     width: 20vw;
-    min-height: 20vw;
+    height: calc(100vh - 152px);
     background-color: #f0f0f0;
     flex-shrink: 0;
     margin-right: 10px;
     list-style-type: none;
-    height: 100%;
+    overflow-y: auto;
 }
     .column-title {
         width: 50%;
@@ -279,7 +288,7 @@ h1, h2 {
     right: 0;
     height: 80px;
     width: 25%;
-    background-color: rgba(255, 0, 0, 0.3);
+    background-color: rgba(255, 0, 0, 0.2);
     display: none;
     justify-content: center;
     align-items: center;
@@ -289,7 +298,7 @@ h1, h2 {
     border-radius: 5px;
 }
     #deletion-area.deletion-area-active {
-        background-color: rgba(255, 0, 0, 0.6);
+        background-color: rgba(255, 0, 0, 0.5);
     }
 
 .delete-icon, .new-column-icon {
@@ -299,7 +308,7 @@ h1, h2 {
 }
 
 .new-column-indicator {
-    background-color: rgba(0, 255, 0, 0.3);
+    background-color: rgba(0, 255, 0, 0.2);
     width: 20vw;
     min-height: 20vw;
     display: none;
@@ -309,5 +318,23 @@ h1, h2 {
     flex-shrink: 0;
 }
     .new-column-indicator.new-column-indicator-active {
-        background-color: rgba(0, 255, 0, 0.6);
+        background-color: rgba(0, 255, 0, 0.5);
     }
+
+.column.minimized {
+    width: 50px;
+    padding: 4px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.vertical-text {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

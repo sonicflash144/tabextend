@@ -169,10 +169,13 @@ function saveColumnState() {
         const tabItems = column.querySelectorAll('.tab-item');
         const tabIds = Array.from(tabItems).map(tabItem => tabItem.id);
         const columnTitle = column.querySelector('.column-title-text').textContent;
+        const isMinimized = column.classList.contains('minimized');
+        
         columnState.push({
             id: columnId,
             tabIds: tabIds,
             title: columnTitle,
+            minimized: isMinimized
         });
     });
 
@@ -180,10 +183,16 @@ function saveColumnState() {
         console.log('Column state saved:', columnState);
     });
 }
-function createColumn(title, id) {
+function createColumn(title, id, minimized = false) {
     const columnsContainer = document.getElementById("columns-container");
     const column = document.createElement("div");
     column.classList.add("column");
+    if (minimized){
+        column.classList.add("minimized");
+    }
+    else{
+        column.classList.remove("minimized");
+    }
     if(id) column.id = id;
     else column.id = `column-${Date.now()}`;
     column.addEventListener("dragover", handleDragOver);
@@ -199,6 +208,21 @@ function createColumn(title, id) {
     openAllButton.title = "Open All";
     openAllButton.innerHTML = `<img src="../icons/openall.svg" width="24" height="24" class="main-grid-item-icon" />`;
     openAllButton.addEventListener("click", openAllInColumn);
+
+    // Add minimize button to the column
+    const minimizeButton = document.createElement("button");
+    minimizeButton.classList.add("minimize-column");
+    minimizeButton.title = "Minimize Column";
+    minimizeButton.innerHTML = `<img src="../icons/minimize.svg" width="24" height="24" class="main-grid-item-icon" />`;
+    minimizeButton.addEventListener("click", () => minimizeColumn(column));
+
+    // Add maximize button to the column
+    const maximizeButton = document.createElement("button");
+    maximizeButton.classList.add("maximize-column");
+    maximizeButton.title = "Maximize Column";
+    maximizeButton.innerHTML = `<img src="../icons/maximize.svg" width="24" height="24" class="main-grid-item-icon" />`;
+    maximizeButton.addEventListener("click", () => maximizeColumn(column));
+    maximizeButton.style.display = minimized ? "inline" : "none"; // Initially hidden if not minimized
 
     // Add title input to the column
     const titleInput = document.createElement("input");
@@ -244,6 +268,9 @@ function createColumn(title, id) {
         titleInput.focus();
         const length = titleInput.value.length;
         titleInput.setSelectionRange(length, length);
+        if(column.classList.contains('minimized')){
+            titleInput.classList.add("vertical-text");
+        }
     });
 
     // Event listener to save on Enter key press
@@ -254,6 +281,8 @@ function createColumn(title, id) {
     });
 
     // Append open all button, title, and delete button to the header container
+    headerContainer.appendChild(minimizeButton);
+    headerContainer.appendChild(maximizeButton);
     headerContainer.appendChild(openAllButton);
     headerContainer.appendChild(titleInput);
     headerContainer.appendChild(titleSpan);
@@ -290,6 +319,52 @@ function openAllInColumn(event) {
     urls.forEach(url => {
         window.open(url, '_blank');
     });
+}
+function minimizeColumn(column) {
+    const titleSpan = column.querySelector(".column-title-text");
+    const maximizeButton = column.querySelector(".maximize-column");
+    const minimizeButton = column.querySelector(".minimize-column");
+    const openAllButton = column.querySelector(".open-all");
+    const deleteButton = column.querySelector(".delete-column");
+    const headerContainer = column.querySelector(".header-container");
+
+    column.classList.add("minimized");
+    titleSpan.classList.add("vertical-text");
+    maximizeButton.style.display = "inline";
+    minimizeButton.style.display = "none";
+    openAllButton.style.display = "none";
+    deleteButton.style.display = "none";
+    headerContainer.classList.add("vertical");
+
+    // Hide all tab items in the column
+    const tabItems = column.querySelectorAll('.tab-item');
+    tabItems.forEach(tabItem => {
+        tabItem.style.display = "none";
+    });
+    saveColumnState();
+}
+function maximizeColumn(column) {
+    const titleSpan = column.querySelector(".column-title-text");
+    const maximizeButton = column.querySelector(".maximize-column");
+    const minimizeButton = column.querySelector(".minimize-column");
+    const openAllButton = column.querySelector(".open-all");
+    const deleteButton = column.querySelector(".delete-column");
+    const headerContainer = column.querySelector(".header-container");
+
+    column.classList.remove("minimized");
+    titleSpan.classList.remove("vertical-text");
+    maximizeButton.style.display = "none";
+    minimizeButton.style.display = "inline";
+    openAllButton.style.display = "inline";
+    deleteButton.style.display = "inline";
+    headerContainer.classList.remove("vertical");
+
+    // Show all tab items in the column
+    const tabItems = column.querySelectorAll('.tab-item');
+    tabItems.forEach(tabItem => {
+        tabItem.style.display = "flex";
+    });
+    saveColumnState();
 }
 
 /* Tab Drag and Drop */
@@ -331,8 +406,8 @@ function handleDragLeave(event) {
 function handleDragOver(event) {
     event.preventDefault();
 
-    const scrollThreshold = 100;
-    const scrollSpeed = 36;
+    const scrollThreshold = 250;
+    const scrollSpeed = 72;
     if (event.clientX < scrollThreshold) {
         window.scrollBy({ left: -scrollSpeed, behavior: 'smooth' });
     } else if (window.innerWidth - event.clientX < scrollThreshold) {
@@ -593,7 +668,6 @@ function calculateFormattedDate(parsedDate) {
     let dateDisplayColor = null;
     if (parsedDate) {
         parsedDate = new Date(parsedDate);
-        console.log(parsedDate);
         diffDays = getToday(parsedDate);
         if (diffDays === 0) {
             formattedDate = 'Today';
@@ -635,7 +709,7 @@ function displaySavedTabs(tabs) {
         } else {
             console.log(columnState);
             columnState.forEach(columnData => {
-                const column = createColumn(columnData.title, columnData.id);
+                const column = createColumn(columnData.title, columnData.id, columnData.minimized);
                 column.setAttribute('draggable', 'true');
                 column.addEventListener('dragstart', handleColumnDragStart);
                 column.addEventListener('dragend', handleColumnDragEnd);
@@ -948,6 +1022,9 @@ function displaySavedTabs(tabs) {
                         });
                     }
                 });
+                if(columnData.minimized) {
+                    minimizeColumn(column);
+                }
             });
         }
         newColumnIndicator = document.createElement('div');
