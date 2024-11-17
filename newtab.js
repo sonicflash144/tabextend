@@ -1,4 +1,5 @@
 import { Chrono } from 'chrono-node';
+import 'emoji-picker-element';
 let dropIndicator = null;
 let dropType = null;
 let deletionArea;
@@ -170,12 +171,14 @@ function saveColumnState() {
         const tabIds = Array.from(tabItems).map(tabItem => tabItem.id);
         const columnTitle = column.querySelector('.column-title-text').textContent;
         const isMinimized = column.classList.contains('minimized');
+        const emoji = column.dataset.emoji;
         
         columnState.push({
             id: columnId,
             tabIds: tabIds,
             title: columnTitle,
-            minimized: isMinimized
+            minimized: isMinimized,
+            emoji: emoji
         });
     });
 
@@ -183,7 +186,7 @@ function saveColumnState() {
         console.log('Column state saved:', columnState);
     });
 }
-function createColumn(title, id, minimized = false) {
+function createColumn(title, id, minimized = false, emoji = null) {
     const columnsContainer = document.getElementById("columns-container");
     const column = document.createElement("div");
     column.classList.add("column");
@@ -281,12 +284,59 @@ function createColumn(title, id, minimized = false) {
         }
     });
 
+    // Function to generate a random emoji
+    const getRandomEmoji = () => {
+        const range = [0x1F34F, 0x1F37F]; // Food and Drink        
+        const codePoint = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
+        return String.fromCodePoint(codePoint);
+    };
+
+    // Create emoji button and span
+    const emojiButton = document.createElement("button");
+    emojiButton.classList.add("emoji-button");
+    emojiButton.textContent = emoji || getRandomEmoji();
+
+    // Store the emoji as a data attribute on the column
+    column.dataset.emoji = emojiButton.textContent;
+
+    // Create and configure the emoji picker element
+    const emojiPicker = document.createElement('emoji-picker');
+    emojiPicker.classList.add('emoji-picker-on-top');
+    emojiPicker.style.display = 'none';
+    emojiPicker.addEventListener('emoji-click', (event) => {
+        const newEmoji = event.detail.unicode;
+        emojiButton.textContent = newEmoji;
+        column.dataset.emoji = newEmoji;
+        emojiPicker.style.display = 'none';
+        saveColumnState();
+    });
+
+    // Toggle emoji picker when clicking the emoji button
+    emojiButton.addEventListener('click', () => {
+        if (emojiPicker.style.display === 'none') {
+            const rect = emojiButton.getBoundingClientRect();
+            emojiPicker.style.top = `${rect.bottom + 4}px`;
+            emojiPicker.style.left = `${rect.left}px`;
+            emojiPicker.style.display = 'block';
+        } else {
+            emojiPicker.style.display = 'none';
+        }
+    });
+    // Hide emoji picker when clicking outside
+    document.addEventListener('click', (event) => {
+        if (!emojiButton.contains(event.target) && !emojiPicker.contains(event.target)) {
+            emojiPicker.style.display = 'none';
+        }
+    });
+
     // Append open all button, title, and delete button to the header container
     const titleGroup = document.createElement("div");
     titleGroup.classList.add("title-group");
 
     headerContainer.appendChild(minimizeButton);
     headerContainer.appendChild(maximizeButton);
+    titleGroup.appendChild(emojiPicker);
+    titleGroup.appendChild(emojiButton);
     titleGroup.appendChild(titleInput);
     titleGroup.appendChild(titleSpan);
     titleGroup.appendChild(openAllButton);
@@ -397,7 +447,10 @@ function handleDragEnd(event) {
         dropIndicator.style.display = 'none';
     }
 }
-function calculateDropPosition(event, tabItems) {
+function calculateDropPosition(event, tabItems, isMinimized = false) {
+    if(isMinimized){
+        return tabItems.length;
+    } 
     let dropPosition = tabItems.length;
     for (let i = 0; i < tabItems.length; i++) {
         const tabRect = tabItems[i].getBoundingClientRect();
@@ -447,6 +500,7 @@ function handleDragOver(event) {
     }
     const column = event.target.closest('.column') || event.target.closest('#open-tabs-list');
     const columnsContainer = document.getElementById('columns-container');
+    const isMinimized = column && column.classList.contains('minimized');
     
     if (!dropIndicator) {
         dropIndicator = document.createElement('div');
@@ -459,7 +513,7 @@ function handleDragOver(event) {
         newColumnIndicator.style.display = 'flex';
         const rect = column.getBoundingClientRect();
         const listItems = Array.from(column.querySelectorAll('.tab-item'));
-        const dropPosition = calculateDropPosition(event, listItems);
+        const dropPosition = calculateDropPosition(event, listItems, isMinimized);
 
         dropIndicator.style.width = `${rect.width}px`;
         dropIndicator.style.height = '2px';
@@ -468,7 +522,12 @@ function handleDragOver(event) {
 
         if (dropPosition === listItems.length) {
             const lastItem = listItems[listItems.length - 1];
-            dropIndicator.style.top = lastItem ? `${lastItem.getBoundingClientRect().bottom + window.scrollY}px` : `${rect.top + window.scrollY}px`;
+            if(isMinimized){
+                dropIndicator.style.top = rect.top + window.scrollY;
+            }
+            else{
+                dropIndicator.style.top = lastItem ? `${lastItem.getBoundingClientRect().bottom + window.scrollY}px` : `${rect.top + window.scrollY}px`;
+            }
         } else {
             dropIndicator.style.top = `${listItems[dropPosition].getBoundingClientRect().top + window.scrollY}px`;
         }
@@ -498,7 +557,7 @@ function handleDragOver(event) {
 }
 function handleDrop(event) {
     event.preventDefault();
-    
+
     // Check if it's a column drop
     const columnsContainer = document.getElementById('columns-container');
     const newColumnIndicator = columnsContainer.querySelector('.new-column-indicator');
@@ -541,12 +600,10 @@ function handleDrop(event) {
 
     // Continue with tab drop logic
     const column = event.target.closest('.column') || event.target.closest('#open-tabs-list');
+    const isMinimized = column && column.classList.contains('minimized');
     if (!column && event.target !== deletionArea && event.target !== newColumnIndicator) {
-        if (dropIndicator) dropIndicator.style.display = 'none';
-        if (newColumnIndicator) newColumnIndicator.style.display = 'none';
         return;
     }
-
     let tabId = event.dataTransfer.getData("text/plain");
     const tabItem = document.getElementById(tabId);
     if (!tabItem || !tabItem.classList.contains('tab-item')) return;
@@ -637,6 +694,13 @@ function handleDrop(event) {
         }
     });
 
+    if(isMinimized){
+        const updatedTabs = column.querySelectorAll('.tab-item');
+        updatedTabs.forEach(tabItem => {
+            tabItem.style.display = "none";
+        });
+    }
+
     if (dropIndicator) dropIndicator.style.display = 'none';
     if (newColumnIndicator) newColumnIndicator.style.display = 'none';
 
@@ -711,8 +775,9 @@ function calculateFormattedDate(parsedDate) {
 /* Tab Display */
 function displaySavedTabs(tabs) {
     const columnsContainer = document.getElementById("columns-container");
-    columnsContainer.addEventListener('dragover', handleDragOver);
-    columnsContainer.addEventListener('drop', handleDrop);
+    const mainContent = document.getElementById("main-content");
+    mainContent.addEventListener('dragover', handleDragOver);
+    mainContent.addEventListener('drop', handleDrop);
     columnsContainer.innerHTML = "";
 
     chrome.storage.local.get('columnState', (result) => {
@@ -722,7 +787,7 @@ function displaySavedTabs(tabs) {
         } else {
             console.log(columnState);
             columnState.forEach(columnData => {
-                const column = createColumn(columnData.title, columnData.id, columnData.minimized);
+                const column = createColumn(columnData.title, columnData.id, columnData.minimized, columnData.emoji);
                 column.setAttribute('draggable', 'true');
                 column.addEventListener('dragstart', handleColumnDragStart);
                 column.addEventListener('dragend', handleColumnDragEnd);
@@ -868,7 +933,7 @@ function displaySavedTabs(tabs) {
                                     activeColorMenu = null;
                                     return;
                                 }
-                                const colorOptions = ['#FFFFFF', '#f7c2d6', '#f1ffc4', '#c6e2e9', '#e9c8fa'];
+                                const colorOptions = ['#FFFFFF', '#f7c2d6', '#f9ffc4', '#c6e2e9', '#e9c8fa'];
                                 colorMenu = document.createElement('div');
                                 colorMenu.classList.add('color-menu');
                             
@@ -1217,3 +1282,12 @@ chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
     });
 });
 displaySavedTabs(tabs_in_storage);
+
+document.addEventListener('dragover', function(event) {
+    event.preventDefault();
+});
+document.addEventListener('drop', function(event) {
+    if (dropIndicator) dropIndicator.style.display = 'none';
+    if (newColumnIndicator) newColumnIndicator.style.display = 'none';
+    if (deletionArea) deletionArea.style.display = 'none';
+});

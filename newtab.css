@@ -193,7 +193,7 @@ h1, h2 {
         align-items: center;
         flex-grow: 1;
         justify-content: center;
-        gap: 8px;
+        gap: 4px;
     }
     .title-group.vertical {
         flex-direction: column-reverse;
@@ -251,6 +251,19 @@ h1, h2 {
     list-style-type: none;
     overflow-y: auto;
 }
+    .emoji-picker-on-top {
+        position: absolute;
+        z-index: 9999;
+    }
+    .emoji-button {
+        background: none;
+        border: none;
+        font-size: 2em;
+        cursor: pointer;
+    }
+        .emoji-button:hover {
+            transform: scale(1.1);
+        }
     .column-title-text {
         max-width: 50%;
         display: none;
