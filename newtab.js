@@ -77,17 +77,6 @@ function closeAllMenus() {
         activeColumnMenu = null;
     }
 }
-function applySidebarState() {
-    browser.storage.local.get("sidebarCollapsed", (data) => {
-        const sidebar = document.getElementById("sidebar");
-        if (data.sidebarCollapsed) {
-            sidebar.classList.add("collapsed");
-        } else {
-            sidebar.classList.remove("collapsed");
-        }
-    });
-}
-applySidebarState();
 
 function deleteTab(id) {
     if (!Array.isArray(id)) {
