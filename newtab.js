@@ -1,5 +1,23 @@
 import { Chrono } from 'chrono-node';
 import 'emoji-picker-element';
+let sidebarCollapsed = false;
+chrome.storage.local.get("sidebarCollapsed", (data) => {
+    sidebarCollapsed = data.sidebarCollapsed;
+    const sidebar = document.getElementById('sidebar');
+    if (sidebarCollapsed) {
+        sidebar.classList.add('collapsed');
+        sidebar.classList.add('no-transition');
+        setTimeout(() => {
+            sidebar.classList.remove('no-transition');
+        }, 100);
+    }
+});
+let scrollAnimation = {
+    isScrolling: false,
+    scrollX: 0,
+    scrollY: 0,
+    animationFrameId: null
+};
 let dropIndicator = null;
 let dropType = null;
 let deletionArea;
@@ -241,6 +259,7 @@ function createColumn(title, id, minimized = false, emoji = null) {
         titleSpan.textContent = title;
         titleSpan.style.display = "inline";
         titleInput.style.display = "none";
+        column.dataset.title = title;
     }
 
     // Create three-dot menu container
@@ -266,7 +285,7 @@ function createColumn(title, id, minimized = false, emoji = null) {
         const menuDropdown = document.createElement("div");
         menuDropdown.className = "options-menu";
         const menuItems = [
-            { text: "Open All", icon: "../icons/openall.svg", action: () => openAllInColumn(column, title) },
+            { text: "Open All", icon: "../icons/openall.svg", action: () => openAllInColumn(column) },
             { text: "Delete Column", icon: "../icons/delete-icon.svg", action: () => deleteColumn(column) }
         ];
         menuItems.forEach(item => {
@@ -302,6 +321,7 @@ function createColumn(title, id, minimized = false, emoji = null) {
             titleSpan.style.display = "inline";
         }
         column.setAttribute("draggable", "true");
+        column.dataset.title = titleInput.value;
         saveColumnState();
     });
 
@@ -411,7 +431,7 @@ function deleteColumn(event) {
     column.remove();
     saveColumnState();
 }
-function openAllInColumn(column, title) {
+function openAllInColumn(column) {
     closeAllMenus();
     const tabItems = column.querySelectorAll('.tab-item');
     const urls = Array.from(tabItems).map(tabItem => tabItem.dataset.url);
@@ -426,7 +446,7 @@ function openAllInColumn(column, title) {
         const tabIds = tabs.map(tab => tab.id); // Extract tab IDs
         chrome.tabs.group({ tabIds: tabIds }, groupId => {
             // Set the title of the group
-            chrome.tabGroups.update(groupId, { title: title });
+            chrome.tabGroups.update(groupId, { title: column.querySelector('.column-title-text').textContent });
         });
     });
 }
@@ -512,26 +532,64 @@ function handleDragLeave(event) {
         newColumnIndicator.classList.remove('new-column-indicator-active');
     }
 }
+function startScrollAnimation(container) {
+    function animate() {
+        if (!scrollAnimation.isScrolling) return;
+
+        if (scrollAnimation.scrollX !== 0 || scrollAnimation.scrollY !== 0) {
+            container.scrollBy(scrollAnimation.scrollX, scrollAnimation.scrollY);
+            scrollAnimation.animationFrameId = requestAnimationFrame(animate);
+        } else {
+            stopScrollAnimation();
+        }
+    }
+
+    scrollAnimation.animationFrameId = requestAnimationFrame(animate);
+}
+function stopScrollAnimation() {
+    scrollAnimation.isScrolling = false;
+    scrollAnimation.scrollX = 0;
+    scrollAnimation.scrollY = 0;
+    if (scrollAnimation.animationFrameId) {
+        cancelAnimationFrame(scrollAnimation.animationFrameId);
+        scrollAnimation.animationFrameId = null;
+    }
+}
 function handleDragOver(event) {
     event.preventDefault();
-    const scrollThreshold = 200;
-    const scrollSpeed = 100;
+    const scrollThreshold = 240;
+    const maxScrollSpeed = 15;
     const columnsContainer = document.getElementById('columns-container');
     const containerRect = columnsContainer.getBoundingClientRect();
     const spaceContainer = document.getElementById('space-container');
     const spaceContainerRect = spaceContainer.getBoundingClientRect();
     const sidebar = document.getElementById('sidebar');
+    const sidebarRect = sidebar.getBoundingClientRect();
 
-    // Handle auto-scrolling
-    if (event.clientX < containerRect.left + scrollThreshold) {
-        columnsContainer.scrollBy({ left: -scrollSpeed, behavior: 'smooth' });
-    } else if (containerRect.right - event.clientX < scrollThreshold) {
-        columnsContainer.scrollBy({ left: scrollSpeed, behavior: 'smooth' });
+    function calculateScrollSpeed(distance) {
+        if (distance <= 0) return 0;
+        if (distance >= scrollThreshold) return 0;
+        
+        // Create a smooth acceleration curve
+        const scrollProgress = 1 - (distance / scrollThreshold);
+        return maxScrollSpeed * Math.pow(scrollProgress, 2);
     }
-    if (event.clientY < containerRect.top + scrollThreshold) {
-        columnsContainer.scrollBy({ top: -scrollSpeed, behavior: 'smooth' });
-    } else if (containerRect.bottom - event.clientY < scrollThreshold) {
-        columnsContainer.scrollBy({ top: scrollSpeed, behavior: 'smooth' });
+
+    // Calculate scroll speeds for each direction
+    const leftSpeed = calculateScrollSpeed(event.clientX - containerRect.left);
+    const rightSpeed = calculateScrollSpeed(containerRect.right - event.clientX);
+    const topSpeed = calculateScrollSpeed(event.clientY - containerRect.top);
+    const bottomSpeed = calculateScrollSpeed(containerRect.bottom - event.clientY);
+    scrollAnimation.scrollX = -leftSpeed + rightSpeed;
+    scrollAnimation.scrollY = -topSpeed + bottomSpeed;
+
+    // Start the animation if we're not already scrolling and there's movement needed
+    if (!scrollAnimation.isScrolling && (scrollAnimation.scrollX !== 0 || scrollAnimation.scrollY !== 0)) {
+        scrollAnimation.isScrolling = true;
+        startScrollAnimation(columnsContainer);
+    } else if (scrollAnimation.scrollX === 0 && scrollAnimation.scrollY === 0) {
+        // Stop scrolling if we're outside the scroll zones
+        stopScrollAnimation();
     }
 
     deletionArea.style.display = 'flex';
@@ -549,13 +607,16 @@ function handleDragOver(event) {
     
     const column = event.target.closest('.column');
     const openTabsList = event.target.closest('#open-tabs-list');
-    const element = column || openTabsList;
+    const element = openTabsList || column;
     const isMinimized = column && column.classList.contains('minimized');
 
     if (!dropIndicator) {
         dropIndicator = document.createElement('div');
         dropIndicator.className = 'drop-indicator';
-        spaceContainer.appendChild(dropIndicator);
+        const dropIndicatorContainer = document.createElement('div');
+        dropIndicatorContainer.className = 'drop-indicator-container';
+        document.body.appendChild(dropIndicatorContainer);
+        dropIndicatorContainer.appendChild(dropIndicator);
     }
 
     // Get the appropriate scroll position based on container
@@ -568,32 +629,28 @@ function handleDragOver(event) {
         const listItems = Array.from(element.querySelectorAll('.tab-item'));
         const dropPosition = calculateDropPosition(event, listItems, isMinimized);
 
-        // Calculate initial positions and dimensions
+        const spaceContainerLeft = spaceContainerRect.left;
+        const spaceContainerRight = spaceContainerRect.right;
+
         let indicatorLeft = rect.left;
         let width = rect.width;
-
-        // Handle left boundary cut-off
-        if (openTabsList) {
-            // For open-tabs-list, use its own boundaries
-            const openTabsRect = openTabsList.getBoundingClientRect();
-            indicatorLeft = openTabsRect.left;
-            width = openTabsRect.width;
-        } else {
-            // For columns, use space container boundaries
-            if (indicatorLeft < spaceContainerRect.left) {
-                const overlap = spaceContainerRect.left - indicatorLeft;
-                indicatorLeft = spaceContainerRect.left;
-                width -= overlap;
+        if(openTabsList){
+            indicatorLeft = sidebarRect.left;
+            width = sidebarRect.width;
+        }
+        else{
+            // Left boundary
+            if (indicatorLeft < spaceContainerLeft) {
+                const difference = spaceContainerLeft - indicatorLeft;
+                indicatorLeft = spaceContainerLeft;
+                width = width - difference;
             }
-
-            const rightEdge = indicatorLeft + width;
-            if (rightEdge > spaceContainerRect.right) {
-                const overlap = rightEdge - spaceContainerRect.right;
-                width -= overlap;
+            // Right boundary 
+            if (indicatorLeft + width > spaceContainerRight) {
+                width = spaceContainerRight - indicatorLeft;
             }
         }
-
-        dropIndicator.style.width = `${Math.max(0, width)}px`;
+        dropIndicator.style.width = `${width}px`;
         dropIndicator.style.height = '2px';
         dropIndicator.style.left = `${indicatorLeft}px`;
 
@@ -634,15 +691,26 @@ function handleDragOver(event) {
         
     } 
     else if (dropType === "column" && columnsContainer) {
-        // Handle column drag over
         const rect = columnsContainer.getBoundingClientRect();
         const columns = Array.from(columnsContainer.querySelectorAll('.column'));
         const dropPosition = calculateColumnDropPosition(event, columns);
 
-        // Calculate initial dimensions
+        const spaceContainerLeft = spaceContainerRect.left;
+        const spaceContainerRight = spaceContainerRect.right;
+
         let indicatorLeft;
         const width = 2;
         let height = rect.height;
+
+        // Left boundary
+        if (indicatorLeft < spaceContainerLeft) {
+            indicatorLeft = spaceContainerLeft;
+        }
+        
+        // Right boundary
+        if (indicatorLeft > spaceContainerRight - width) {
+            indicatorLeft = spaceContainerRight - width;
+        }
 
         if (dropPosition === columns.length) {
             const lastColumn = columns[columns.length - 1];
@@ -654,36 +722,10 @@ function handleDragOver(event) {
             indicatorLeft = targetColumn.getBoundingClientRect().left;
         }
 
-        // Handle horizontal boundaries
-        if (indicatorLeft < spaceContainerRect.left) {
-            indicatorLeft = spaceContainerRect.left;
-        }
-        const rightEdge = indicatorLeft + width;
-        if (rightEdge > spaceContainerRect.right) {
-            indicatorLeft = spaceContainerRect.right - width;
-        }
-
-        // Calculate initial top position
-        let indicatorTop = rect.top + containerScrollTop;
-
-        // Handle top boundary cut-off
-        if (indicatorTop < spaceContainerRect.top) {
-            const overlap = spaceContainerRect.top - indicatorTop;
-            indicatorTop = spaceContainerRect.top;
-            height -= overlap;
-        }
-
-        // Handle bottom boundary cut-off
-        const bottomEdge = indicatorTop + height;
-        if (bottomEdge > spaceContainerRect.bottom) {
-            const overlap = bottomEdge - spaceContainerRect.bottom;
-            height -= overlap;
-        }
-
         dropIndicator.style.width = `${width}px`;
-        dropIndicator.style.height = `${Math.max(0, height)}px`;
+        dropIndicator.style.height = `${height}px`;
         dropIndicator.style.left = `${indicatorLeft}px`;
-        dropIndicator.style.top = `${indicatorTop}px`;
+        dropIndicator.style.top = `${rect.top + containerScrollTop}px`;
         
         newColumnIndicator.style.display = 'none';
     }
@@ -839,6 +881,7 @@ function handleDrop(event) {
     saveColumnState();
 }
 function handleDragEnd(event) {
+    stopScrollAnimation();
     event.target.closest('.tab-item')?.classList.remove("dragging");
     event.target.closest('.column')?.classList.remove("dragging");
     if (deletionArea) deletionArea.style.display = 'none';
@@ -1382,12 +1425,6 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 });
 
 fetchOpenTabs();
-document.querySelector('.minimize-sidebar').addEventListener('click', () => {
-    document.getElementById('sidebar').classList.add('collapsed');
-});
-document.querySelector('.maximize-sidebar').addEventListener('click', () => {
-    document.getElementById('sidebar').classList.remove('collapsed');
-});
 
 chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
     let columnState = data.columnState || [];
@@ -1411,6 +1448,20 @@ chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
 });
 displaySavedTabs(tabs_in_storage);
 
+document.querySelector('.minimize-sidebar').addEventListener('click', () => {
+    document.getElementById('sidebar').classList.add('collapsed');
+    sidebarCollapsed = true;
+    chrome.storage.local.set({ sidebarCollapsed: sidebarCollapsed }, () => {
+        console.log("Sidebar collapsed state saved");
+    });
+});
+document.querySelector('.maximize-sidebar').addEventListener('click', () => {
+    document.getElementById('sidebar').classList.remove('collapsed');
+    sidebarCollapsed = false;
+    chrome.storage.local.set({ sidebarCollapsed: sidebarCollapsed }, () => {
+        console.log("Sidebar expanded state saved");
+    });
+});
 document.addEventListener('dragover', function(event) {
     event.preventDefault();
 });

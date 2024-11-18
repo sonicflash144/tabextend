@@ -80,6 +80,9 @@ h1, h2 {
         width: 80px;
         overflow: hidden;
     }
+    #sidebar.no-transition {
+        transition: none;
+    }
 
 #main-content {
     width: 75%;
@@ -349,6 +352,16 @@ h1, h2 {
     background-color: #007bff;
     pointer-events: none;
     z-index: 1000;
+}
+.drop-indicator-container {
+    position: absolute;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1000;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
 }
 
 .close-button {
