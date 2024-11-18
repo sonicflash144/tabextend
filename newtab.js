@@ -77,17 +77,6 @@ function closeAllMenus() {
         activeColumnMenu = null;
     }
 }
-function applySidebarState() {
-    chrome.storage.local.get("sidebarCollapsed", (data) => {
-        const sidebar = document.getElementById("sidebar");
-        if (data.sidebarCollapsed) {
-            sidebar.classList.add("collapsed");
-        } else {
-            sidebar.classList.remove("collapsed");
-        }
-    });
-}
-applySidebarState();
 
 function deleteTab(id) {
     if (!Array.isArray(id)) {
@@ -1398,8 +1387,6 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
             }
         });
     }
-});
-chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes.bgTabs) {
         chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
             let columnState = data.columnState || [];
