@@ -164,7 +164,8 @@ function saveTabNote(id, note) {
 }
 function parseAndSaveDate(note) {
     const chrono = new Chrono();
-    const parsedDate = chrono.parseDate(note);
+    const parsedNote = note.replace(/\\\w+/g, '');
+    const parsedDate = chrono.parseDate(parsedNote);
     const detectedDateText = parsedDate ? chrono.parse(note)[0].text : '';
     
     // Remove the parsed date from the note
@@ -994,7 +995,7 @@ function displaySavedTabs(tabs) {
                                 <div class="tab-info-right">
                                     <span class="tab-title" data-url="${tab.url}" id="title-display-${tab.id}">${tab.title}</span>
                                     <input type="text" class="hidden" id="title-input-${tab.id}" value="${tab.title}">
-                                    <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note ? tab.note.replace(/\n/g, '<br>') : ''}</div>
+                                    <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note ? tab.note.replace(/\\/g, '').replace(/\n/g, '<br>') : ''}</div>
                                     <textarea class="tab-note hidden" id="note-input-${tab.id}" rows="1">${tab.note ? tab.note.replace(/<br>/g, '\n') : ''}</textarea>
                                     <div class="date-display ${formattedDate ? '' : 'hidden'}" id="date-display-${tab.id}">${formattedDate || ''}</div>
                                 </div>
@@ -1218,7 +1219,7 @@ function displaySavedTabs(tabs) {
                         noteInput.addEventListener("blur", function () {
                             const note = noteInput.value;
                             saveTabNote(tab.id, note);
-                            noteDisplay.innerHTML = note ? note.replace(/\n/g, '<br>') : '';
+                            noteDisplay.innerHTML = note ? note.replace(/\\/g, '').replace(/\n/g, '<br>') : '';
                             noteInput.classList.add("hidden");
                             noteDisplay.classList.remove("hidden");
                             li.addEventListener('dragstart', handleDragStart);
@@ -1239,14 +1240,11 @@ function displaySavedTabs(tabs) {
 
                         noteInput.addEventListener("input", function () {
                             const note = noteInput.value;
-                            const { detectedDateText } = parseAndSaveDate(note);
-                            const noteHTML = note.replace(detectedDateText, `<span style="color: red;">${detectedDateText}</span>`);
-                            noteDisplay.innerHTML = noteHTML;
-
                             // Update the date display in real-time
                             const dateDisplay = li.querySelector(`#date-display-${tab.id}`);
                             const chrono = new Chrono();
-                            const parsedDate = chrono.parseDate(note);
+                            const parsedNote = note.replace(/\\\w+/g, '');
+                            const parsedDate = chrono.parseDate(parsedNote);
                             if (parsedDate) {
                                 const { formattedDate, dateDisplayColor } = calculateFormattedDate(parsedDate);
                                 dateDisplay.textContent = formattedDate;
