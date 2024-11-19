@@ -600,7 +600,7 @@ function handleDragOver(event) {
 
     if (dropType === "list-item" && element) {
         // Handle list item drag over
-        newColumnIndicator.style.display = openTabsList ? 'none' : 'flex';
+        newColumnIndicator.style.display = 'flex';
         const rect = element.getBoundingClientRect();
         const listItems = Array.from(element.querySelectorAll('.tab-item'));
         const dropPosition = calculateDropPosition(event, listItems, isMinimized);
