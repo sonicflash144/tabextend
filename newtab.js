@@ -1,8 +1,6 @@
 import { Chrono } from 'chrono-node';
 import 'emoji-picker-element';
-//let sidebarCollapsed = false;
 chrome.storage.local.get("sidebarCollapsed", (data) => {
-    //sidebarCollapsed = data.sidebarCollapsed;
     const sidebar = document.getElementById('sidebar');
     if (data.sidebarCollapsed) {
         sidebar.classList.add('collapsed');
@@ -41,7 +39,6 @@ function getToday(tabDate) {
 document.getElementById("add-column").addEventListener("click", () => {
     createColumn("New Column");
     saveColumnState();
-    //displaySavedTabs(tabs_in_storage);
 });
 
 function createDeletionArea() {
@@ -432,8 +429,6 @@ function deleteColumn(event) {
     const tabItems = column.querySelectorAll('.tab-item');
     const tabIds = Array.from(tabItems).map(tabItem => tabItem.id);
     deleteTab(tabIds.map(id => parseInt(id.replace('tab-', ''))), column);
-    //column.remove();
-    //saveColumnState();
 }
 function openAllInColumn(column) {
     closeAllMenus();
@@ -821,8 +816,6 @@ function handleDrop(event) {
         else{
             saveColumnState();
         }
-        //saveColumnState();
-        //displaySavedTabs(tabs_in_storage);
         return;
     }
 
@@ -878,8 +871,6 @@ function handleDrop(event) {
             tabItem.style.display = "none";
         });
     }
-
-    //saveColumnState();
 }
 function handleDragEnd(event) {
     stopScrollAnimation();
@@ -959,10 +950,7 @@ function displaySavedTabs(tabs) {
 
     chrome.storage.local.get('columnState', (result) => {
         const columnState = result.columnState || [];
-        if(columnState.length === 0) {
-            createColumn("New Column");
-            saveColumnState();
-        } else {
+        if(columnState.length > 0) {
             console.log(columnState);
             columnState.forEach(columnData => {
                 const column = createColumn(columnData.title, columnData.id, columnData.minimized, columnData.emoji);
@@ -1185,7 +1173,6 @@ function displaySavedTabs(tabs) {
                             deleteTabOption.addEventListener('click', () => {
                                 deleteTab(tab.id);
                                 closeAllMenus();
-                                //displaySavedTabs(tabs_in_storage);
                             });
 
                              // Remove Date option
@@ -1395,29 +1382,19 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
         if(changes.savedTabs){
             tabs_in_storage = changes.savedTabs.newValue.filter(tab => !('temp' in tab));
         }
-        if(changes.columnState){
-            if(changes.animation){
-                const column = document.getElementById(changes.animation.newValue.columnId);
-                if(changes.animation.newValue.minimized === true){
-                    minimizeColumn(column);
-                }
-                else{
-                    maximizeColumn(column);
-                }
-                return;
+        if(changes.columnState && changes.animation){
+            const column = document.getElementById(changes.animation.newValue.columnId);
+            if(changes.animation.newValue.minimized === true){
+                minimizeColumn(column);
             }
+            else{
+                maximizeColumn(column);
+            }
+            return;
         }
         displaySavedTabs(tabs_in_storage);
-        /*
-        tabs_in_storage = changes.savedTabs.newValue.filter(tab => !('temp' in tab));
-        chrome.storage.local.get('columnState', (data) => {
-            if(data.columnState.length > 0){
-                displaySavedTabs(tabs_in_storage);
-            }
-        });
-        */
     }
-    if (areaName === 'local' && changes.bgTabs) {
+    else if (areaName === 'local' && changes.bgTabs) {
         chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
             let columnState = data.columnState || [];
             const bgTabs = data.bgTabs || [];
@@ -1437,7 +1414,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
             });
         });
     }
-    if (areaName === 'local' && changes.sidebarCollapsed) {
+    else if (areaName === 'local' && changes.sidebarCollapsed) {
         if(changes.sidebarCollapsed.newValue) {
             document.getElementById('sidebar').classList.add('collapsed');
         } else {
@@ -1452,15 +1429,18 @@ chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
     let columnState = data.columnState || [];
     const bgTabs = data.bgTabs || [];
     let savedTabs = data.savedTabs || [];
-    const tabIds = bgTabs.map(tab => tab.id);
 
-    if (columnState.length === 0) {
-        columnState.push({ id: "defaultColumn", tabIds: [], title: "New Column", emoji: getRandomEmoji() });
+    if(bgTabs.length > 0) {
+        const tabIds = bgTabs.map(tab => tab.id);
+        if (columnState.length === 0) {
+            columnState.push({ id: "defaultColumn", tabIds: [], title: "New Column", emoji: getRandomEmoji() });
+        }
+        const firstColumn = columnState[0];
+        const formattedIds = tabIds.map(id => `tab-${id}`);
+        firstColumn.tabIds = firstColumn.tabIds.concat(formattedIds);
+        savedTabs = savedTabs.concat(bgTabs);
     }
-    const firstColumn = columnState[0];
-    const formattedIds = tabIds.map(id => `tab-${id}`);
-    firstColumn.tabIds = firstColumn.tabIds.concat(formattedIds);
-    savedTabs = savedTabs.concat(bgTabs);
+
     savedTabs = savedTabs.filter(tab => !('temp' in tab));
     savedTabs.push({"temp": Date.now()});
 
@@ -1470,15 +1450,11 @@ chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
 });
 
 document.querySelector('.minimize-sidebar').addEventListener('click', () => {
-    //document.getElementById('sidebar').classList.add('collapsed');
-    //sidebarCollapsed = true;
     chrome.storage.local.set({ sidebarCollapsed: true }, () => {
         console.log("Sidebar collapsed state saved");
     });
 });
 document.querySelector('.maximize-sidebar').addEventListener('click', () => {
-    //document.getElementById('sidebar').classList.remove('collapsed');
-    //sidebarCollapsed = false;
     chrome.storage.local.set({ sidebarCollapsed: false }, () => {
         console.log("Sidebar expanded state saved");
     });

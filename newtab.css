@@ -296,6 +296,20 @@ h1, h2 {
     .column:not(.dragging) {
         transition: all 0.3s ease;
     }
+    .new-column-indicator {
+        background-color: rgba(0, 255, 0, 0.2);
+        border-radius: 5px;
+        min-width: 240px;
+        width: 20vw;
+        height: calc(100vh - 152px);
+        flex-shrink: 0;
+        display: none;
+        justify-content: center;
+        align-items: center;
+    }
+        .new-column-indicator.new-column-indicator-active {
+            background-color: rgba(0, 255, 0, 0.5);
+        }
     .emoji-picker-on-top {
         position: absolute;
         z-index: 9999;
@@ -421,20 +435,6 @@ h1, h2 {
     height: 40px;
     opacity: 0.5;
 }
-
-.new-column-indicator {
-    background-color: rgba(0, 255, 0, 0.2);
-    width: 20vw;
-    min-height: 20vw;
-    display: none;
-    justify-content: center;
-    align-items: center;
-    border-radius: 5px;
-    flex-shrink: 0;
-}
-    .new-column-indicator.new-column-indicator-active {
-        background-color: rgba(0, 255, 0, 0.5);
-    }
 
 .vertical-text {
     writing-mode: vertical-lr;
