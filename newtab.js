@@ -1,10 +1,8 @@
 import { Chrono } from 'chrono-node';
 import 'emoji-picker-element';
-let sidebarCollapsed = false;
 browser.storage.local.get("sidebarCollapsed", (data) => {
-    sidebarCollapsed = data.sidebarCollapsed;
     const sidebar = document.getElementById('sidebar');
-    if (sidebarCollapsed) {
+    if (data.sidebarCollapsed) {
         sidebar.classList.add('collapsed');
         sidebar.classList.add('no-transition');
         setTimeout(() => {
@@ -41,7 +39,6 @@ function getToday(tabDate) {
 document.getElementById("add-column").addEventListener("click", () => {
     createColumn("New Column");
     saveColumnState();
-    displaySavedTabs(tabs_in_storage);
 });
 
 function createDeletionArea() {
@@ -78,7 +75,7 @@ function closeAllMenus() {
     }
 }
 
-function deleteTab(id) {
+function deleteTab(id, column = null) {
     if (!Array.isArray(id)) {
         id = [id];
     }
@@ -92,9 +89,18 @@ function deleteTab(id) {
                 console.log('Tab deleted:', tabId);
             }
         });
-        browser.storage.local.set({ savedTabs: tabs }, () => {
-            console.log('Updated storage with remaining tabs');
-        });
+
+        if(column){
+            column.remove();
+            browser.storage.local.set({ savedTabs: tabs, columnState: saveColumnState(true) }, () => {
+                console.log('Updated storage with remaining columns');
+            });
+        }
+        else{
+            browser.storage.local.set({ savedTabs: tabs }, () => {
+                console.log('Updated storage with remaining tabs');
+            });
+        }
     });
 }
 function saveTab(tabId) {
@@ -117,7 +123,7 @@ function saveTab(tabId) {
                 browser.storage.local.get("savedTabs", (data) => {
                     const existingTabs = data.savedTabs || [];
                     const updatedTabs = [...existingTabs, ...newTabs];
-                    browser.storage.local.set({ savedTabs: updatedTabs }, () => {
+                    browser.storage.local.set({ savedTabs: updatedTabs, columnState: saveColumnState(true) }, () => {
                         browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                             let activeTab = tabs[0];
                             
@@ -173,7 +179,7 @@ function saveTabTitle(id, newTitle) {
     });
 }
 
-function saveColumnState() {
+function saveColumnState(returnState = false) {
     const columnsContainer = document.getElementById('columns-container');
     const columns = columnsContainer.querySelectorAll('.column');
     const columnState = [];
@@ -194,9 +200,14 @@ function saveColumnState() {
         });
     });
 
-    browser.storage.local.set({ columnState }, () => {
-        console.log('Column state saved:', columnState);
-    });
+    if(returnState){
+        return columnState;
+    }
+    else{
+        browser.storage.local.set({ columnState }, () => {
+            //console.log('Column state saved:', columnState);
+        });
+    }
 }
 const getRandomEmoji = () => {
     const range = [0x1F34F, 0x1F37F]; // Food and Drink        
@@ -222,7 +233,9 @@ function createColumn(title, id, minimized = false, emoji = null) {
     minimizeButton.innerHTML = `<img src="../icons/minimize.svg" width="24" height="24" class="main-grid-item-icon" />`;
     minimizeButton.addEventListener("click", () => {
         minimizeColumn(column);
-        saveColumnState();
+        browser.storage.local.set({ columnState: saveColumnState(true), animation: {columnId: column.id, minimized: true} }, () => {
+            console.log(`${column.id} minimized`);
+        });
     });
 
     // Add maximize button to the column
@@ -232,7 +245,9 @@ function createColumn(title, id, minimized = false, emoji = null) {
     maximizeButton.innerHTML = `<img src="../icons/maximize.svg" width="24" height="24" class="main-grid-item-icon" />`;
     maximizeButton.addEventListener("click", () => {
         maximizeColumn(column);
-        saveColumnState();
+        browser.storage.local.set({ columnState: saveColumnState(true), animation: {columnId: column.id, minimized: false} }, () => {
+            console.log(`${column.id} maximized`);
+        });
     });
     maximizeButton.style.display = minimized ? "inline" : "none"; // Initially hidden if not minimized
 
@@ -412,9 +427,7 @@ function deleteColumn(event) {
     }
     const tabItems = column.querySelectorAll('.tab-item');
     const tabIds = Array.from(tabItems).map(tabItem => tabItem.id);
-    deleteTab(tabIds.map(id => parseInt(id.replace('tab-', ''))));
-    column.remove();
-    saveColumnState();
+    deleteTab(tabIds.map(id => parseInt(id.replace('tab-', ''))), column);
 }
 function openAllInColumn(column) {
     closeAllMenus();
@@ -790,8 +803,9 @@ function handleDrop(event) {
         if(itemIdsToSave.length > 0) {
             saveTab(itemIdsToSave);
         }
-        saveColumnState();
-        displaySavedTabs(tabs_in_storage);
+        else{
+            saveColumnState();
+        }
         return;
     }
 
@@ -822,13 +836,6 @@ function handleDrop(event) {
         }
     });
 
-    if (itemIdsToSave.length > 0) {
-        saveTab(itemIdsToSave);
-    }
-    if (tabIdsToDelete.length > 0) {
-        deleteTab(tabIdsToDelete);
-    }
-
     // Insert all items into the column at once
     itemsToInsert.forEach(({ item, dropPosition }) => {
         if (dropPosition === tabItems.length) {
@@ -838,14 +845,22 @@ function handleDrop(event) {
         }
     });
 
+    if (itemIdsToSave.length > 0) {
+        saveTab(itemIdsToSave);
+    }
+    if (tabIdsToDelete.length > 0) {
+        deleteTab(tabIdsToDelete);
+    }
+    if (itemIdsToSave.length === 0 && tabIdsToDelete.length === 0) {
+        saveColumnState();
+    }
+
     if(isMinimized){
         const updatedTabs = column.querySelectorAll('.tab-item');
         updatedTabs.forEach(tabItem => {
             tabItem.style.display = "none";
         });
     }
-
-    saveColumnState();
 }
 function handleDragEnd(event) {
     stopScrollAnimation();
@@ -1151,7 +1166,6 @@ function displaySavedTabs(tabs) {
                             deleteTabOption.addEventListener('click', () => {
                                 deleteTab(tab.id);
                                 closeAllMenus();
-                                displaySavedTabs(tabs_in_storage);
                             });
 
                              // Remove Date option
@@ -1357,17 +1371,24 @@ function fetchOpenTabs() {
 browser.tabs.onUpdated.addListener(fetchOpenTabs);
 browser.tabs.onRemoved.addListener(fetchOpenTabs);
 browser.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'local' && changes.savedTabs) {
-        tabs_in_storage = changes.savedTabs.newValue.filter(tab => !('temp' in tab));
-        browser.storage.local.get('columnState', (data) => {
-            if(data.columnState.length > 0){
-                displaySavedTabs(tabs_in_storage);
+    if (areaName === 'local' && (changes.savedTabs || changes.columnState)) {
+        console.log(changes);
+        if(changes.savedTabs){
+            tabs_in_storage = changes.savedTabs.newValue.filter(tab => !('temp' in tab));
+        }
+        if(changes.columnState && changes.animation){
+            const column = document.getElementById(changes.animation.newValue.columnId);
+            if(changes.animation.newValue.minimized === true){
+                minimizeColumn(column);
             }
-        });
+            else{
+                maximizeColumn(column);
+            }
+            return;
+        }
+        displaySavedTabs(tabs_in_storage);
     }
-});
-browser.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'local' && changes.bgTabs) {
+    else if (areaName === 'local' && changes.bgTabs) {
         const oldBgTabs = changes.bgTabs.oldValue || [];
         const newBgTabs = changes.bgTabs.newValue || [];
 
@@ -1391,6 +1412,13 @@ browser.storage.onChanged.addListener((changes, areaName) => {
                     console.log("Migrated bgTabs");
                 });
             });
+        }
+    }
+    else if (areaName === 'local' && changes.sidebarCollapsed) {
+        if(changes.sidebarCollapsed.newValue) {
+            document.getElementById('sidebar').classList.add('collapsed');
+        } else {
+            document.getElementById('sidebar').classList.remove('collapsed');
         }
     }
 });
@@ -1418,16 +1446,12 @@ browser.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
 });
 
 document.querySelector('.minimize-sidebar').addEventListener('click', () => {
-    document.getElementById('sidebar').classList.add('collapsed');
-    sidebarCollapsed = true;
-    browser.storage.local.set({ sidebarCollapsed: sidebarCollapsed }, () => {
+    browser.storage.local.set({ sidebarCollapsed: true }, () => {
         console.log("Sidebar collapsed state saved");
     });
 });
 document.querySelector('.maximize-sidebar').addEventListener('click', () => {
-    document.getElementById('sidebar').classList.remove('collapsed');
-    sidebarCollapsed = false;
-    browser.storage.local.set({ sidebarCollapsed: sidebarCollapsed }, () => {
+    browser.storage.local.set({ sidebarCollapsed: false }, () => {
         console.log("Sidebar expanded state saved");
     });
 });
