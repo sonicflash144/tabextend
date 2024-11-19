@@ -789,7 +789,6 @@ function handleDrop(event) {
             item.parentNode.removeChild(item);
         });
         deleteTab(tabIdsToDelete);
-        saveColumnState();
         return;
     }
     else if(newColumnIndicator.contains(event.target)) {
