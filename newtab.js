@@ -283,7 +283,7 @@ function createColumn(title, id, minimized = false, emoji = null) {
     // Toggle menu on button click with dynamic positioning
     menuButton.addEventListener("click", (e) => {
         e.stopPropagation();
-        if(activeColumnMenu){
+        if(activeColumnMenu && activeColumnMenu.dataset.columnId === column.id){
             closeAllMenus();
             return;
         }
@@ -319,6 +319,7 @@ function createColumn(title, id, minimized = false, emoji = null) {
 
         document.body.appendChild(menuDropdown);
         activeColumnMenu = menuDropdown;
+        activeColumnMenu.dataset.columnId = column.id;
     });
 
     // Event listener to switch to read mode
