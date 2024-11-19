@@ -199,6 +199,11 @@ function saveColumnState() {
         console.log('Column state saved:', columnState);
     });
 }
+const getRandomEmoji = () => {
+    const range = [0x1F34F, 0x1F37F]; // Food and Drink        
+    const codePoint = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
+    return String.fromCodePoint(codePoint);
+};
 function createColumn(title, id, minimized = false, emoji = null) {
     const columnsContainer = document.getElementById("columns-container");
     const column = document.createElement("div");
@@ -206,8 +211,6 @@ function createColumn(title, id, minimized = false, emoji = null) {
     if (minimized) column.classList.add("minimized");
     if(id) column.id = id;
     else column.id = `column-${Date.now()}`;
-    column.addEventListener("dragover", handleDragOver);
-    column.addEventListener("drop", handleDrop);
 
     // Create a container for the title and buttons
     const headerContainer = document.createElement("div");
@@ -338,13 +341,6 @@ function createColumn(title, id, minimized = false, emoji = null) {
             titleInput.blur();
         }
     });
-
-    // Function to generate a random emoji
-    const getRandomEmoji = () => {
-        const range = [0x1F34F, 0x1F37F]; // Food and Drink        
-        const codePoint = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
-        return String.fromCodePoint(codePoint);
-    };
 
     // Create emoji button and span
     const emojiButton = document.createElement("button");
@@ -583,12 +579,12 @@ function handleDragOver(event) {
     }
 
     deletionArea.style.display = 'flex';
-    if (event.target === deletionArea) {
+    if (deletionArea.contains(event.target)) {
         deletionArea.classList.add('deletion-area-active');
         dropIndicator.style.display = 'none';
         event.dataTransfer.dropEffect = 'move';
         return;
-    } else if (event.target === newColumnIndicator) {
+    } else if (newColumnIndicator.contains(event.target)) {
         newColumnIndicator.classList.add('new-column-indicator-active');
         dropIndicator.style.display = 'none';
         event.dataTransfer.dropEffect = 'move';
@@ -614,7 +610,7 @@ function handleDragOver(event) {
 
     if (dropType === "list-item" && element) {
         // Handle list item drag over
-        newColumnIndicator.style.display = openTabsList ? 'none' : 'flex';
+        newColumnIndicator.style.display = 'flex';
         const rect = element.getBoundingClientRect();
         const listItems = Array.from(element.querySelectorAll('.tab-item'));
         const dropPosition = calculateDropPosition(event, listItems, isMinimized);
@@ -733,15 +729,10 @@ function handleDrop(event) {
     const droppedColumn = document.getElementById(columnDropData);
 
     if (droppedColumn && droppedColumn.classList.contains('column')) {
-        if(event.target === deletionArea) {
+        if(deletionArea.contains(event.target)) {
             deleteColumn(droppedColumn);
-            deletionArea.style.display = 'none';
-            deletionArea.classList.remove('deletion-area-active');
-            if (newColumnIndicator) newColumnIndicator.style.display = 'none';
             return;
         }
-        deletionArea.style.display = 'none';
-        deletionArea.classList.remove('deletion-area-active');
 
         // Handle column drop
         const columns = Array.from(columnsContainer.querySelectorAll('.column'));
@@ -749,7 +740,8 @@ function handleDrop(event) {
 
         if (dropPosition === columns.length) {
             columnsContainer.appendChild(droppedColumn);
-        } else {
+        } 
+        else {
             columnsContainer.insertBefore(droppedColumn, columns[dropPosition]);
         }
         // Ensure 'new-column-indicator' remains the last child
@@ -757,19 +749,14 @@ function handleDrop(event) {
             columnsContainer.appendChild(newColumnIndicator);
         }
 
-        if (dropIndicator) dropIndicator.style.display = 'none';
-        if (newColumnIndicator) newColumnIndicator.style.display = 'none';
-
         saveColumnState();
         return; // Exit since we handled a column drop
     }
-    deletionArea.style.display = 'none';
-    deletionArea.classList.remove('deletion-area-active');
 
     // Continue with tab drop logic
     const column = event.target.closest('.column') || event.target.closest('#open-tabs-list');
     const isMinimized = column && column.classList.contains('minimized');
-    if (!column && event.target !== deletionArea && event.target !== newColumnIndicator) {
+    if (!column && !deletionArea.contains(event.target) && !newColumnIndicator.contains(event.target)) {
         return;
     }
     let tabId = event.dataTransfer.getData("text/plain");
@@ -785,7 +772,7 @@ function handleDrop(event) {
     const itemIdsToSave = [];
     const itemsToInsert = [];
 
-    if(event.target === deletionArea) {
+    if(deletionArea.contains(event.target)) {
         itemsToProcess.forEach(item => {
             const itemId = item.id;
             if (itemId.startsWith('tab-')) {
@@ -802,7 +789,7 @@ function handleDrop(event) {
         saveColumnState();
         return;
     }
-    else if(event.target === newColumnIndicator) {
+    else if(newColumnIndicator.contains(event.target)) {
         const newColumn = createColumn("New Column");
         itemsToProcess.forEach(item => {
             if(item.id.startsWith('opentab-')) {
@@ -1418,7 +1405,7 @@ chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
     const tabIds = bgTabs.map(tab => tab.id);
 
     if (columnState.length === 0) {
-        columnState.push({ id: "defaultColumn", tabIds: [], title: "New Column" });
+        columnState.push({ id: "defaultColumn", tabIds: [], title: "New Column", emoji: getRandomEmoji() });
     }
     const firstColumn = columnState[0];
     const formattedIds = tabIds.map(id => `tab-${id}`);
@@ -1431,7 +1418,6 @@ chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
         console.log("Migrated bgTabs");
     });
 });
-displaySavedTabs(tabs_in_storage);
 
 document.querySelector('.minimize-sidebar').addEventListener('click', () => {
     document.getElementById('sidebar').classList.add('collapsed');
