@@ -1179,6 +1179,294 @@ function calculateFormattedDate(parsedDate) {
 }
 
 /* Tab Display */
+function createTabItem(tab, groupId = null){
+    const li = document.createElement("li");
+    li.style.userSelect = "none";
+    li.id = `tab-${tab.id}`;
+    li.style.backgroundColor = tab.color; 
+    li.classList.add("tab-item");
+    li.dataset.url = tab.url;
+    
+    li.draggable = true;
+    li.addEventListener("dragstart", handleDragStart);
+    li.addEventListener("dragend", handleDragEnd);
+
+    // Calculate the formatted date when displaying
+    const { formattedDate, dateDisplayColor } = calculateFormattedDate(tab.parsedDate);
+    const savedFormattedDate = formattedDate;
+    const savedDateDisplayColor = dateDisplayColor;
+    li.innerHTML += `
+        <div class="tab-info-container">
+            <div class="tab-info-left">
+                <img src="${tab.favIconUrl}" width="24" height="24">
+            </div>
+            <div class="tab-info-right">
+                <span class="tab-title" data-url="${tab.url}" id="title-display-${tab.id}">${tab.title}</span>
+                <input type="text" class="hidden" id="title-input-${tab.id}" value="${tab.title}">
+                <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note ? tab.note.replace(/\\/g, '').replace(/\n/g, '<br>') : ''}</div>
+                <textarea class="tab-note hidden" id="note-input-${tab.id}" rows="1">${tab.note ? tab.note.replace(/<br>/g, '\n') : ''}</textarea>
+                <div class="date-display ${formattedDate ? '' : 'hidden'}" id="date-display-${tab.id}">${formattedDate || ''}</div>
+            </div>
+            <div class="tab-actions">
+                <button class="more-options" data-index="${tab.id}">
+                    <img src="../icons/morevertical.svg" class="main-grid-item-icon" />
+                </button>
+            </div>
+        </div>
+    `;
+
+    const dateDisplay = li.querySelector(`#date-display-${tab.id}`);
+    dateDisplay.style.backgroundColor = savedDateDisplayColor;
+
+    const favicon = li.querySelector(".tab-info-left");
+    favicon.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const selectedItems = document.querySelectorAll('.selected');
+        const allItems = Array.from(document.querySelectorAll('li'));
+        const currentIndex = allItems.indexOf(li);
+    
+        if (event.ctrlKey || event.metaKey) {
+            // Toggle selection with Ctrl/Cmd click
+            li.classList.toggle('selected');
+        } else if (event.shiftKey && lastSelectedIndex !== null) {
+            // Select range with Shift click
+            const start = Math.min(lastSelectedIndex, currentIndex);
+            const end = Math.max(lastSelectedIndex, currentIndex);
+            for (let i = start; i <= end; i++) {
+                allItems[i].classList.add('selected');
+            }
+        } else {
+            // Single selection
+            if (selectedItems.length === 1 && selectedItems[0] === li) {
+                // Clear selection if the only selected item is clicked again
+                li.classList.remove('selected');
+            } else {
+                selectedItems.forEach(item => item.classList.remove('selected'));
+                li.classList.add('selected');
+            }
+        }
+    
+        lastSelectedIndex = currentIndex;
+    });
+
+    const tabLink = li.querySelector('.tab-title');
+    tabLink.addEventListener('click', () => {
+        window.location.href = tabLink.dataset.url;
+    });
+
+    // Add event listener to the document to detect clicks outside of the li elements
+    document.addEventListener('click', (event) => {
+        const allItems = Array.from(document.querySelectorAll('li'));
+        const isClickInside = allItems.some(item => item.contains(event.target));
+
+        if (!isClickInside) {
+            allItems.forEach(item => item.classList.remove('selected'));
+        }
+    });
+    
+    const moreOptionsButton = li.querySelector('.more-options');
+    moreOptionsButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+
+        // Close all menus if clicking on the same button
+        if (activeOptionsMenu && activeOptionsMenu.dataset.tabId === tab.id.toString()) {
+            closeAllMenus();
+            return;
+        }
+        closeAllMenus();
+
+        const optionsMenu = document.createElement('div');
+        optionsMenu.className = 'options-menu';
+        optionsMenu.dataset.tabId = tab.id.toString();
+        // Determine whether to show "Add Note" or "Edit Note" based on the note content
+        const noteButtonText = tab.note && tab.note.trim() !== '' ? 'Edit Note' : 'Add Note';
+        optionsMenu.innerHTML = `
+            <button class="menu-option rename-tab" data-index="${tab.id}">Rename</button>
+            <button class="menu-option add-note" data-index="${tab.id}">${noteButtonText}</button>
+            <button class="menu-option remove-date ${formattedDate ? '' : 'hidden'}" data-index="${tab.id}">Clear Date</button>
+            <button class="menu-option color-tab" data-index="${tab.id}">Color</button>
+            <button class="menu-option delete-tab" data-index="${tab.id}">Delete</button>
+        `;
+        document.body.appendChild(optionsMenu);
+    
+        const rect = moreOptionsButton.getBoundingClientRect();
+        optionsMenu.style.top = `${rect.bottom + window.scrollY}px`;
+        optionsMenu.style.left = `${rect.left + window.scrollX}px`;
+        optionsMenu.style.display = 'flex';
+        activeOptionsMenu = optionsMenu;                        
+        let colorMenu = null;
+    
+        // Color Tab option
+        const colorTabOption = optionsMenu.querySelector('.color-tab');
+        colorTabOption.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (activeColorMenu) {
+                activeColorMenu.remove();
+                activeColorMenu = null;
+                return;
+            }
+            const colorOptions = ['#FFFFFF', '#f7c2d6', '#f9ffc4', '#cbecf5', '#ebc4ff'];
+            colorMenu = document.createElement('div');
+            colorMenu.classList.add('color-menu');
+        
+            colorOptions.forEach(color => {
+                const colorOption = document.createElement('div');
+                colorOption.classList.add('color-option');
+                colorOption.style.backgroundColor = color;
+                colorOption.addEventListener('click', () => {
+                    tab.color = color;
+                    li.style.backgroundColor = color;
+                    chrome.storage.local.set({ savedTabs: tabs_in_storage }, () => {
+                        console.log('Tab color saved:', tab.id, tab.color);
+                    });
+                    closeAllMenus();
+                });
+                colorMenu.appendChild(colorOption);
+            });
+        
+            document.body.appendChild(colorMenu);
+            const rect = colorTabOption.getBoundingClientRect();
+            colorMenu.style.top = `${rect.top + window.scrollY}px`;
+            colorMenu.style.left = `${rect.right + window.scrollX}px`;
+            activeColorMenu = colorMenu;
+        });
+    
+        // Rename Tab option
+        const renameTabOption = optionsMenu.querySelector('.rename-tab');
+        renameTabOption.addEventListener('click', () => {
+            li.removeEventListener('dragstart', handleDragStart);
+            const titleDisplay = li.querySelector(`#title-display-${tab.id}`);
+            const titleInput = li.querySelector(`#title-input-${tab.id}`);
+            
+            titleInput.classList.remove("hidden");
+            titleDisplay.classList.add("hidden");
+            titleInput.focus();
+            
+            const length = titleInput.value.length;
+            titleInput.setSelectionRange(length, length);
+
+            titleInput.addEventListener('keydown', function handleKeydown(event) {
+                if (event.key === 'Enter') {
+                    titleDisplay.textContent = titleInput.value;
+                    titleInput.classList.add("hidden");
+                    titleDisplay.classList.remove("hidden");
+                    titleInput.removeEventListener('keydown', handleKeydown);
+                }
+            });
+            
+            closeAllMenus();
+        });
+
+        const titleDisplay = li.querySelector(`#title-display-${tab.id}`);
+        const titleInput = li.querySelector(`#title-input-${tab.id}`);
+
+        titleInput.addEventListener("blur", function () {
+            const newTitle = titleInput.value;
+            saveTabTitle(tab.id, newTitle);
+            titleDisplay.textContent = newTitle;
+            titleInput.classList.add("hidden");
+            titleDisplay.classList.remove("hidden");
+            li.addEventListener('dragstart', handleDragStart);
+        });
+
+        // Add Note option
+        const editTabOption = optionsMenu.querySelector('.add-note');
+        editTabOption.addEventListener('click', () => {
+            li.removeEventListener('dragstart', handleDragStart);
+            const noteDisplay = li.querySelector(`#note-display-${tab.id}`);
+            const noteInput = li.querySelector(`#note-input-${tab.id}`);
+            
+            noteInput.classList.remove("hidden");
+            noteDisplay.classList.add("hidden");
+            noteInput.focus();
+            
+            const length = noteInput.value.length;
+            noteInput.setSelectionRange(length, length);
+            
+            closeAllMenus();
+        });
+    
+        // Delete Tab option
+        const deleteTabOption = optionsMenu.querySelector('.delete-tab');
+        deleteTabOption.addEventListener('click', () => {
+            deleteTab(tab.id);
+            closeAllMenus();
+        });
+
+        // Remove Date option
+        const removeDateOption = optionsMenu.querySelector('.remove-date');
+        removeDateOption.addEventListener('click', () => {
+            tab.parsedDate = null;
+            dateDisplay.textContent = '';
+            dateDisplay.classList.add('hidden');
+            chrome.storage.local.set({ savedTabs: tabs_in_storage }, () => {
+                console.log('Tab date removed:', tab.id);
+            });
+            closeAllMenus();
+        });
+    });
+    
+    const noteDisplay = li.querySelector(`#note-display-${tab.id}`);
+    const noteInput = li.querySelector(`#note-input-${tab.id}`);
+    
+    noteDisplay.addEventListener("click", function () {
+        li.removeEventListener('dragstart', handleDragStart);
+        if (noteInput.classList.contains("hidden")) {
+            noteInput.classList.remove("hidden");
+            noteDisplay.classList.add("hidden");
+            noteInput.focus();
+            
+            const length = noteInput.value.length;
+            noteInput.setSelectionRange(length, length);
+        }
+    });
+    
+    noteInput.addEventListener("blur", function () {
+        const note = noteInput.value;
+        saveTabNote(tab.id, note);
+        noteDisplay.innerHTML = note ? note.replace(/\\/g, '').replace(/\n/g, '<br>') : '';
+        noteInput.classList.add("hidden");
+        noteDisplay.classList.remove("hidden");
+        li.addEventListener('dragstart', handleDragStart);
+    });
+
+    noteInput.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" && !event.shiftKey) {
+            noteInput.blur();
+        }
+        else if (event.key === "Enter" && event.shiftKey) {
+            const start = noteInput.selectionStart;
+            const end = noteInput.selectionEnd;
+            noteInput.value = noteInput.value.substring(0, start) + "\n" + noteInput.value.substring(end);
+            noteInput.selectionStart = noteInput.selectionEnd = start + 1;
+            event.preventDefault();
+        }
+    });
+
+    noteInput.addEventListener("input", function () {
+        const note = noteInput.value;
+        // Update the date display in real-time
+        const dateDisplay = li.querySelector(`#date-display-${tab.id}`);
+        const chrono = new Chrono();
+        const parsedNote = note.replace(/\\\w+/g, '');
+        const parsedDate = chrono.parseDate(parsedNote);
+        if (parsedDate) {
+            const { formattedDate, dateDisplayColor } = calculateFormattedDate(parsedDate);
+            dateDisplay.textContent = formattedDate;
+            dateDisplay.classList.remove('hidden');
+            dateDisplay.style.backgroundColor = dateDisplayColor;
+        } 
+        else if(savedFormattedDate) {
+            dateDisplay.textContent = savedFormattedDate;
+            dateDisplay.classList.remove('hidden');
+            dateDisplay.style.backgroundColor = savedDateDisplayColor;
+        }
+        else {
+            dateDisplay.classList.add('hidden');
+        }
+    });
+    return li;
+}
 function displaySavedTabs(tabs) {
     const columnsContainer = document.getElementById("columns-container");
     const mainContent = document.getElementById("main-content");
@@ -1232,10 +1520,56 @@ function displaySavedTabs(tabs) {
                         titleGroup.appendChild(titleSpan);
                         titleGroup.appendChild(titleInput);
 
-                        const collapseButton = document.createElement("button");
-                        collapseButton.classList.add("collapse-button");
-                        collapseButton.innerHTML = `<img src="../icons/chevron-down.svg" class="main-grid-item-icon" />`;
-                        titleGroup.appendChild(collapseButton);
+                        const expandButton = document.createElement("button");
+                        expandButton.classList.add("expand-button");
+                        expandButton.innerHTML = `<img src="../icons/chevron-down.svg" class="main-grid-item-icon" />`;
+                        titleGroup.appendChild(expandButton);
+
+                        expandButton.addEventListener('click', () => {
+                            const isExpanded = expandButton.classList.toggle('expanded');
+                            const faviconsContainer = expandButton.closest('.tab-group-container').querySelector('.favicons-container');
+                            const allFaviconWrappers = faviconsContainer.querySelectorAll('.favicon-wrapper');
+                            
+                            // Update button appearance
+                            expandButton.innerHTML = isExpanded 
+                                ? `<img src="../icons/chevron-up.svg" class="main-grid-item-icon" />`
+                                : `<img src="../icons/chevron-down.svg" class="main-grid-item-icon" />`;
+                        
+                            // Create or remove expanded tab items
+                            if (isExpanded) {
+                                // Hide the favicon grid
+                                faviconsContainer.style.display = 'none';
+                                
+                                // Create expanded tab items
+                                const expandedContainer = document.createElement('div');
+                                expandedContainer.classList.add('expanded-tabs');
+                                
+                                allFaviconWrappers.forEach(wrapper => {
+                                    const favicon = wrapper.querySelector('.subgroup-favicon');
+                                    const tabId = parseInt(favicon.id.split('-')[1]);
+                                    const tab = tabs.find(t => t.id === tabId);
+                                    
+                                    const expandedTab = createTabItem(tab);
+                                    // Remove drag listeners to prevent nested dragging
+                                    expandedTab.removeEventListener('dragstart', handleDragStart);
+                                    expandedTab.removeEventListener('dragend', handleDragEnd);
+                                    expandedTab.draggable = false;
+                                    
+                                    expandedContainer.appendChild(expandedTab);
+                                });
+                                
+                                faviconsContainer.parentNode.appendChild(expandedContainer);
+                            } else {
+                                // Show the favicon grid
+                                faviconsContainer.style.display = 'flex';
+                                
+                                // Remove expanded tabs
+                                const expandedContainer = faviconsContainer.parentNode.querySelector('.expanded-tabs');
+                                if (expandedContainer) {
+                                    expandedContainer.remove();
+                                }
+                            }
+                        });
 
                         tabGroupContainer.appendChild(titleGroup);
                     
@@ -1264,6 +1598,11 @@ function displaySavedTabs(tabs) {
                             titleSpan.style.display = "inline";
                             saveColumnState();
                         });
+           
+                        const moreOptionsButton = document.createElement('button');
+                        moreOptionsButton.classList.add('more-options');
+                        moreOptionsButton.innerHTML = `<img src="../icons/morevertical.svg" class="main-grid-item-icon" />`;
+                        titleGroup.appendChild(moreOptionsButton);
                     
                         tabId.forEach((subTabId, index) => {
                             // Skip the first element which is the groupId and the last element which is the title
@@ -1273,6 +1612,7 @@ function displaySavedTabs(tabs) {
                             if (tab) {
                                 const faviconWrapper = document.createElement("div");
                                 faviconWrapper.classList.add("favicon-wrapper");
+                                faviconWrapper.style.backgroundColor = tab.color || '#FFFFFF';
                                 
                                 const favicon = document.createElement("img");
                                 favicon.src = tab.favIconUrl;
@@ -1297,16 +1637,7 @@ function displaySavedTabs(tabs) {
                         tabInfoContainer.appendChild(faviconsContainer);
                         tabGroupContainer.appendChild(tabInfoContainer);
                         
-                        const moreOptionsButton = document.createElement('button');
-                        moreOptionsButton.classList.add('more-options');
-                        moreOptionsButton.innerHTML = `<img src="../icons/morevertical.svg" class="main-grid-item-icon" />`;
-                        
-                        const tabActions = document.createElement("div");
-                        tabActions.classList.add("tab-actions");
-                        tabActions.appendChild(moreOptionsButton);
-                        
                         li.appendChild(tabGroupContainer);
-                        li.appendChild(tabActions);
                     
                         moreOptionsButton.addEventListener('click', (event) => {
                             event.stopPropagation();
@@ -1360,294 +1691,9 @@ function displaySavedTabs(tabs) {
                         return;
                     }
                     const tab = tabs.find(t => `${t.id}` === tabId.split('-')[1]);
-                    if(tab){
-                        const li = document.createElement("li");
-                        li.style.userSelect = "none";
-                        li.id = `tab-${tab.id}`;
-                        li.style.backgroundColor = tab.color; 
-                        li.classList.add("tab-item");
-                        li.dataset.url = tab.url;
-                        
-                        li.draggable = true;
-                        li.addEventListener("dragstart", handleDragStart);
-                        li.addEventListener("dragend", handleDragEnd);
-                
-                        // Calculate the formatted date when displaying
-                        const { formattedDate, dateDisplayColor } = calculateFormattedDate(tab.parsedDate);
-                        const savedFormattedDate = formattedDate;
-                        const savedDateDisplayColor = dateDisplayColor;
-                        li.innerHTML += `
-                            <div class="tab-info-container">
-                                <div class="tab-info-left">
-                                    <img src="${tab.favIconUrl}" width="24" height="24">
-                                </div>
-                                <div class="tab-info-right">
-                                    <span class="tab-title" data-url="${tab.url}" id="title-display-${tab.id}">${tab.title}</span>
-                                    <input type="text" class="hidden" id="title-input-${tab.id}" value="${tab.title}">
-                                    <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note ? tab.note.replace(/\\/g, '').replace(/\n/g, '<br>') : ''}</div>
-                                    <textarea class="tab-note hidden" id="note-input-${tab.id}" rows="1">${tab.note ? tab.note.replace(/<br>/g, '\n') : ''}</textarea>
-                                    <div class="date-display ${formattedDate ? '' : 'hidden'}" id="date-display-${tab.id}">${formattedDate || ''}</div>
-                                </div>
-                                <div class="tab-actions">
-                                    <button class="more-options" data-index="${tab.id}">
-                                        <img src="../icons/morevertical.svg" class="main-grid-item-icon" />
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-
-                        const dateDisplay = li.querySelector(`#date-display-${tab.id}`);
-                        dateDisplay.style.backgroundColor = savedDateDisplayColor;
-                        
+                    if (tab) {
+                        const li = createTabItem(tab);
                         column.appendChild(li);
-
-                        const favicon = li.querySelector(".tab-info-left");
-                        favicon.addEventListener("click", (event) => {
-                            event.stopPropagation();
-                            const selectedItems = document.querySelectorAll('.selected');
-                            const allItems = Array.from(document.querySelectorAll('li'));
-                            const currentIndex = allItems.indexOf(li);
-                        
-                            if (event.ctrlKey || event.metaKey) {
-                                // Toggle selection with Ctrl/Cmd click
-                                li.classList.toggle('selected');
-                            } else if (event.shiftKey && lastSelectedIndex !== null) {
-                                // Select range with Shift click
-                                const start = Math.min(lastSelectedIndex, currentIndex);
-                                const end = Math.max(lastSelectedIndex, currentIndex);
-                                for (let i = start; i <= end; i++) {
-                                    allItems[i].classList.add('selected');
-                                }
-                            } else {
-                                // Single selection
-                                if (selectedItems.length === 1 && selectedItems[0] === li) {
-                                    // Clear selection if the only selected item is clicked again
-                                    li.classList.remove('selected');
-                                } else {
-                                    selectedItems.forEach(item => item.classList.remove('selected'));
-                                    li.classList.add('selected');
-                                }
-                            }
-                        
-                            lastSelectedIndex = currentIndex;
-                        });
-
-                        const tabLink = li.querySelector('.tab-title');
-                        tabLink.addEventListener('click', () => {
-                            window.location.href = tabLink.dataset.url;
-                        });
-            
-                        // Add event listener to the document to detect clicks outside of the li elements
-                        document.addEventListener('click', (event) => {
-                            const allItems = Array.from(document.querySelectorAll('li'));
-                            const isClickInside = allItems.some(item => item.contains(event.target));
-            
-                            if (!isClickInside) {
-                                allItems.forEach(item => item.classList.remove('selected'));
-                            }
-                        });
-                        
-                        const moreOptionsButton = li.querySelector('.more-options');
-                        moreOptionsButton.addEventListener('click', (event) => {
-                            event.stopPropagation();
-
-                            // Close all menus if clicking on the same button
-                            if (activeOptionsMenu && activeOptionsMenu.dataset.tabId === tab.id.toString()) {
-                                closeAllMenus();
-                                return;
-                            }
-                            closeAllMenus();
-
-                            const optionsMenu = document.createElement('div');
-                            optionsMenu.className = 'options-menu';
-                            optionsMenu.dataset.tabId = tab.id.toString();
-                            // Determine whether to show "Add Note" or "Edit Note" based on the note content
-                            const noteButtonText = tab.note && tab.note.trim() !== '' ? 'Edit Note' : 'Add Note';
-                            optionsMenu.innerHTML = `
-                                <button class="menu-option rename-tab" data-index="${tab.id}">Rename</button>
-                                <button class="menu-option add-note" data-index="${tab.id}">${noteButtonText}</button>
-                                <button class="menu-option remove-date ${formattedDate ? '' : 'hidden'}" data-index="${tab.id}">Clear Date</button>
-                                <button class="menu-option color-tab" data-index="${tab.id}">Color</button>
-                                <button class="menu-option delete-tab" data-index="${tab.id}">Delete</button>
-                            `;
-                            document.body.appendChild(optionsMenu);
-                        
-                            const rect = moreOptionsButton.getBoundingClientRect();
-                            optionsMenu.style.top = `${rect.bottom + window.scrollY}px`;
-                            optionsMenu.style.left = `${rect.left + window.scrollX}px`;
-                            optionsMenu.style.display = 'flex';
-                            activeOptionsMenu = optionsMenu;                        
-                            let colorMenu = null;
-                      
-                            // Color Tab option
-                            const colorTabOption = optionsMenu.querySelector('.color-tab');
-                            colorTabOption.addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                if (activeColorMenu) {
-                                    activeColorMenu.remove();
-                                    activeColorMenu = null;
-                                    return;
-                                }
-                                const colorOptions = ['#FFFFFF', '#f7c2d6', '#f9ffc4', '#c6e2e9', '#e9c8fa'];
-                                colorMenu = document.createElement('div');
-                                colorMenu.classList.add('color-menu');
-                            
-                                colorOptions.forEach(color => {
-                                    const colorOption = document.createElement('div');
-                                    colorOption.classList.add('color-option');
-                                    colorOption.style.backgroundColor = color;
-                                    colorOption.addEventListener('click', () => {
-                                        tab.color = color;
-                                        li.style.backgroundColor = color;
-                                        chrome.storage.local.set({ savedTabs: tabs }, () => {
-                                            console.log('Tab color saved:', tab.id, tab.color);
-                                        });
-                                        closeAllMenus();
-                                    });
-                                    colorMenu.appendChild(colorOption);
-                                });
-                            
-                                document.body.appendChild(colorMenu);
-                                const rect = colorTabOption.getBoundingClientRect();
-                                colorMenu.style.top = `${rect.top + window.scrollY}px`;
-                                colorMenu.style.left = `${rect.right + window.scrollX}px`;
-                                activeColorMenu = colorMenu;
-                            });
-                        
-                            // Rename Tab option
-                            const renameTabOption = optionsMenu.querySelector('.rename-tab');
-                            renameTabOption.addEventListener('click', () => {
-                                li.removeEventListener('dragstart', handleDragStart);
-                                const titleDisplay = li.querySelector(`#title-display-${tab.id}`);
-                                const titleInput = li.querySelector(`#title-input-${tab.id}`);
-                                
-                                titleInput.classList.remove("hidden");
-                                titleDisplay.classList.add("hidden");
-                                titleInput.focus();
-                                
-                                const length = titleInput.value.length;
-                                titleInput.setSelectionRange(length, length);
-
-                                titleInput.addEventListener('keydown', function handleKeydown(event) {
-                                    if (event.key === 'Enter') {
-                                        titleDisplay.textContent = titleInput.value;
-                                        titleInput.classList.add("hidden");
-                                        titleDisplay.classList.remove("hidden");
-                                        titleInput.removeEventListener('keydown', handleKeydown);
-                                    }
-                                });
-                                
-                                closeAllMenus();
-                            });
-
-                            const titleDisplay = li.querySelector(`#title-display-${tab.id}`);
-                            const titleInput = li.querySelector(`#title-input-${tab.id}`);
-
-                            titleInput.addEventListener("blur", function () {
-                                const newTitle = titleInput.value;
-                                saveTabTitle(tab.id, newTitle);
-                                titleDisplay.textContent = newTitle;
-                                titleInput.classList.add("hidden");
-                                titleDisplay.classList.remove("hidden");
-                                li.addEventListener('dragstart', handleDragStart);
-                            });
-
-                            // Add Note option
-                            const editTabOption = optionsMenu.querySelector('.add-note');
-                            editTabOption.addEventListener('click', () => {
-                                li.removeEventListener('dragstart', handleDragStart);
-                                const noteDisplay = li.querySelector(`#note-display-${tab.id}`);
-                                const noteInput = li.querySelector(`#note-input-${tab.id}`);
-                                
-                                noteInput.classList.remove("hidden");
-                                noteDisplay.classList.add("hidden");
-                                noteInput.focus();
-                                
-                                const length = noteInput.value.length;
-                                noteInput.setSelectionRange(length, length);
-                                
-                                closeAllMenus();
-                            });
-                        
-                            // Delete Tab option
-                            const deleteTabOption = optionsMenu.querySelector('.delete-tab');
-                            deleteTabOption.addEventListener('click', () => {
-                                deleteTab(tab.id);
-                                closeAllMenus();
-                            });
-
-                             // Remove Date option
-                             const removeDateOption = optionsMenu.querySelector('.remove-date');
-                             removeDateOption.addEventListener('click', () => {
-                                 tab.parsedDate = null;
-                                 dateDisplay.textContent = '';
-                                 dateDisplay.classList.add('hidden');
-                                 chrome.storage.local.set({ savedTabs: tabs }, () => {
-                                     console.log('Tab date removed:', tab.id);
-                                 });
-                                 closeAllMenus();
-                             });
-                        });
-                        
-                        const noteDisplay = li.querySelector(`#note-display-${tab.id}`);
-                        const noteInput = li.querySelector(`#note-input-${tab.id}`);
-                        
-                        noteDisplay.addEventListener("click", function () {
-                            li.removeEventListener('dragstart', handleDragStart);
-                            if (noteInput.classList.contains("hidden")) {
-                                noteInput.classList.remove("hidden");
-                                noteDisplay.classList.add("hidden");
-                                noteInput.focus();
-                                
-                                const length = noteInput.value.length;
-                                noteInput.setSelectionRange(length, length);
-                            }
-                        });
-                        
-                        noteInput.addEventListener("blur", function () {
-                            const note = noteInput.value;
-                            saveTabNote(tab.id, note);
-                            noteDisplay.innerHTML = note ? note.replace(/\\/g, '').replace(/\n/g, '<br>') : '';
-                            noteInput.classList.add("hidden");
-                            noteDisplay.classList.remove("hidden");
-                            li.addEventListener('dragstart', handleDragStart);
-                        });
-
-                        noteInput.addEventListener("keydown", function (event) {
-                            if (event.key === "Enter" && !event.shiftKey) {
-                                noteInput.blur();
-                            }
-                            else if (event.key === "Enter" && event.shiftKey) {
-                                const start = noteInput.selectionStart;
-                                const end = noteInput.selectionEnd;
-                                noteInput.value = noteInput.value.substring(0, start) + "\n" + noteInput.value.substring(end);
-                                noteInput.selectionStart = noteInput.selectionEnd = start + 1;
-                                event.preventDefault();
-                            }
-                        });
-
-                        noteInput.addEventListener("input", function () {
-                            const note = noteInput.value;
-                            // Update the date display in real-time
-                            const dateDisplay = li.querySelector(`#date-display-${tab.id}`);
-                            const chrono = new Chrono();
-                            const parsedNote = note.replace(/\\\w+/g, '');
-                            const parsedDate = chrono.parseDate(parsedNote);
-                            if (parsedDate) {
-                                const { formattedDate, dateDisplayColor } = calculateFormattedDate(parsedDate);
-                                dateDisplay.textContent = formattedDate;
-                                dateDisplay.classList.remove('hidden');
-                                dateDisplay.style.backgroundColor = dateDisplayColor;
-                            } 
-                            else if(savedFormattedDate) {
-                                dateDisplay.textContent = savedFormattedDate;
-                                dateDisplay.classList.remove('hidden');
-                                dateDisplay.style.backgroundColor = savedDateDisplayColor;
-                            }
-                            else {
-                                dateDisplay.classList.add('hidden');
-                            }
-                        });
                     }
                 });
                 if(columnData.minimized) {

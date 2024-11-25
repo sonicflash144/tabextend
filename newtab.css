@@ -155,14 +155,20 @@ h1, h2 {
     }
 
 .tab-item {
+    background-color: #fff;
     display: flex;
     align-items: center;
     margin: 10px 0;
     padding: 10px;
     border: 2px solid transparent; 
     border-radius: 5px;
-    background-color: #fff;
+    width: 100%;
+    box-sizing: border-box;
 }
+    .tab-item.subgroup-item {
+        background-color: #dddddd;
+        padding: 4px 10px;
+    }
     .tab-item.dragging {
         opacity: 0.5;
     }
@@ -197,12 +203,12 @@ h1, h2 {
         width: 28px;
         margin-left: auto;
         position: relative;
-        align-self: flex-start;
+
     }
         #sidebar.collapsed .tab-actions {
             display: none;
         }
-        .tab-actions button, .menu-container button {
+        .tab-actions button, .menu-container button, .more-options {
             background: none;
             border: none;
             cursor: pointer;
@@ -213,7 +219,7 @@ h1, h2 {
         .more-options.vertical {
             transform: rotate(90deg);
         }
-        .tab-actions img {
+        .tab-actions img, .more-options img {
             width: 20px;
             height: 20px;
         }
@@ -454,22 +460,23 @@ h1, h2 {
     display: flex;
     flex-direction: column;
     row-gap: 4px;
-    width: calc(100% - 28px);
+    width: 100%;
 }
 
 .favicons-container {
     display: flex;
-    column-gap: 32px;
-    row-gap: 8px;
+    column-gap: 24px;
+    row-gap: 12px;
     flex-wrap: wrap;
+    margin-bottom: 4px;
 }
-    .collapse-button {
+    .expand-button {
         background: none;
         border: none;
         cursor: pointer;
         opacity: 0.5;
     }
-        .collapse-button:hover {
+        .expand-button:hover {
             opacity: 0.8;
         }
     .subgroup-title {
@@ -479,6 +486,7 @@ h1, h2 {
     .subgroup-title-group {
         display: flex;
         justify-content: space-between;
+        align-items: center;
     }
     .subgroup-title-text {
         text-align: left;
@@ -490,6 +498,9 @@ h1, h2 {
         text-overflow: ellipsis;
     }
     .favicon-wrapper {
+        background-color: #fff;
+        padding: 4px;
+        border-radius: 5px;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -504,4 +515,14 @@ h1, h2 {
         text-align: center;
         font-size: 12px;
         margin-top: 4px;
+    }
+    .expanded-tabs {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        gap: 8px;
+        margin: 4px 0px;
+    }
+    .expanded-tabs .tab-item {
+        margin: 0;
     }
