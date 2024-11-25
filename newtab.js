@@ -187,7 +187,19 @@ function saveColumnState(returnState = false) {
     columns.forEach(column => {
         const columnId = column.id;
         const tabItems = column.querySelectorAll('.tab-item');
-        const tabIds = Array.from(tabItems).map(tabItem => tabItem.id);
+        const tabIds = Array.from(tabItems).map(tabItem => {
+            if (tabItem.classList.contains('subgroup-item')) {
+                const subgroup = [tabItem.id];
+                const faviconsContainer = tabItem.querySelector('.favicons-container');
+                const favicons = faviconsContainer.querySelectorAll('img');
+                favicons.forEach(favicon => {
+                    subgroup.push(favicon.id);
+                });
+                return subgroup;
+            } else {
+                return tabItem.id;
+            }
+        });
         const columnTitle = column.querySelector('.column-title-text').textContent;
         const isMinimized = column.classList.contains('minimized');
         const emoji = column.dataset.emoji;
@@ -498,6 +510,34 @@ function maximizeColumn(column) {
         tabItem.style.display = "flex";
     });
 }
+function ungroupSubgroup(groupId) {
+    chrome.storage.local.get(['columnState', 'savedTabs'], (data) => {
+        const columnState = data.columnState || [];
+        const savedTabs = data.savedTabs || [];
+
+        // Find which column contains the subgroup
+        for (let column of columnState) {
+            const tabIds = column.tabIds;
+            const subgroupIndex = tabIds.findIndex(id => Array.isArray(id) && id[0] === groupId);
+            
+            if (subgroupIndex !== -1) {
+                // Get the subgroup array
+                const subgroup = tabIds[subgroupIndex];
+                // Remove the subgroup itself
+                tabIds.splice(subgroupIndex, 1);
+                // Add all tabs from subgroup individually (skip first element as it's the group ID)
+                const individualTabs = subgroup.slice(1);
+                tabIds.splice(subgroupIndex, 0, ...individualTabs);
+                
+                // Save the updated state
+                chrome.storage.local.set({ columnState: columnState, savedTabs: savedTabs }, () => {
+                    console.log('Subgroup ungrouped:', groupId);
+                });
+                break;
+            }
+        }
+    });
+}
 
 /* Tab Drag and Drop */
 function handleDragStart(event) {
@@ -508,7 +548,18 @@ function handleDragStart(event) {
     event.dataTransfer.setData("text/plain", tabItem.id);
     event.dataTransfer.setDragImage(tabItem, 0, 0);
     dropType = "list-item";
-    tabItem.classList.add("dragging");
+
+    // Check if the dragged item is selected and if there are multiple selected items
+    const selectedItems = document.querySelectorAll('.selected');
+    const isDraggedItemSelected = tabItem.classList.contains('selected');
+    
+    if (isDraggedItemSelected && selectedItems.length > 1) {
+        // Add dragging class to all selected items
+        selectedItems.forEach(item => item.classList.add('dragging'));
+    } else {
+        // If dragging an unselected item, only add dragging to that item
+        tabItem.classList.add('dragging');
+    }
 }
 function calculateDropPosition(event, tabItems, isMinimized = false) {
     if(isMinimized){
@@ -688,6 +739,26 @@ function handleDragOver(event) {
         }
         
         dropIndicator.style.top = `${indicatorTop}px`;
+
+        // Check if dragging directly over a saved tab
+        const targetTab = listItems.find(item => {
+            if (item.closest('#open-tabs-list') || item.classList.contains('dragging')) {
+                return false;
+            }
+            const itemRect = item.getBoundingClientRect();
+            const itemHeight = itemRect.bottom - itemRect.top;
+            const middleThirdTop = itemRect.top + itemHeight / 3;
+            const middleThirdBottom = itemRect.bottom - itemHeight / 3;
+            return event.clientY >= middleThirdTop && event.clientY <= middleThirdBottom;
+        });
+
+        if (targetTab) {
+            dropIndicator.style.display = 'none';
+            targetTab.style.outline = '2px solid #007bff';
+        } else {
+            listItems.forEach(item => item.style.outline = 'none');
+            dropIndicator.style.display = 'block';
+        }
         
     } 
     else if (dropType === "column" && columnsContainer) {
@@ -730,7 +801,7 @@ function handleDragOver(event) {
         newColumnIndicator.style.display = 'none';
     }
     
-    dropIndicator.style.display = 'block';
+    //dropIndicator.style.display = 'block';
     event.dataTransfer.dropEffect = 'move';
 }
 function handleDrop(event) {
@@ -822,6 +893,135 @@ function handleDrop(event) {
     let tabItems = Array.from(column.querySelectorAll('.tab-item'));
     let dropPosition = calculateDropPosition(event, tabItems);
 
+    // Check if the tab is dropped directly on top of another tab
+    const targetTab = tabItems.find(item => {
+        if (item.closest('#open-tabs-list') || item.classList.contains('dragging')) {
+            return false;
+        }
+        const itemRect = item.getBoundingClientRect();
+        const itemHeight = itemRect.bottom - itemRect.top;
+        const middleThirdTop = itemRect.top + itemHeight / 3;
+        const middleThirdBottom = itemRect.bottom - itemHeight / 3;
+        return event.clientY >= middleThirdTop && event.clientY <= middleThirdBottom;
+    });
+
+    if (targetTab) {
+        const targetTabId = targetTab.id;
+        let draggedTabIds = Array.from(itemsToProcess).map(item => item.id);
+        const isOpenTabsList = draggedTabIds.some(id => id.startsWith('opentab-'));
+        let draggedTabIdsCopy = draggedTabIds.slice();
+        draggedTabIds = draggedTabIds.map(id => id.replace('opentab-', 'tab-'));
+            
+        // Generate unique group ID
+        const generateGroupId = () => `group-${Date.now()}`;
+    
+        // Save them as a subgroup within columnState
+        const columnState = saveColumnState(true);
+        console.log('Column state:', columnState);
+        const columnIndex = columnState.findIndex(col => col.id === column.id);
+        if (columnIndex !== -1) {
+            const tabIds = columnState[columnIndex].tabIds;
+            const targetTabIdIndex = tabIds.findIndex(id => id === targetTabId || (Array.isArray(id) && id[0] === targetTabId));
+            const draggedIsSubgroup = draggedTabIds.length === 1 && tabIds.find(id => Array.isArray(id) && id[0] === draggedTabIds[0]);
+            
+            if (targetTabIdIndex !== -1) {
+                // If source is a subgroup and target is a regular tab
+                if (draggedIsSubgroup && !Array.isArray(tabIds[targetTabIdIndex])) {
+                    const sourceSubgroup = tabIds.find(id => Array.isArray(id) && id[0] === draggedTabIds[0]);
+                    const newGroupId = generateGroupId();
+                    const tabsFromSource = sourceSubgroup.slice(1);
+                    tabIds[targetTabIdIndex] = [newGroupId, tabIds[targetTabIdIndex], ...tabsFromSource];
+                    // Remove the source subgroup
+                    const sourceIndex = tabIds.findIndex(id => Array.isArray(id) && id[0] === draggedTabIds[0]);
+                    tabIds.splice(sourceIndex, 1);
+                } 
+                // Merging two subgroups
+                else if (draggedIsSubgroup && Array.isArray(tabIds[targetTabIdIndex])) {
+                    const sourceSubgroup = tabIds.find(id => Array.isArray(id) && id[0] === draggedTabIds[0]);
+                    const tabsToAdd = sourceSubgroup.slice(1);
+                    tabIds[targetTabIdIndex].push(...tabsToAdd);
+                    const sourceIndex = tabIds.findIndex(id => Array.isArray(id) && id[0] === draggedTabIds[0]);
+                    tabIds.splice(sourceIndex, 1);
+                } 
+                // Adding tabs to existing subgroup
+                else if (Array.isArray(tabIds[targetTabIdIndex])) {
+                    draggedTabIds.forEach(draggedTabId => {
+                        tabIds[targetTabIdIndex].push(draggedTabId);
+                    });
+                }
+                // Creating new subgroup from regular tabs
+                else {
+                    tabIds[targetTabIdIndex] = [generateGroupId(), tabIds[targetTabIdIndex], ...draggedTabIds];
+                }
+    
+                // Remove draggedTabIds from their original columns
+                columnState.forEach(col => {
+                    draggedTabIds.forEach(draggedTabId => {
+                        const index = col.tabIds.indexOf(draggedTabId);
+                        if (index !== -1) {
+                            col.tabIds.splice(index, 1);
+                        }
+                    });
+                });
+            }
+            columnState[columnIndex].tabIds = tabIds;
+            if (isOpenTabsList) {
+                let updatedTabs = [];
+                let tabsProcessed = [];
+            
+                draggedTabIdsCopy.forEach(draggedTabId => {
+                    const originalDraggedTabId = draggedTabId;
+                    if(!draggedTabId.startsWith('opentab-')) {
+                        tabsProcessed.push(draggedTabId);
+                    }
+                    draggedTabId = draggedTabId.replace('opentab-', 'tab-');
+                    const numericId = parseInt(draggedTabId.replace('tab-', ''));
+                    chrome.tabs.get(numericId, (tab) => {
+                        if (originalDraggedTabId.startsWith('opentab-')) {
+                            const newTab = {
+                                title: tab.title,
+                                url: tab.url,
+                                favIconUrl: tab.favIconUrl || '',
+                                id: numericId,
+                                color: '#FFFFFF'
+                            };
+                            updatedTabs.push(newTab);
+                        }
+                        tabsProcessed.push(draggedTabId);
+                
+                        if (tabsProcessed.length === draggedTabIds.length) {
+                            chrome.storage.local.get('savedTabs', (data) => {
+                                let existingTabs = data.savedTabs || [];
+                                updatedTabs = existingTabs.concat(updatedTabs);
+                
+                                chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                                    let activeTab = tabs[0];
+                                    draggedTabIds.forEach(draggedTabId => {
+                                        const numericId = parseInt(draggedTabId.replace('tab-', ''));
+                                        chrome.tabs.remove(numericId, () => {
+                                            chrome.tabs.update(activeTab.id, { active: true });
+                                        });
+                                    });
+                
+                                    chrome.storage.local.set({ columnState: columnState, savedTabs: updatedTabs }, () => {
+                                        //console.log('Updated storage with new tab:', updatedTabs);
+                                    });
+                                });
+                            });
+                        }
+                    });
+                });
+            }
+            else {
+                chrome.storage.local.set({ columnState }, () => {
+                    //console.log('Updated column state with subgroup:', columnState);
+                });
+            }
+    
+        }
+        return;
+    }
+
     itemsToProcess.forEach(item => {
         tabItems = Array.from(column.querySelectorAll('.tab-item'));
         let itemId = item.id;
@@ -874,7 +1074,9 @@ function handleDrop(event) {
 }
 function handleDragEnd(event) {
     stopScrollAnimation();
-    event.target.closest('.tab-item')?.classList.remove("dragging");
+    document.querySelectorAll('.tab-item.dragging').forEach(item => {
+        item.classList.remove("dragging");
+    });
     event.target.closest('.column')?.classList.remove("dragging");
     if (deletionArea) deletionArea.style.display = 'none';
     if (dropIndicator) dropIndicator.style.display = 'none';
@@ -958,6 +1160,146 @@ function displaySavedTabs(tabs) {
                 column.addEventListener('dragstart', handleColumnDragStart);
                 column.addEventListener('dragend', handleDragEnd);
                 columnData.tabIds.forEach(tabId => {
+                    if(Array.isArray(tabId)){
+                        const li = document.createElement("li");
+                        li.style.userSelect = "none";
+                        li.classList.add("tab-item");
+                        li.classList.add("subgroup-item");
+                        li.draggable = true;
+                        li.id = tabId[0];
+                        li.addEventListener("dragstart", handleDragStart);
+                        li.addEventListener("dragend", handleDragEnd);
+
+                        const tabGroupContainer = document.createElement("div");
+                        tabGroupContainer.classList.add("tab-group-container");
+                        
+                        const tabInfoContainer = document.createElement("div");
+                        tabInfoContainer.classList.add("tab-info-container");
+                        
+                        const faviconsContainer = document.createElement("div");
+                        faviconsContainer.classList.add("favicons-container");
+                    
+                        // Create title elements
+                        const titleGroup = document.createElement("div");
+                        //titleGroup.classList.add("title-group");
+                    
+                        const titleSpan = document.createElement("span");
+                        titleSpan.classList.add("subgroup-title-text");
+                        titleSpan.textContent = "Subgroup Title"; // Default title, you can customize this
+                        titleSpan.style.display = "inline";
+                    
+                        const titleInput = document.createElement("input");
+                        titleInput.type = "text";
+                        titleInput.classList.add("subgroup-title");
+                        titleInput.style.display = "none";
+                    
+                        titleGroup.appendChild(titleSpan);
+                        titleGroup.appendChild(titleInput);
+                        tabGroupContainer.appendChild(titleGroup);
+                    
+                        // Event listener to switch to edit mode
+                        titleSpan.addEventListener("click", () => {
+                            titleInput.value = titleSpan.textContent;
+                            titleInput.style.display = "inline";
+                            titleSpan.style.display = "none";
+                            titleInput.focus();
+                            const length = titleInput.value.length;
+                            titleInput.setSelectionRange(length, length);
+                        });
+                    
+                        // Event listener to save on Enter key press
+                        titleInput.addEventListener("keydown", (event) => {
+                            if (event.key === "Enter") {
+                                titleInput.blur();
+                            }
+                        });
+                    
+                        // Event listener to switch to read mode
+                        titleInput.addEventListener("blur", () => {
+                            if (titleInput.value.trim() !== "") {
+                                titleSpan.textContent = titleInput.value;
+                                titleInput.style.display = "none";
+                                titleSpan.style.display = "inline";
+                            }
+                        });
+                    
+                        tabId.forEach(subTabId => {
+                            // Skip the first element which is the groupId
+                            if (subTabId === tabId[0]) return;
+                        
+                            const tab = tabs.find(t => `${t.id}` === subTabId.split('-')[1]);
+                            if (tab) {
+                                const faviconWrapper = document.createElement("div");
+                                faviconWrapper.classList.add("favicon-wrapper");
+                                
+                                const favicon = document.createElement("img");
+                                favicon.src = tab.favIconUrl;
+                                favicon.id = `tab-${tab.id}`;
+                                favicon.classList.add("subgroup-favicon");
+                                
+                                const title = document.createElement("div");
+                                title.classList.add("favicon-title");
+                                title.textContent = tab.title;
+                                title.title = tab.title;
+                    
+                                faviconWrapper.appendChild(favicon);
+                                faviconWrapper.appendChild(title);
+                                faviconWrapper.addEventListener("click", () => {
+                                    window.location.href = tab.url;
+                                });
+                                faviconsContainer.appendChild(faviconWrapper);
+                            }
+                        });
+                        
+                        tabInfoContainer.appendChild(faviconsContainer);
+                        tabGroupContainer.appendChild(tabInfoContainer);
+                        
+                        const moreOptionsButton = document.createElement('button');
+                        moreOptionsButton.classList.add('more-options');
+                        moreOptionsButton.innerHTML = `<img src="../icons/morevertical.svg" class="main-grid-item-icon" />`;
+                        
+                        const tabActions = document.createElement("div");
+                        tabActions.classList.add("tab-actions");
+                        tabActions.appendChild(moreOptionsButton);
+                        
+                        li.appendChild(tabGroupContainer);
+                        li.appendChild(tabActions);
+                    
+                        moreOptionsButton.addEventListener('click', (event) => {
+                            event.stopPropagation();
+                    
+                            // Close all menus if clicking on the same button
+                            if (activeOptionsMenu && activeOptionsMenu.dataset.tabId === tabId[0]) {
+                                closeAllMenus();
+                                return;
+                            }
+                            closeAllMenus();
+                    
+                            const optionsMenu = document.createElement('div');
+                            optionsMenu.className = 'options-menu';
+                            optionsMenu.dataset.tabId = tabId[0];
+                            optionsMenu.innerHTML = `
+                                <button class="menu-option ungroup-subgroup" data-index="${tabId[0]}">Ungroup</button>
+                            `;
+                            document.body.appendChild(optionsMenu);
+                    
+                            const rect = moreOptionsButton.getBoundingClientRect();
+                            optionsMenu.style.top = `${rect.bottom + window.scrollY}px`;
+                            optionsMenu.style.left = `${rect.left + window.scrollX}px`;
+                            optionsMenu.style.display = 'flex';
+                            activeOptionsMenu = optionsMenu;
+                    
+                            // Ungroup Subgroup option
+                            const ungroupSubgroupOption = optionsMenu.querySelector('.ungroup-subgroup');
+                            ungroupSubgroupOption.addEventListener('click', () => {
+                                ungroupSubgroup(tabId[0]);
+                                closeAllMenus();
+                            });
+                        });
+                        
+                        column.appendChild(li);
+                        return;
+                    }
                     const tab = tabs.find(t => `${t.id}` === tabId.split('-')[1]);
                     if(tab){
                         const li = document.createElement("li");
@@ -1381,6 +1723,9 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
         console.log(changes);
         if(changes.savedTabs){
             tabs_in_storage = changes.savedTabs.newValue.filter(tab => !('temp' in tab));
+            if(changes.delay){
+                return;
+            }
         }
         if(changes.columnState && changes.animation){
             const column = document.getElementById(changes.animation.newValue.columnId);

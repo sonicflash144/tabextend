@@ -120,7 +120,6 @@ h1, h2 {
 }
 #tab-list img, #open-tabs-list img {
     vertical-align: middle;
-    margin-right: 10px;
 }
 
 #tab-list-container {
@@ -169,9 +168,6 @@ h1, h2 {
     }
     .tab-item.selected {
         border-color: #007BFF;
-    }
-    .tab-item img {
-        margin-right: 10px;
     }
 
 .tab-title {
@@ -443,3 +439,42 @@ h1, h2 {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+.subgroup-favicon {
+    width: 24px;
+    height: 24px;
+}
+
+.tab-group-container {
+    display: flex;
+    flex-direction: column;
+    row-gap: 8px;
+}
+
+.favicons-container {
+    display: flex;
+    column-gap: 32px;
+    row-gap: 8px;
+    flex-wrap: wrap;
+}
+    .subgroup-title-text {
+        text-align: left;
+        font-weight: bold;
+        font-size: 14px;
+    }
+    .favicon-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 32px;
+        cursor: pointer;
+    }
+    .favicon-title {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        width: 100%;
+        text-align: center;
+        font-size: 12px;
+        margin-top: 4px;
+    }
