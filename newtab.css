@@ -197,6 +197,7 @@ h1, h2 {
         width: 28px;
         margin-left: auto;
         position: relative;
+        align-self: flex-start;
     }
         #sidebar.collapsed .tab-actions {
             display: none;
@@ -319,6 +320,10 @@ h1, h2 {
         .emoji-button:hover {
             transform: scale(1.1);
         }
+    .column-title {
+        height: 16px;
+        width: 100%;
+    }
     .column-title-text {
         display: none;
         user-select: none;
@@ -448,7 +453,8 @@ h1, h2 {
 .tab-group-container {
     display: flex;
     flex-direction: column;
-    row-gap: 8px;
+    row-gap: 4px;
+    width: calc(100% - 28px);
 }
 
 .favicons-container {
@@ -457,10 +463,31 @@ h1, h2 {
     row-gap: 8px;
     flex-wrap: wrap;
 }
+    .collapse-button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        opacity: 0.5;
+    }
+        .collapse-button:hover {
+            opacity: 0.8;
+        }
+    .subgroup-title {
+        height: 14px;
+        width: 80%;
+    }
+    .subgroup-title-group {
+        display: flex;
+        justify-content: space-between;
+    }
     .subgroup-title-text {
         text-align: left;
         font-weight: bold;
         font-size: 14px;
+        white-space: nowrap;
+        width: 80%;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     .favicon-wrapper {
         display: flex;

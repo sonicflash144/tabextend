@@ -1,4 +1,4 @@
-import { Chrono } from 'chrono-node';
+import { Chrono, de } from 'chrono-node';
 import 'emoji-picker-element';
 chrome.storage.local.get("sidebarCollapsed", (data) => {
     const sidebar = document.getElementById('sidebar');
@@ -103,6 +103,14 @@ function deleteTab(id, column = null) {
         }
     });
 }
+function deleteSubgroup(groupId) {
+    const li = document.getElementById(groupId);
+    const tabIds = Array.from(li.querySelectorAll('.subgroup-favicon')).map(favicon => parseInt(favicon.id.split('-')[1]));
+    li.remove();
+    saveColumnState();
+    deleteTab(tabIds);
+}
+
 function saveTab(tabId) {
     const tabIds = Array.isArray(tabId) ? tabId : [tabId];
     const newTabs = [];
@@ -195,6 +203,8 @@ function saveColumnState(returnState = false) {
                 favicons.forEach(favicon => {
                     subgroup.push(favicon.id);
                 });
+                const subgroupTitle = tabItem.querySelector('.subgroup-title-text').textContent;
+                subgroup.push(subgroupTitle);
                 return subgroup;
             } else {
                 return tabItem.id;
@@ -443,10 +453,25 @@ function deleteColumn(event) {
     const tabIds = Array.from(tabItems).map(tabItem => tabItem.id);
     deleteTab(tabIds.map(id => parseInt(id.replace('tab-', ''))), column);
 }
-function openAllInColumn(column) {
+function openAllInColumn(column, subgroup = null) {
     closeAllMenus();
-    const tabItems = column.querySelectorAll('.tab-item');
-    const urls = Array.from(tabItems).map(tabItem => tabItem.dataset.url);
+    let urls;
+    if (subgroup) {
+        const favicons = Array.from(column.querySelectorAll(`#${subgroup[0]} .subgroup-favicon`));
+        urls = favicons.map(favicon => favicon.dataset.url);
+    }
+    else{
+        const tabItems = column.querySelectorAll('.tab-item');
+        urls = Array.from(tabItems).flatMap(tabItem => {
+            if (tabItem.classList.contains('subgroup-item')) {
+                const favicons = tabItem.querySelectorAll('.subgroup-favicon');
+                return Array.from(favicons).map(favicon => favicon.dataset.url);
+            } else {
+                return tabItem.dataset.url;
+            }
+        });
+    }
+
     // Open all tabs
     const createTabs = urls.map(url => 
         new Promise(resolve => {
@@ -458,7 +483,14 @@ function openAllInColumn(column) {
         const tabIds = tabs.map(tab => tab.id); // Extract tab IDs
         chrome.tabs.group({ tabIds: tabIds }, groupId => {
             // Set the title of the group
-            chrome.tabGroups.update(groupId, { title: column.querySelector('.column-title-text').textContent });
+            let title;
+            if(subgroup){
+                title = subgroup[subgroup.length - 1];
+            }
+            else{
+                title = column.querySelector('.column-title-text').textContent;
+            }
+            chrome.tabGroups.update(groupId, { title });
         });
     });
 }
@@ -868,6 +900,9 @@ function handleDrop(event) {
                     console.log('Tab closed:', itemId);
                 });
             }
+            else if (itemId.startsWith('group')) {
+                deleteSubgroup(itemId);
+            }
             item.parentNode.removeChild(item);
         });
         deleteTab(tabIdsToDelete);
@@ -929,8 +964,9 @@ function handleDrop(event) {
                 if (draggedIsSubgroup && !Array.isArray(tabIds[targetTabIdIndex])) {
                     const sourceSubgroup = tabIds.find(id => Array.isArray(id) && id[0] === draggedTabIds[0]);
                     const newGroupId = generateGroupId();
-                    const tabsFromSource = sourceSubgroup.slice(1);
-                    tabIds[targetTabIdIndex] = [newGroupId, tabIds[targetTabIdIndex], ...tabsFromSource];
+                    const tabsFromSource = sourceSubgroup.slice(1, -1);
+                    const title = sourceSubgroup[sourceSubgroup.length - 1];
+                    tabIds[targetTabIdIndex] = [newGroupId, tabIds[targetTabIdIndex], ...tabsFromSource, title];
                     // Remove the source subgroup
                     const sourceIndex = tabIds.findIndex(id => Array.isArray(id) && id[0] === draggedTabIds[0]);
                     tabIds.splice(sourceIndex, 1);
@@ -938,20 +974,20 @@ function handleDrop(event) {
                 // Merging two subgroups
                 else if (draggedIsSubgroup && Array.isArray(tabIds[targetTabIdIndex])) {
                     const sourceSubgroup = tabIds.find(id => Array.isArray(id) && id[0] === draggedTabIds[0]);
-                    const tabsToAdd = sourceSubgroup.slice(1);
-                    tabIds[targetTabIdIndex].push(...tabsToAdd);
+                    const tabsToAdd = sourceSubgroup.slice(1, -1);
+                    tabIds[targetTabIdIndex].splice(tabIds[targetTabIdIndex].length - 1, 0, ...tabsToAdd);
                     const sourceIndex = tabIds.findIndex(id => Array.isArray(id) && id[0] === draggedTabIds[0]);
                     tabIds.splice(sourceIndex, 1);
                 } 
                 // Adding tabs to existing subgroup
                 else if (Array.isArray(tabIds[targetTabIdIndex])) {
                     draggedTabIds.forEach(draggedTabId => {
-                        tabIds[targetTabIdIndex].push(draggedTabId);
+                        tabIds[targetTabIdIndex].splice(tabIds[targetTabIdIndex].length - 1, 0, draggedTabId);
                     });
                 }
                 // Creating new subgroup from regular tabs
                 else {
-                    tabIds[targetTabIdIndex] = [generateGroupId(), tabIds[targetTabIdIndex], ...draggedTabIds];
+                    tabIds[targetTabIdIndex] = [generateGroupId(), tabIds[targetTabIdIndex], ...draggedTabIds, "New Group"];
                 }
     
                 // Remove draggedTabIds from their original columns
@@ -1181,11 +1217,11 @@ function displaySavedTabs(tabs) {
                     
                         // Create title elements
                         const titleGroup = document.createElement("div");
-                        //titleGroup.classList.add("title-group");
+                        titleGroup.classList.add("subgroup-title-group");
                     
                         const titleSpan = document.createElement("span");
                         titleSpan.classList.add("subgroup-title-text");
-                        titleSpan.textContent = "Subgroup Title"; // Default title, you can customize this
+                        titleSpan.textContent = tabId[tabId.length - 1];
                         titleSpan.style.display = "inline";
                     
                         const titleInput = document.createElement("input");
@@ -1195,6 +1231,12 @@ function displaySavedTabs(tabs) {
                     
                         titleGroup.appendChild(titleSpan);
                         titleGroup.appendChild(titleInput);
+
+                        const collapseButton = document.createElement("button");
+                        collapseButton.classList.add("collapse-button");
+                        collapseButton.innerHTML = `<img src="../icons/chevron-down.svg" class="main-grid-item-icon" />`;
+                        titleGroup.appendChild(collapseButton);
+
                         tabGroupContainer.appendChild(titleGroup);
                     
                         // Event listener to switch to edit mode
@@ -1216,16 +1258,16 @@ function displaySavedTabs(tabs) {
                     
                         // Event listener to switch to read mode
                         titleInput.addEventListener("blur", () => {
-                            if (titleInput.value.trim() !== "") {
-                                titleSpan.textContent = titleInput.value;
-                                titleInput.style.display = "none";
-                                titleSpan.style.display = "inline";
-                            }
+                            const trimmedValue = titleInput.value.trim();
+                            titleSpan.textContent = trimmedValue === "" ? "New Group" : trimmedValue;
+                            titleInput.style.display = "none";
+                            titleSpan.style.display = "inline";
+                            saveColumnState();
                         });
                     
-                        tabId.forEach(subTabId => {
-                            // Skip the first element which is the groupId
-                            if (subTabId === tabId[0]) return;
+                        tabId.forEach((subTabId, index) => {
+                            // Skip the first element which is the groupId and the last element which is the title
+                            if (index === 0 || index === tabId.length - 1) return;
                         
                             const tab = tabs.find(t => `${t.id}` === subTabId.split('-')[1]);
                             if (tab) {
@@ -1236,6 +1278,7 @@ function displaySavedTabs(tabs) {
                                 favicon.src = tab.favIconUrl;
                                 favicon.id = `tab-${tab.id}`;
                                 favicon.classList.add("subgroup-favicon");
+                                favicon.dataset.url = tab.url;
                                 
                                 const title = document.createElement("div");
                                 title.classList.add("favicon-title");
@@ -1279,7 +1322,9 @@ function displaySavedTabs(tabs) {
                             optionsMenu.className = 'options-menu';
                             optionsMenu.dataset.tabId = tabId[0];
                             optionsMenu.innerHTML = `
+                                <button class="menu-option open-all-subgroup" data-index="${tabId[0]}">Open All</button>
                                 <button class="menu-option ungroup-subgroup" data-index="${tabId[0]}">Ungroup</button>
+                                <button class="menu-option delete-subgroup" data-index="${tabId[0]}">Delete</button>
                             `;
                             document.body.appendChild(optionsMenu);
                     
@@ -1288,11 +1333,25 @@ function displaySavedTabs(tabs) {
                             optionsMenu.style.left = `${rect.left + window.scrollX}px`;
                             optionsMenu.style.display = 'flex';
                             activeOptionsMenu = optionsMenu;
+
+                            // Open All Subgroup option
+                            const openAllSubgroupOption = optionsMenu.querySelector('.open-all-subgroup');
+                            openAllSubgroupOption.addEventListener('click', () => {
+                                openAllInColumn(column, tabId);
+                                closeAllMenus();
+                            });
                     
                             // Ungroup Subgroup option
                             const ungroupSubgroupOption = optionsMenu.querySelector('.ungroup-subgroup');
                             ungroupSubgroupOption.addEventListener('click', () => {
                                 ungroupSubgroup(tabId[0]);
+                                closeAllMenus();
+                            });
+
+                            // Delete Subgroup option
+                            const deleteSubgroupOption = optionsMenu.querySelector('.delete-subgroup');
+                            deleteSubgroupOption.addEventListener('click', () => {
+                                deleteSubgroup(tabId[0]);
                                 closeAllMenus();
                             });
                         });
