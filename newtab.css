@@ -212,9 +212,15 @@ h1, h2 {
             background: none;
             border: none;
             cursor: pointer;
+            width: 24px;
+            height: 24px;
+        }
+        .menu-item-icon {
+            width: 16px;
+            height: 16px;
         }
         .menu-container.vertical {
-            margin-left: 0;
+            margin-left: 0 auto;
         }
         .more-options.vertical {
             transform: rotate(90deg);
@@ -248,10 +254,15 @@ h1, h2 {
         border: none;
         cursor: pointer;
         opacity: 0.3;
+        width: 24px;
+        height: 24px;
     }
         .minimize-column:hover,
         .maximize-column:hover {
             opacity: 0.6;
+        }
+        .maximize-column {
+            display: none;
         }
 
     .header-container.vertical {
@@ -326,12 +337,13 @@ h1, h2 {
         .emoji-button:hover {
             transform: scale(1.1);
         }
-    .column-title {
+    .column-title-input {
         height: 16px;
         width: 100%;
+        display: none;
     }
     .column-title-text {
-        display: none;
+        display: inline;
         user-select: none;
         overflow: hidden;
         white-space: nowrap;
@@ -465,7 +477,7 @@ h1, h2 {
 
 .favicons-container {
     display: flex;
-    column-gap: 24px;
+    column-gap: 12px;
     row-gap: 12px;
     flex-wrap: wrap;
     margin-bottom: 4px;

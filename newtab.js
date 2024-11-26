@@ -3,8 +3,7 @@ import 'emoji-picker-element';
 chrome.storage.local.get("sidebarCollapsed", (data) => {
     const sidebar = document.getElementById('sidebar');
     if (data.sidebarCollapsed) {
-        sidebar.classList.add('collapsed');
-        sidebar.classList.add('no-transition');
+        sidebar.classList.add('collapsed', 'no-transition');
         setTimeout(() => {
             sidebar.classList.remove('no-transition');
         }, 100);
@@ -16,10 +15,12 @@ let scrollAnimation = {
     scrollY: 0,
     animationFrameId: null
 };
+const columnsContainer = document.getElementById('columns-container');
+const colorOptions = ['#FFFFFF', '#ffc4c4', '#fffdc4', '#b0e5ff', '#ebc4ff'];
 let dropIndicator = null;
 let dropType = null;
-let deletionArea;
-let newColumnIndicator;
+let deletionArea = null;
+let newColumnIndicator = null;
 let lastSelectedIndex = null;
 let activeColumnMenu = null;
 let activeOptionsMenu = null;
@@ -33,11 +34,16 @@ function getToday(tabDate) {
     parsedDate.setHours(0, 0, 0, 0); // Normalize to start of the day
 
     const diffTime = parsedDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
 }
+const getRandomEmoji = () => {
+    const range = [0x1F34F, 0x1F37F]; // Food and Drink        
+    const codePoint = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
+    return String.fromCodePoint(codePoint);
+};
 document.getElementById("add-column").addEventListener("click", () => {
-    createColumn("New Column");
+    createColumn();
     saveColumnState();
 });
 
@@ -69,10 +75,9 @@ function closeAllMenus() {
     activeOptionsMenu = activeColorMenu = activeColumnMenu = null;
 }
 
+/* Tab and Subgroup Functions */
 function deleteTab(id, column = null) {
-    if (!Array.isArray(id)) {
-        id = [id];
-    }
+    if (!Array.isArray(id)) id = [id];
 
     chrome.storage.local.get("savedTabs", (data) => {
         const tabs = data.savedTabs || [];
@@ -104,7 +109,34 @@ function deleteSubgroup(groupId) {
     saveColumnState();
     deleteTab(tabIds);
 }
+function ungroupSubgroup(groupId) {
+    chrome.storage.local.get(['columnState', 'savedTabs'], (data) => {
+        const columnState = data.columnState || [];
+        const savedTabs = data.savedTabs || [];
 
+        // Find which column contains the subgroup
+        for (let column of columnState) {
+            const tabIds = column.tabIds;
+            const subgroupIndex = tabIds.findIndex(id => Array.isArray(id) && id[0] === groupId);
+            
+            if (subgroupIndex !== -1) {
+                // Get the subgroup array
+                const subgroup = tabIds[subgroupIndex];
+                // Remove the subgroup itself
+                tabIds.splice(subgroupIndex, 1);
+                // Add all tabs from subgroup individually
+                const individualTabs = subgroup.slice(1, -2);
+                tabIds.splice(subgroupIndex, 0, ...individualTabs);
+                
+                // Save the updated state
+                chrome.storage.local.set({ columnState: columnState, savedTabs: savedTabs }, () => {
+                    console.log('Subgroup ungrouped:', groupId);
+                });
+                break;
+            }
+        }
+    });
+}
 function saveTab(tabId) {
     const tabIds = Array.isArray(tabId) ? tabId : [tabId];
     const newTabs = [];
@@ -128,10 +160,8 @@ function saveTab(tabId) {
                     chrome.storage.local.set({ savedTabs: updatedTabs, columnState: saveColumnState(true) }, () => {
                         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                             let activeTab = tabs[0];
-                            
-                            // Close the specified tabs
                             chrome.tabs.remove(tabIds.map(id => parseInt(id.replace('tab-', ''))), () => {
-                                // Optionally, you can ensure the focus remains on the active tab
+                                // Ensure the focus remains on the active tab
                                 chrome.tabs.update(activeTab.id, { active: true });
                             });
                         });
@@ -141,12 +171,90 @@ function saveTab(tabId) {
         });
     });
 }
+
+/* Tab Menu Actions */
+function createMenuDropdown(menuItems, button) {
+    const menuDropdown = document.createElement("div");
+    menuDropdown.className = "options-menu";
+
+    menuItems.forEach(item => {
+        if (item.hidden) return;
+        const menuItem = document.createElement("button");
+        menuItem.classList.add("menu-option");
+        menuItem.innerHTML = `
+            ${item.icon ? `<img src="${item.icon}" class="menu-item-icon" />` : ''}
+            <span>${item.text}</span>
+        `;
+        menuItem.addEventListener("click", (e) => {
+            e.stopPropagation();
+            item.action(e);
+            menuDropdown.style.display = "none";
+        });
+        menuDropdown.appendChild(menuItem);
+    });
+
+    // Position the dropdown relative to the button
+    const buttonRect = button.getBoundingClientRect();
+    menuDropdown.style.position = "fixed";
+    menuDropdown.style.top = `${buttonRect.bottom + 5}px`;
+    menuDropdown.style.right = `${window.innerWidth - buttonRect.right}px`;
+
+    document.body.appendChild(menuDropdown);
+    return menuDropdown;
+}
+function renameTab(tab, li) {
+    li.removeEventListener('dragstart', handleDragStart);
+    const titleDisplay = li.querySelector(`#title-display-${tab.id}`);
+    const titleInput = li.querySelector(`#title-input-${tab.id}`);
+
+    titleInput.classList.remove("hidden");
+    titleDisplay.classList.add("hidden");
+    titleInput.focus();
+
+    const length = titleInput.value.length;
+    titleInput.setSelectionRange(length, length);
+
+    titleInput.addEventListener('keydown', function handleKeydown(event) {
+        if (event.key === 'Enter') {
+            titleDisplay.textContent = titleInput.value;
+            titleInput.classList.add("hidden");
+            titleDisplay.classList.remove("hidden");
+            titleInput.removeEventListener('keydown', handleKeydown);
+        }
+    });
+
+    titleInput.addEventListener("blur", function () {
+        const newTitle = titleInput.value;
+        chrome.storage.local.get("savedTabs", (data) => {
+            const tabs = data.savedTabs || [];
+            const tabIndex = tabs.findIndex(t => t.id === tab.id);
+            tabs[tabIndex].title = newTitle;
+            titleDisplay.textContent = newTitle;
+            titleInput.classList.add("hidden");
+            titleDisplay.classList.remove("hidden");
+            li.addEventListener('dragstart', handleDragStart);
+            chrome.storage.local.set({ savedTabs: tabs }, () => {
+                //console.log('Tab title saved:', tab.id, newTitle);
+            });
+        });
+    });
+}
+function editTabNote(tab, li) {
+    li.removeEventListener('dragstart', handleDragStart);
+    const noteDisplay = li.querySelector(`#note-display-${tab.id}`);
+    const noteInput = li.querySelector(`#note-input-${tab.id}`);
+
+    noteInput.classList.remove("hidden");
+    noteDisplay.classList.add("hidden");
+    noteInput.focus();
+
+    const length = noteInput.value.length;
+    noteInput.setSelectionRange(length, length);
+}
 function saveTabNote(id, note) {
     chrome.storage.local.get("savedTabs", (data) => {
         const tabs = data.savedTabs || [];
         const index = tabs.findIndex(tab => tab.id === id);
-
-        // Parse the date but do not format it yet
         const { parsedDate, remainingNote } = parseAndSaveDate(note);
         tabs[index].note = remainingNote.replace(/\n/g, '<br>'); // Update the note for the tab
 
@@ -167,279 +275,48 @@ function parseAndSaveDate(note) {
     
     // Remove the parsed date from the note
     const remainingNote = parsedDate ? note.replace(detectedDateText, '').trim() : note;
-    
     return { parsedDate, remainingNote, detectedDateText };
 }
-function saveTabTitle(id, newTitle) {
-    chrome.storage.local.get("savedTabs", (data) => {
-        const tabs = data.savedTabs || [];
-        const tabIndex = tabs.findIndex(tab => tab.id === id);
-        tabs[tabIndex].title = newTitle;
-        chrome.storage.local.set({ savedTabs: tabs }, () => {
-            console.log('Tab title saved:', id, newTitle);
-        });
+function removeDate(tab, dateDisplay) {
+    tab.parsedDate = null;
+    dateDisplay.textContent = '';
+    dateDisplay.classList.add('hidden');
+    chrome.storage.local.set({ savedTabs: tabs_in_storage }, () => {
+        console.log('Tab date removed:', tab.id);
     });
 }
-
-function saveColumnState(returnState = false) {
-    const columnsContainer = document.getElementById('columns-container');
-    const columns = columnsContainer.querySelectorAll('.column');
-    const columnState = [];
-
-    columns.forEach(column => {
-        const columnId = column.id;
-        const tabItems = Array.from(column.querySelectorAll('.tab-item')).filter(item => 
-            item.classList.contains('tab-item') && 
-            !item.closest('.expanded-tabs')
-        );
-        const tabIds = Array.from(tabItems).map(tabItem => {
-            if (tabItem.classList.contains('subgroup-item')) {
-                const subgroup = [tabItem.id];
-                const expandedContainer = tabItem.querySelector('.expanded-tabs');
-                const expandedTabList = expandedContainer.querySelectorAll('li');
-                expandedTabList.forEach(tab => {
-                    subgroup.push(tab.id);
-                });
-                const subgroupTitle = tabItem.querySelector('.subgroup-title-text').textContent;
-                const isExpanded = tabItem.querySelector('.expand-button').classList.contains('expanded');
-                subgroup.push(subgroupTitle, isExpanded);
-                return subgroup.length > 3 ? subgroup : null;
-            } else {
-                return tabItem.id;
-            }
-        }).filter(id => id !== null);
-        const columnTitle = column.querySelector('.column-title-text').textContent;
-        const isMinimized = column.classList.contains('minimized');
-        const emoji = column.dataset.emoji;
-        
-        columnState.push({
-            id: columnId,
-            tabIds: tabIds,
-            title: columnTitle,
-            minimized: isMinimized,
-            emoji: emoji
-        });
-    });
-    if(returnState) {
-        return columnState;
+function openColorMenu(tab, li, moreOptionsButton) {
+    if (activeColorMenu) {
+        activeColorMenu.remove();
+        activeColorMenu = null;
+        return;
     }
-    else{
-        chrome.storage.local.set({ columnState }, () => {
-            //console.log('Column state saved:', columnState);
-        });
-    }
-}
-const getRandomEmoji = () => {
-    const range = [0x1F34F, 0x1F37F]; // Food and Drink        
-    const codePoint = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
-    return String.fromCodePoint(codePoint);
-};
-function createColumn(title, id, minimized = false, emoji = null) {
-    const columnsContainer = document.getElementById("columns-container");
-    const column = document.createElement("div");
-    column.classList.add("column");
-    if (minimized) column.classList.add("minimized");
-    if(id) column.id = id;
-    else column.id = `column-${Date.now()}`;
+    const colorMenu = document.createElement('div');
+    colorMenu.classList.add('color-menu');
 
-    // Create a container for the title and buttons
-    const headerContainer = document.createElement("div");
-    headerContainer.classList.add("header-container");
-
-    // Add minimize button to the column
-    const minimizeButton = document.createElement("button");
-    minimizeButton.classList.add("minimize-column");
-    minimizeButton.title = "Minimize Column";
-    minimizeButton.innerHTML = `<img src="../icons/minimize.svg" width="24" height="24" class="main-grid-item-icon" />`;
-    minimizeButton.addEventListener("click", () => {
-        minimizeColumn(column);
-        chrome.storage.local.set({ columnState: saveColumnState(true), animation: {columnId: column.id, minimized: true} }, () => {
-            console.log(`${column.id} minimized`);
-        });
-    });
-
-    // Add maximize button to the column
-    const maximizeButton = document.createElement("button");
-    maximizeButton.classList.add("maximize-column");
-    maximizeButton.title = "Maximize Column";
-    maximizeButton.innerHTML = `<img src="../icons/maximize.svg" width="24" height="24" class="main-grid-item-icon" />`;
-    maximizeButton.addEventListener("click", () => {
-        maximizeColumn(column);
-        chrome.storage.local.set({ columnState: saveColumnState(true), animation: {columnId: column.id, minimized: false} }, () => {
-            console.log(`${column.id} maximized`);
-        });
-    });
-    maximizeButton.style.display = minimized ? "inline" : "none"; // Initially hidden if not minimized
-
-    // Add title input to the column
-    const titleInput = document.createElement("input");
-    titleInput.type = "text";
-    titleInput.classList.add("column-title");
-    titleInput.placeholder = "Enter column title";
-
-    // Create a span to display the title in read mode
-    const titleSpan = document.createElement("h2");
-    titleSpan.classList.add("column-title-text");
-
-    // If a title is provided, display it in read mode
-    if (title) {
-        titleSpan.textContent = title;
-        titleSpan.style.display = "inline";
-        titleInput.style.display = "none";
-        column.dataset.title = title;
-    }
-
-    // Create three-dot menu container
-    const menuContainer = document.createElement("div");
-    menuContainer.classList.add("menu-container");
-    
-    // Create three-dot menu button
-    const menuButton = document.createElement("button");
-    menuButton.classList.add("more-options");
-    menuButton.innerHTML = `<img src="../icons/morevertical.svg" width="24" height="24" class="main-grid-item-icon" />`;
-    menuContainer.appendChild(menuButton);
-    
-    // Toggle menu on button click with dynamic positioning
-    menuButton.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if(activeColumnMenu && activeColumnMenu.dataset.columnId === column.id){
-            closeAllMenus();
-            return;
-        }
-        closeAllMenus();
-
-        // Create menu dropdown
-        const menuDropdown = document.createElement("div");
-        menuDropdown.className = "options-menu";
-        const menuItems = [
-            { text: "Open All", icon: "../icons/openall.svg", action: () => openAllInColumn(column) },
-            { text: "Delete Column", icon: "../icons/delete-icon.svg", action: () => deleteColumn(column) }
-        ];
-        menuItems.forEach(item => {
-            const menuItem = document.createElement("button");
-            menuItem.classList.add("menu-option");
-            menuItem.innerHTML = `
-                <img src="${item.icon}" width="16" height="16" class="menu-item-icon" />
-                <span>${item.text}</span>
-            `;
-            menuItem.addEventListener("click", (e) => {
-                e.stopPropagation();
-                item.action(e);
-                menuDropdown.style.display = "none";
+    colorOptions.forEach(color => {
+        const colorOption = document.createElement('div');
+        colorOption.classList.add('color-option');
+        colorOption.style.backgroundColor = color;
+        colorOption.addEventListener('click', () => {
+            tab.color = color;
+            li.style.backgroundColor = color;
+            chrome.storage.local.set({ savedTabs: tabs_in_storage }, () => {
+                console.log('Tab color saved:', tab.id, tab.color);
             });
-            menuDropdown.appendChild(menuItem);
+            closeAllMenus();
         });
-    
-        // Position the dropdown relative to the button
-        const buttonRect = menuButton.getBoundingClientRect();
-        menuDropdown.style.position = "fixed";
-        menuDropdown.style.top = `${buttonRect.bottom + 5}px`; // 5px gap below button
-        menuDropdown.style.right = `${window.innerWidth - buttonRect.right}px`; // Align right edges
-
-        document.body.appendChild(menuDropdown);
-        activeColumnMenu = menuDropdown;
-        activeColumnMenu.dataset.columnId = column.id;
+        colorMenu.appendChild(colorOption);
     });
 
-    // Event listener to switch to read mode
-    titleInput.addEventListener("blur", () => {
-        if (titleInput.value.trim() !== "") {
-            titleSpan.textContent = titleInput.value;
-            titleInput.style.display = "none";
-            titleSpan.style.display = "inline";
-        }
-        column.setAttribute("draggable", "true");
-        column.dataset.title = titleInput.value;
-        saveColumnState();
-    });
-
-    // Event listener to switch to edit mode
-    titleSpan.addEventListener("click", () => {
-        column.setAttribute("draggable", "false");
-        titleInput.value = titleSpan.textContent;
-        titleInput.style.display = "inline";
-        titleSpan.style.display = "none";
-        titleInput.focus();
-        const length = titleInput.value.length;
-        titleInput.setSelectionRange(length, length);
-        if(column.classList.contains('minimized')){
-            titleInput.classList.add("vertical-text");
-        }
-        else{
-            titleInput.classList.remove("vertical-text");
-        }
-    });
-
-    // Event listener to save on Enter key press
-    titleInput.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-            titleInput.blur();
-        }
-    });
-
-    // Create emoji button and span
-    const emojiButton = document.createElement("button");
-    emojiButton.classList.add("emoji-button");
-    emojiButton.textContent = emoji || getRandomEmoji();
-
-    // Store the emoji as a data attribute on the column
-    column.dataset.emoji = emojiButton.textContent;
-
-    // Create and configure the emoji picker element
-    const emojiPicker = document.createElement('emoji-picker');
-    emojiPicker.classList.add('emoji-picker-on-top');
-    emojiPicker.style.display = 'none';
-    emojiPicker.addEventListener('emoji-click', (event) => {
-        const newEmoji = event.detail.unicode;
-        emojiButton.textContent = newEmoji;
-        column.dataset.emoji = newEmoji;
-        emojiPicker.style.display = 'none';
-        saveColumnState();
-    });
-
-    // Toggle emoji picker when clicking the emoji button
-    emojiButton.addEventListener('click', () => {
-        if (emojiPicker.style.display === 'none') {
-            const rect = emojiButton.getBoundingClientRect();
-            emojiPicker.style.top = `${rect.bottom + 4}px`;
-            emojiPicker.style.left = `${rect.left}px`;
-            emojiPicker.style.display = 'block';
-        } else {
-            emojiPicker.style.display = 'none';
-        }
-    });
-    // Hide emoji picker when clicking outside
-    document.addEventListener('click', (event) => {
-        if (!emojiButton.contains(event.target) && !emojiPicker.contains(event.target)) {
-            emojiPicker.style.display = 'none';
-        }
-    });
-
-    // Append open all button, title, and delete button to the header container
-    const titleGroup = document.createElement("div");
-    titleGroup.classList.add("title-group");
-
-    headerContainer.appendChild(minimizeButton);
-    headerContainer.appendChild(maximizeButton);
-    titleGroup.appendChild(emojiPicker);
-    titleGroup.appendChild(emojiButton);
-    titleGroup.appendChild(titleInput);
-    titleGroup.appendChild(titleSpan);
-    headerContainer.appendChild(titleGroup);
-    headerContainer.appendChild(menuContainer);
-
-    // Append header container to the column
-    column.appendChild(headerContainer);
-    columnsContainer.appendChild(column);
-
-    // Ensure 'new-column-indicator' remains the last child
-    const newColumnIndicator = columnsContainer.querySelector('.new-column-indicator');
-    if (newColumnIndicator) {
-        columnsContainer.appendChild(newColumnIndicator);
-    }
-    
-    return column;
+    document.body.appendChild(colorMenu);
+    const rect = moreOptionsButton.getBoundingClientRect();
+    colorMenu.style.top = `${rect.bottom + 5}px`;
+    colorMenu.style.right = `${window.innerWidth - rect.right}px`;
+    activeColorMenu = colorMenu;
 }
+
+/* Column Menu Actions */
 function deleteColumn(event) {
     closeAllMenus();
     let column = event;
@@ -458,7 +335,7 @@ function openAllInColumn(column, subgroup = null) {
         urls = favicons.map(favicon => favicon.dataset.url);
     }
     else{
-        const tabItems = column.querySelectorAll('.tab-item');
+        const tabItems = column.querySelectorAll('.tab-item:not(.subgroup-item .tab-item)');
         urls = Array.from(tabItems).flatMap(tabItem => {
             if (tabItem.classList.contains('subgroup-item')) {
                 const favicons = tabItem.querySelectorAll('.subgroup-favicon');
@@ -490,6 +367,225 @@ function openAllInColumn(column, subgroup = null) {
             chrome.tabGroups.update(groupId, { title });
         });
     });
+}
+
+/* Column Functions */
+function saveColumnState(returnState = false) {
+    const columns = columnsContainer.querySelectorAll('.column');
+    const columnState = [];
+
+    columns.forEach(column => {
+        const columnId = column.id;
+        const tabItems = Array.from(column.querySelectorAll('.tab-item')).filter(item => 
+            item.classList.contains('tab-item') && !item.closest('.expanded-tabs')
+        );
+        const tabIds = Array.from(tabItems).map(tabItem => {
+            if (tabItem.classList.contains('subgroup-item')) {
+                const expandedContainer = tabItem.querySelector('.expanded-tabs');
+                const expandedTabList = Array.from(expandedContainer.querySelectorAll('li'));
+                const subgroup = [
+                    tabItem.id,
+                    ...expandedTabList.map(tab => tab.id),
+                    tabItem.querySelector('.subgroup-title-text').textContent,
+                    tabItem.querySelector('.expand-button').classList.contains('expanded')
+                ];
+                return subgroup.length > 3 ? subgroup : null;
+            } 
+            else {
+                return tabItem.id;
+            }
+        }).filter(id => id !== null);
+        
+        columnState.push({
+            id: columnId,
+            tabIds: tabIds,
+            title: column.querySelector('.column-title-text').textContent,
+            minimized: column.classList.contains('minimized'),
+            emoji: column.dataset.emoji
+        });
+    });
+    if(returnState) {
+        return columnState;
+    }
+    else{
+        chrome.storage.local.set({ columnState }, () => {
+            //console.log('Column state saved:', columnState);
+        });
+    }
+}
+function createColumn(title, id, minimized = false, emoji = null) {
+    const columnsContainer = document.getElementById("columns-container");
+    const column = document.createElement("div");
+    column.classList.add("column");
+    if (minimized) column.classList.add("minimized");
+    if (id) {
+        column.id = id;
+    } else {
+        column.id = `column-${Date.now()}`;
+    }
+
+    // Create a container for the title and buttons
+    const headerContainer = document.createElement("div");
+    headerContainer.classList.add("header-container");
+
+    // Add minimize button to the column
+    const minimizeButton = document.createElement("button");
+    minimizeButton.classList.add("minimize-column");
+    minimizeButton.title = "Minimize Column";
+    minimizeButton.innerHTML = `<img src="../icons/minimize.svg" />`;
+    minimizeButton.addEventListener("click", () => {
+        minimizeColumn(column);
+        chrome.storage.local.set({ columnState: saveColumnState(true), animation: {columnId: column.id, minimized: true} }, () => {
+            //console.log(`${column.id} minimized`);
+        });
+    });
+
+    // Add maximize button to the column
+    const maximizeButton = document.createElement("button");
+    maximizeButton.classList.add("maximize-column");
+    maximizeButton.title = "Maximize Column";
+    maximizeButton.innerHTML = `<img src="../icons/maximize.svg" />`;
+    maximizeButton.addEventListener("click", () => {
+        maximizeColumn(column);
+        chrome.storage.local.set({ columnState: saveColumnState(true), animation: {columnId: column.id, minimized: false} }, () => {
+            //console.log(`${column.id} maximized`);
+        });
+    });
+
+    // Add title input to the column
+    const titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.classList.add("column-title-input");
+    titleInput.placeholder = "Enter column title";
+
+    // Create a span to display the title in read mode
+    const titleSpan = document.createElement("h2");
+    titleSpan.classList.add("column-title-text");
+    if(!title) title = "New Column";
+    titleSpan.textContent = title;
+    column.dataset.title = title;
+
+    // Create three-dot menu container
+    const menuContainer = document.createElement("div");
+    menuContainer.classList.add("menu-container");
+    
+    // Create three-dot menu button
+    const menuButton = document.createElement("button");
+    menuButton.classList.add("more-options");
+    menuButton.innerHTML = `<img src="../icons/morevertical.svg" />`;
+    menuContainer.appendChild(menuButton);
+    menuButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if(activeColumnMenu && activeColumnMenu.dataset.columnId === column.id){
+            closeAllMenus();
+            return;
+        }
+        closeAllMenus();
+
+        const menuItems = [
+            { text: "Open All", icon: "../icons/openall.svg", action: () => openAllInColumn(column) },
+            { text: "Delete Column", icon: "../icons/delete-icon.svg", action: () => deleteColumn(column) }
+        ];
+        
+        activeColumnMenu = createMenuDropdown(menuItems, menuButton);
+        activeColumnMenu.dataset.columnId = column.id;
+    });
+
+    // Switch to edit mode
+    titleSpan.addEventListener("click", () => {
+        column.setAttribute("draggable", "false");
+        titleInput.value = titleSpan.textContent;
+        titleInput.style.display = "inline";
+        titleSpan.style.display = "none";
+        titleInput.focus();
+        const length = titleInput.value.length;
+        titleInput.setSelectionRange(length, length);
+        if(column.classList.contains('minimized')){
+            titleInput.classList.add("vertical-text");
+        }
+        else{
+            titleInput.classList.remove("vertical-text");
+        }
+    });
+
+    // Switch to read mode
+    titleInput.addEventListener("blur", () => {
+        if (titleInput.value.trim() !== "") {
+            titleSpan.textContent = titleInput.value;
+            titleInput.style.display = "none";
+            titleSpan.style.display = "inline";
+        }
+        column.setAttribute("draggable", "true");
+        column.dataset.title = titleInput.value;
+        saveColumnState();
+    });
+    // Save on Enter key press
+    titleInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            titleInput.blur();
+        }
+    });
+
+    // Create emoji button and span
+    const emojiButton = document.createElement("button");
+    emojiButton.classList.add("emoji-button");
+    emojiButton.textContent = emoji || getRandomEmoji();
+    column.dataset.emoji = emojiButton.textContent;
+
+    // Create and configure the emoji picker element
+    const emojiPicker = document.createElement('emoji-picker');
+    emojiPicker.classList.add('emoji-picker-on-top');
+    emojiPicker.style.display = 'none';
+    emojiPicker.addEventListener('emoji-click', (event) => {
+        const newEmoji = event.detail.unicode;
+        emojiButton.textContent = newEmoji;
+        column.dataset.emoji = newEmoji;
+        emojiPicker.style.display = 'none';
+        saveColumnState();
+    });
+
+    // Toggle emoji picker when clicking the emoji button
+    emojiButton.addEventListener('click', () => {
+        if (emojiPicker.style.display === 'none') {
+            const rect = emojiButton.getBoundingClientRect();
+            emojiPicker.style.top = `${rect.bottom + 4}px`;
+            emojiPicker.style.left = `${rect.left}px`;
+            emojiPicker.style.display = 'block';
+        } 
+        else {
+            emojiPicker.style.display = 'none';
+        }
+    });
+    // Hide emoji picker when clicking outside
+    document.addEventListener('click', (event) => {
+        if (!emojiButton.contains(event.target) && !emojiPicker.contains(event.target)) {
+            emojiPicker.style.display = 'none';
+        }
+    });
+
+    const titleGroup = document.createElement("div");
+    titleGroup.classList.add("title-group");
+
+    headerContainer.appendChild(minimizeButton);
+    headerContainer.appendChild(maximizeButton);
+    titleGroup.appendChild(emojiPicker);
+    titleGroup.appendChild(emojiButton);
+    titleGroup.appendChild(titleInput);
+    titleGroup.appendChild(titleSpan);
+    headerContainer.appendChild(titleGroup);
+    headerContainer.appendChild(menuContainer);
+
+    // Append header container to the column
+    column.appendChild(headerContainer);
+    columnsContainer.appendChild(column);
+
+    // Ensure 'new-column-indicator' remains the last child
+    const newColumnIndicator = columnsContainer.querySelector('.new-column-indicator');
+    if (newColumnIndicator) {
+        columnsContainer.appendChild(newColumnIndicator);
+    }
+
+    return column;
 }
 function minimizeColumn(column) {
     const titleSpan = column.querySelector(".column-title-text");
@@ -537,34 +633,6 @@ function maximizeColumn(column) {
     const tabItems = column.querySelectorAll('.tab-item');
     tabItems.forEach(tabItem => {
         tabItem.style.display = "flex";
-    });
-}
-function ungroupSubgroup(groupId) {
-    chrome.storage.local.get(['columnState', 'savedTabs'], (data) => {
-        const columnState = data.columnState || [];
-        const savedTabs = data.savedTabs || [];
-
-        // Find which column contains the subgroup
-        for (let column of columnState) {
-            const tabIds = column.tabIds;
-            const subgroupIndex = tabIds.findIndex(id => Array.isArray(id) && id[0] === groupId);
-            
-            if (subgroupIndex !== -1) {
-                // Get the subgroup array
-                const subgroup = tabIds[subgroupIndex];
-                // Remove the subgroup itself
-                tabIds.splice(subgroupIndex, 1);
-                // Add all tabs from subgroup individually
-                const individualTabs = subgroup.slice(1, -2);
-                tabIds.splice(subgroupIndex, 0, ...individualTabs);
-                
-                // Save the updated state
-                chrome.storage.local.set({ columnState: columnState, savedTabs: savedTabs }, () => {
-                    console.log('Subgroup ungrouped:', groupId);
-                });
-                break;
-            }
-        }
     });
 }
 
@@ -647,7 +715,6 @@ function handleDragOver(event) {
     event.preventDefault();
     const scrollThreshold = 240;
     const maxScrollSpeed = 15;
-    const columnsContainer = document.getElementById('columns-container');
     const containerRect = columnsContainer.getBoundingClientRect();
     const spaceContainer = document.getElementById('space-container');
     const spaceContainerRect = spaceContainer.getBoundingClientRect();
@@ -875,7 +942,7 @@ function handleDragOver(event) {
         dropIndicator.style.height = `${height}px`;
         dropIndicator.style.left = `${indicatorLeft}px`;
         dropIndicator.style.top = `${rect.top + containerScrollTop}px`;
-        
+        dropIndicator.style.display = 'block';
         newColumnIndicator.style.display = 'none';
     }
     
@@ -885,7 +952,6 @@ function handleDrop(event) {
     event.preventDefault();
 
     // Check if it's a column drop
-    const columnsContainer = document.getElementById('columns-container');
     const newColumnIndicator = columnsContainer.querySelector('.new-column-indicator');
     const columnDropData = event.dataTransfer.getData("text/plain");
     const droppedColumn = document.getElementById(columnDropData);
@@ -956,7 +1022,7 @@ function handleDrop(event) {
         return;
     }
     else if(newColumnIndicator.contains(event.target)) {
-        const newColumn = createColumn("New Column");
+        const newColumn = createColumn();
         itemsToProcess.forEach(item => {
             if(item.id.startsWith('opentab-')) {
                 itemIdsToSave.push(item.id.replace('opentab-', ''));
@@ -1378,7 +1444,7 @@ function createTabItem(tab){
             </div>
             <div class="tab-actions">
                 <button class="more-options" data-index="${tab.id}">
-                    <img src="../icons/morevertical.svg" class="main-grid-item-icon" />
+                    <img src="../icons/morevertical.svg" />
                 </button>
             </div>
         </div>
@@ -1436,143 +1502,24 @@ function createTabItem(tab){
     const moreOptionsButton = li.querySelector('.more-options');
     moreOptionsButton.addEventListener('click', (event) => {
         event.stopPropagation();
-
-        // Close all menus if clicking on the same button
+    
         if (activeOptionsMenu && activeOptionsMenu.dataset.tabId === tab.id.toString()) {
             closeAllMenus();
             return;
         }
         closeAllMenus();
-
-        const optionsMenu = document.createElement('div');
-        optionsMenu.className = 'options-menu';
-        optionsMenu.dataset.tabId = tab.id.toString();
-        // Determine whether to show "Add Note" or "Edit Note" based on the note content
+    
         const noteButtonText = tab.note && tab.note.trim() !== '' ? 'Edit Note' : 'Add Note';
-        optionsMenu.innerHTML = `
-            <button class="menu-option rename-tab" data-index="${tab.id}">Rename</button>
-            <button class="menu-option add-note" data-index="${tab.id}">${noteButtonText}</button>
-            <button class="menu-option remove-date ${formattedDate ? '' : 'hidden'}" data-index="${tab.id}">Clear Date</button>
-            <button class="menu-option color-tab" data-index="${tab.id}">Color</button>
-            <button class="menu-option delete-tab" data-index="${tab.id}">Delete</button>
-        `;
-        document.body.appendChild(optionsMenu);
+        const menuItems = [
+            { text: "Rename", action: () => { renameTab(tab, li); closeAllMenus() } },            
+            { text: noteButtonText, action: () => { editTabNote(tab, li); closeAllMenus() } },
+            { text: "Clear Date", action: () => { removeDate(tab, dateDisplay); closeAllMenus() }, hidden: !formattedDate },
+            { text: "Color", action: () => openColorMenu(tab, li, moreOptionsButton) },
+            { text: "Delete", action: () => deleteTab(tab.id) }
+        ];
     
-        const rect = moreOptionsButton.getBoundingClientRect();
-        optionsMenu.style.top = `${rect.bottom + window.scrollY}px`;
-        optionsMenu.style.left = `${rect.left + window.scrollX}px`;
-        optionsMenu.style.display = 'flex';
-        activeOptionsMenu = optionsMenu;                        
-        let colorMenu = null;
-    
-        // Color Tab option
-        const colorTabOption = optionsMenu.querySelector('.color-tab');
-        colorTabOption.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (activeColorMenu) {
-                activeColorMenu.remove();
-                activeColorMenu = null;
-                return;
-            }
-            const colorOptions = ['#FFFFFF', '#ffc4c4', '#fffdc4', '#b0e5ff', '#ebc4ff'];
-            colorMenu = document.createElement('div');
-            colorMenu.classList.add('color-menu');
-        
-            colorOptions.forEach(color => {
-                const colorOption = document.createElement('div');
-                colorOption.classList.add('color-option');
-                colorOption.style.backgroundColor = color;
-                colorOption.addEventListener('click', () => {
-                    tab.color = color;
-                    li.style.backgroundColor = color;
-                    chrome.storage.local.set({ savedTabs: tabs_in_storage }, () => {
-                        console.log('Tab color saved:', tab.id, tab.color);
-                    });
-                    closeAllMenus();
-                });
-                colorMenu.appendChild(colorOption);
-            });
-        
-            document.body.appendChild(colorMenu);
-            const rect = colorTabOption.getBoundingClientRect();
-            colorMenu.style.top = `${rect.top + window.scrollY}px`;
-            colorMenu.style.left = `${rect.right + window.scrollX}px`;
-            activeColorMenu = colorMenu;
-        });
-    
-        // Rename Tab option
-        const renameTabOption = optionsMenu.querySelector('.rename-tab');
-        renameTabOption.addEventListener('click', () => {
-            li.removeEventListener('dragstart', handleDragStart);
-            const titleDisplay = li.querySelector(`#title-display-${tab.id}`);
-            const titleInput = li.querySelector(`#title-input-${tab.id}`);
-            
-            titleInput.classList.remove("hidden");
-            titleDisplay.classList.add("hidden");
-            titleInput.focus();
-            
-            const length = titleInput.value.length;
-            titleInput.setSelectionRange(length, length);
-
-            titleInput.addEventListener('keydown', function handleKeydown(event) {
-                if (event.key === 'Enter') {
-                    titleDisplay.textContent = titleInput.value;
-                    titleInput.classList.add("hidden");
-                    titleDisplay.classList.remove("hidden");
-                    titleInput.removeEventListener('keydown', handleKeydown);
-                }
-            });
-            
-            closeAllMenus();
-        });
-
-        const titleDisplay = li.querySelector(`#title-display-${tab.id}`);
-        const titleInput = li.querySelector(`#title-input-${tab.id}`);
-
-        titleInput.addEventListener("blur", function () {
-            const newTitle = titleInput.value;
-            saveTabTitle(tab.id, newTitle);
-            titleDisplay.textContent = newTitle;
-            titleInput.classList.add("hidden");
-            titleDisplay.classList.remove("hidden");
-            li.addEventListener('dragstart', handleDragStart);
-        });
-
-        // Add Note option
-        const editTabOption = optionsMenu.querySelector('.add-note');
-        editTabOption.addEventListener('click', () => {
-            li.removeEventListener('dragstart', handleDragStart);
-            const noteDisplay = li.querySelector(`#note-display-${tab.id}`);
-            const noteInput = li.querySelector(`#note-input-${tab.id}`);
-            
-            noteInput.classList.remove("hidden");
-            noteDisplay.classList.add("hidden");
-            noteInput.focus();
-            
-            const length = noteInput.value.length;
-            noteInput.setSelectionRange(length, length);
-            
-            closeAllMenus();
-        });
-    
-        // Delete Tab option
-        const deleteTabOption = optionsMenu.querySelector('.delete-tab');
-        deleteTabOption.addEventListener('click', () => {
-            deleteTab(tab.id);
-            closeAllMenus();
-        });
-
-        // Remove Date option
-        const removeDateOption = optionsMenu.querySelector('.remove-date');
-        removeDateOption.addEventListener('click', () => {
-            tab.parsedDate = null;
-            dateDisplay.textContent = '';
-            dateDisplay.classList.add('hidden');
-            chrome.storage.local.set({ savedTabs: tabs_in_storage }, () => {
-                console.log('Tab date removed:', tab.id);
-            });
-            closeAllMenus();
-        });
+        activeOptionsMenu = createMenuDropdown(menuItems, moreOptionsButton);
+        activeOptionsMenu.dataset.tabId = tab.id.toString();
     });
     
     const noteDisplay = li.querySelector(`#note-display-${tab.id}`);
@@ -1643,8 +1590,8 @@ function toggleSubgroupExpandedState(expandButton) {
 
     // Update button appearance
     expandButton.innerHTML = isExpanded 
-        ? `<img src="../icons/chevron-up.svg" class="main-grid-item-icon" />`
-        : `<img src="../icons/chevron-down.svg" class="main-grid-item-icon" />`;
+        ? `<img src="../icons/chevron-up.svg" />`
+        : `<img src="../icons/chevron-down.svg" />`;
 
     if (isExpanded) {
         faviconsContainer.style.display = 'none';
@@ -1716,7 +1663,7 @@ function displaySavedTabs(tabs) {
 
                         const expandButton = document.createElement("button");
                         expandButton.classList.add("expand-button");
-                        expandButton.innerHTML = `<img src="../icons/chevron-down.svg" class="main-grid-item-icon" />`;
+                        expandButton.innerHTML = `<img src="../icons/chevron-down.svg" />`;
                         subgroupTabActions.appendChild(expandButton);
 
                         tabGroupContainer.appendChild(titleGroup);
@@ -1749,7 +1696,7 @@ function displaySavedTabs(tabs) {
            
                         const moreOptionsButton = document.createElement('button');
                         moreOptionsButton.classList.add('more-options');
-                        moreOptionsButton.innerHTML = `<img src="../icons/morevertical.svg" class="main-grid-item-icon" />`;
+                        moreOptionsButton.innerHTML = `<img src="../icons/morevertical.svg" />`;
                         subgroupTabActions.appendChild(moreOptionsButton);
                     
                         tabId.forEach((subTabId, index) => {
@@ -1801,50 +1748,21 @@ function displaySavedTabs(tabs) {
 
                         moreOptionsButton.addEventListener('click', (event) => {
                             event.stopPropagation();
-                    
-                            // Close all menus if clicking on the same button
+                        
                             if (activeOptionsMenu && activeOptionsMenu.dataset.tabId === tabId[0]) {
                                 closeAllMenus();
                                 return;
                             }
                             closeAllMenus();
-                    
-                            const optionsMenu = document.createElement('div');
-                            optionsMenu.className = 'options-menu';
-                            optionsMenu.dataset.tabId = tabId[0];
-                            optionsMenu.innerHTML = `
-                                <button class="menu-option open-all-subgroup" data-index="${tabId[0]}">Open All</button>
-                                <button class="menu-option ungroup-subgroup" data-index="${tabId[0]}">Ungroup</button>
-                                <button class="menu-option delete-subgroup" data-index="${tabId[0]}">Delete</button>
-                            `;
-                            document.body.appendChild(optionsMenu);
-                    
-                            const rect = moreOptionsButton.getBoundingClientRect();
-                            optionsMenu.style.top = `${rect.bottom + window.scrollY}px`;
-                            optionsMenu.style.left = `${rect.left + window.scrollX}px`;
-                            optionsMenu.style.display = 'flex';
-                            activeOptionsMenu = optionsMenu;
-
-                            // Open All Subgroup option
-                            const openAllSubgroupOption = optionsMenu.querySelector('.open-all-subgroup');
-                            openAllSubgroupOption.addEventListener('click', () => {
-                                openAllInColumn(column, tabId);
-                                closeAllMenus();
-                            });
-                    
-                            // Ungroup Subgroup option
-                            const ungroupSubgroupOption = optionsMenu.querySelector('.ungroup-subgroup');
-                            ungroupSubgroupOption.addEventListener('click', () => {
-                                ungroupSubgroup(tabId[0]);
-                                closeAllMenus();
-                            });
-
-                            // Delete Subgroup option
-                            const deleteSubgroupOption = optionsMenu.querySelector('.delete-subgroup');
-                            deleteSubgroupOption.addEventListener('click', () => {
-                                deleteSubgroup(tabId[0]);
-                                closeAllMenus();
-                            });
+                        
+                            const menuItems = [
+                                { text: "Open All", action: () => { openAllInColumn(column, tabId); closeAllMenus(); } },
+                                { text: "Ungroup", action: () => { ungroupSubgroup(tabId[0]); closeAllMenus(); } },
+                                { text: "Delete", action: () => { deleteSubgroup(tabId[0]); closeAllMenus(); } }
+                            ];
+                        
+                            activeOptionsMenu = createMenuDropdown(menuItems, moreOptionsButton);
+                            activeOptionsMenu.dataset.tabId = tabId[0];
                         });
 
                         expandButton.addEventListener('click', () => {
