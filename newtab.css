@@ -479,27 +479,28 @@ h1, h2 {
         .expand-button:hover {
             opacity: 0.8;
         }
-    .subgroup-title {
-        height: 14px;
-        width: 80%;
-    }
     .subgroup-title-group {
         display: flex;
         justify-content: space-between;
         align-items: center;
     }
-    .subgroup-title-text {
-        text-align: left;
-        font-weight: bold;
-        font-size: 14px;
-        white-space: nowrap;
-        width: 80%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
+        .subgroup-title {
+            height: 14px;
+        }
+        .subgroup-title-text {
+            text-align: left;
+            font-weight: bold;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .subgroup-tab-actions {
+            display: flex;
+        }
     .favicon-wrapper {
         background-color: #fff;
-        padding: 4px;
+        padding: 4px 8px;
         border-radius: 5px;
         display: flex;
         flex-direction: column;
