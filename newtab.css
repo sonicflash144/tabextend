@@ -131,8 +131,16 @@ h1, h2 {
     font-size: 14px;
     color: #333;
     width: 100%;
+    overflow: hidden;
     word-wrap: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 6;
+    line-clamp: 6;
+    -webkit-box-orient: vertical;
 }
+    .note-display.hidden {
+        display: none;
+    }
 .date-display {
     margin-top: 5px;
     color: white;
@@ -145,12 +153,14 @@ h1, h2 {
     width: 100%;
     font-size: 14px;
     padding: 4px;
-    overflow: scroll;
+    overflow-x: hidden;
+    overflow-y: auto;
     resize: none; 
     box-sizing: border-box;
-    min-height: 48px; 
+    min-height: 48px;
+    max-height: 112px;
 }
-    .tab-note::-webkit-scrollbar {
+    .tab-note::-webkit-scrollbar-horizontal {
         display: none;
     }
 
@@ -481,6 +491,8 @@ h1, h2 {
     row-gap: 12px;
     flex-wrap: wrap;
     margin-bottom: 4px;
+    max-height: 180px;
+    overflow-y: auto;
 }
     .expand-button {
         background: none;

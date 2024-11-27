@@ -247,6 +247,8 @@ function editTabNote(tab, li) {
     noteInput.classList.remove("hidden");
     noteDisplay.classList.add("hidden");
     noteInput.focus();
+    noteInput.style.height = "auto";
+    noteInput.style.height = (noteInput.scrollHeight) + "px";
 
     const length = noteInput.value.length;
     noteInput.setSelectionRange(length, length);
@@ -646,16 +648,15 @@ function handleDragStart(event) {
     event.dataTransfer.setDragImage(tabItem, 0, 0);
     dropType = "list-item";
 
-    // Check if the dragged item is selected and if there are multiple selected items
     const selectedItems = document.querySelectorAll('.selected');
     const isDraggedItemSelected = tabItem.classList.contains('selected');
     
     if (isDraggedItemSelected && selectedItems.length > 1) {
-        // Add dragging class to all selected items
         selectedItems.forEach(item => item.classList.add('dragging'));
-    } else {
+    } 
+    // If dragging an unselected item, only add dragging to that item
+    else {
         selectedItems.forEach(item => item.classList.remove('selected'));
-        // If dragging an unselected item, only add dragging to that item
         tabItem.classList.add('dragging');
     }
 }
@@ -664,7 +665,7 @@ function calculateDropPosition(event, tabItems, isMinimized = false) {
         return tabItems.length;
     } 
 
-    // Filter out items that are inside subgroups when dragging a subgroup
+    // If dragging a subgroup, filter out items that are inside subgroups
     const draggedElement = document.querySelector('.dragging');
     if (draggedElement && draggedElement.classList.contains('subgroup-item')) {
         tabItems = tabItems.filter(item => !item.closest('.expanded-tabs'));
@@ -699,7 +700,6 @@ function startScrollAnimation(container) {
             stopScrollAnimation();
         }
     }
-
     scrollAnimation.animationFrameId = requestAnimationFrame(animate);
 }
 function stopScrollAnimation() {
@@ -713,14 +713,12 @@ function stopScrollAnimation() {
 }
 function handleDragOver(event) {
     event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+
+    /* Auto Scroll */
     const scrollThreshold = 240;
     const maxScrollSpeed = 15;
     const containerRect = columnsContainer.getBoundingClientRect();
-    const spaceContainer = document.getElementById('space-container');
-    const spaceContainerRect = spaceContainer.getBoundingClientRect();
-    const sidebar = document.getElementById('sidebar');
-    const sidebarRect = sidebar.getBoundingClientRect();
-
     function calculateScrollSpeed(distance) {
         if (distance <= 0) return 0;
         if (distance >= scrollThreshold) return 0;
@@ -729,67 +727,65 @@ function handleDragOver(event) {
         const scrollProgress = 1 - (distance / scrollThreshold);
         return maxScrollSpeed * Math.pow(scrollProgress, 2);
     }
-
-    // Calculate scroll speeds for each direction
     const leftSpeed = calculateScrollSpeed(event.clientX - containerRect.left);
     const rightSpeed = calculateScrollSpeed(containerRect.right - event.clientX);
     const topSpeed = calculateScrollSpeed(event.clientY - containerRect.top);
     const bottomSpeed = calculateScrollSpeed(containerRect.bottom - event.clientY);
     scrollAnimation.scrollX = -leftSpeed + rightSpeed;
     scrollAnimation.scrollY = -topSpeed + bottomSpeed;
-
-    // Start the animation if we're not already scrolling and there's movement needed
     if (!scrollAnimation.isScrolling && (scrollAnimation.scrollX !== 0 || scrollAnimation.scrollY !== 0)) {
         scrollAnimation.isScrolling = true;
         startScrollAnimation(columnsContainer);
-    } else if (scrollAnimation.scrollX === 0 && scrollAnimation.scrollY === 0) {
-        // Stop scrolling if we're outside the scroll zones
+    } 
+    else if (scrollAnimation.scrollX === 0 && scrollAnimation.scrollY === 0) {
         stopScrollAnimation();
     }
 
+    /* Deletion Area and New Column Indicator */
     deletionArea.style.display = 'flex';
     if (deletionArea.contains(event.target)) {
         deletionArea.classList.add('deletion-area-active');
         dropIndicator.style.display = 'none';
-        event.dataTransfer.dropEffect = 'move';
         return;
-    } else if (newColumnIndicator.contains(event.target)) {
+    } 
+    else if (newColumnIndicator.contains(event.target)) {
         newColumnIndicator.classList.add('new-column-indicator-active');
         dropIndicator.style.display = 'none';
-        event.dataTransfer.dropEffect = 'move';
         return;
     }
     
     const column = event.target.closest('.column');
     const openTabsList = event.target.closest('#open-tabs-list');
-    const element = openTabsList || column;
-    const isMinimized = column && column.classList.contains('minimized');
+    const spaceContainer = document.getElementById('space-container');
+    const spaceContainerRect = spaceContainer.getBoundingClientRect();
+    const spaceContainerLeft = spaceContainerRect.left;
+    const spaceContainerRight = spaceContainerRect.right;
+    const containerScrollTop = openTabsList ? sidebar.scrollTop : columnsContainer.scrollTop;
 
     if (!dropIndicator) {
         dropIndicator = document.createElement('div');
         dropIndicator.className = 'drop-indicator';
         const dropIndicatorContainer = document.createElement('div');
         dropIndicatorContainer.className = 'drop-indicator-container';
-        document.body.appendChild(dropIndicatorContainer);
         dropIndicatorContainer.appendChild(dropIndicator);
+        document.body.appendChild(dropIndicatorContainer);
     }
 
-    // Get the appropriate scroll position based on container
-    const containerScrollTop = openTabsList ? sidebar.scrollTop : columnsContainer.scrollTop;
-
-    if ((dropType === "list-item") && element) {
-        // Handle list item drag over
+    if (dropType === "list-item") {
         newColumnIndicator.style.display = 'flex';
+        const sidebar = document.getElementById('sidebar');
+        const sidebarRect = sidebar.getBoundingClientRect();
+        const element = openTabsList || column;
+        if(!element){
+            return;
+        }
         const rect = element.getBoundingClientRect();
         // Only get top-level tab items (excluding items inside subgroups)
         const listItems = Array.from(element.children).filter(item => 
-            item.classList.contains('tab-item') && 
-            !item.closest('.expanded-tabs')
+            item.classList.contains('tab-item') && !item.closest('.expanded-tabs')
         );
+        const isMinimized = column && column.classList.contains('minimized');
         const dropPosition = calculateDropPosition(event, listItems, isMinimized);
-
-        const spaceContainerLeft = spaceContainerRect.left;
-        const spaceContainerRight = spaceContainerRect.right;
 
         let indicatorLeft = rect.left;
         let width = rect.width;
@@ -813,44 +809,22 @@ function handleDragOver(event) {
         dropIndicator.style.height = '2px';
         dropIndicator.style.left = `${indicatorLeft}px`;
 
-        // Calculate and constrain top position
+        const rectTopScroll = rect.top + containerScrollTop;
+        const containerRect = openTabsList ? sidebarRect : spaceContainerRect;
         let indicatorTop;
         if (dropPosition === listItems.length) {
             const lastItem = listItems[listItems.length - 1];
-            if (isMinimized) {
-                indicatorTop = rect.top + containerScrollTop;
-            } else {
-                indicatorTop = lastItem 
-                    ? lastItem.getBoundingClientRect().bottom + containerScrollTop
-                    : rect.top + containerScrollTop;
-            }
-        } 
-        else {
+            indicatorTop = isMinimized || !lastItem 
+                ? rectTopScroll 
+                : lastItem.getBoundingClientRect().bottom + containerScrollTop;
+        } else {
             indicatorTop = listItems[dropPosition].getBoundingClientRect().top + containerScrollTop;
         }
-        
-        // Handle vertical boundaries based on container
-        if (openTabsList) {
-            const sidebarRect = sidebar.getBoundingClientRect();
-            if (indicatorTop < sidebarRect.top) {
-                indicatorTop = sidebarRect.top;
-            }
-            if (indicatorTop + 2 > sidebarRect.bottom) {
-                indicatorTop = sidebarRect.bottom - 2;
-            }
-        } 
-        else {
-            if (indicatorTop < spaceContainerRect.top) {
-                indicatorTop = spaceContainerRect.top;
-            }
-            if (indicatorTop + 2 > spaceContainerRect.bottom) {
-                indicatorTop = spaceContainerRect.bottom - 2;
-            }
-        }
-        
+        indicatorTop = Math.max(indicatorTop, containerRect.top);
+        indicatorTop = Math.min(indicatorTop, containerRect.bottom - 2);
         dropIndicator.style.top = `${indicatorTop}px`;
 
-        // Check if dragging directly over a saved tab
+        // Check if dragging directly over a tab or group
         const targetTab = listItems.find(item => {
             if (item.closest('#open-tabs-list') || item.classList.contains('dragging') || item.closest('.expanded-tabs')) {
                 return false;
@@ -862,9 +836,20 @@ function handleDragOver(event) {
             }
             const itemRect = item.getBoundingClientRect();
             const itemHeight = itemRect.bottom - itemRect.top;
+
+            // Calculate middle third region
             const middleThirdTop = itemRect.top + itemHeight / 3;
             const middleThirdBottom = itemRect.bottom - itemHeight / 3;
-            return event.clientY >= middleThirdTop && event.clientY <= middleThirdBottom;
+
+            // Calculate fixed 32px exclusion region
+            const fixedMargin = 32;
+            const fixedTop = itemRect.top + fixedMargin;
+            const fixedBottom = itemRect.bottom - fixedMargin;
+
+            // Use larger region
+            return fixedBottom - fixedTop > middleThirdBottom - middleThirdTop
+            ? event.clientY >= fixedTop && event.clientY <= fixedBottom
+            : event.clientY >= middleThirdTop && event.clientY <= middleThirdBottom;
         });
 
         if (targetTab) {
@@ -906,13 +891,11 @@ function handleDragOver(event) {
             dropIndicator.style.top = `${subgroupIndicatorTop}px`;
         }
     }
-    else if (dropType === "column" && columnsContainer) {
+    else if (dropType === "column") {
+        newColumnIndicator.style.display = 'none';
         const rect = columnsContainer.getBoundingClientRect();
         const columns = Array.from(columnsContainer.querySelectorAll('.column'));
         const dropPosition = calculateColumnDropPosition(event, columns);
-
-        const spaceContainerLeft = spaceContainerRect.left;
-        const spaceContainerRight = spaceContainerRect.right;
 
         let indicatorLeft;
         const width = 2;
@@ -922,7 +905,6 @@ function handleDragOver(event) {
         if (indicatorLeft < spaceContainerLeft) {
             indicatorLeft = spaceContainerLeft;
         }
-        
         // Right boundary
         if (indicatorLeft > spaceContainerRight - width) {
             indicatorLeft = spaceContainerRight - width;
@@ -943,10 +925,7 @@ function handleDragOver(event) {
         dropIndicator.style.left = `${indicatorLeft}px`;
         dropIndicator.style.top = `${rect.top + containerScrollTop}px`;
         dropIndicator.style.display = 'block';
-        newColumnIndicator.style.display = 'none';
     }
-    
-    event.dataTransfer.dropEffect = 'move';
 }
 function handleDrop(event) {
     event.preventDefault();
@@ -1089,9 +1068,20 @@ function handleDrop(event) {
         }
         const itemRect = item.getBoundingClientRect();
         const itemHeight = itemRect.bottom - itemRect.top;
+
+        // Calculate middle third region
         const middleThirdTop = itemRect.top + itemHeight / 3;
         const middleThirdBottom = itemRect.bottom - itemHeight / 3;
-        return event.clientY >= middleThirdTop && event.clientY <= middleThirdBottom;
+
+        // Calculate fixed 32px exclusion region
+        const fixedMargin = 32;
+        const fixedTop = itemRect.top + fixedMargin;
+        const fixedBottom = itemRect.bottom - fixedMargin;
+
+        // Use larger region
+        return fixedBottom - fixedTop > middleThirdBottom - middleThirdTop
+        ? event.clientY >= fixedTop && event.clientY <= fixedBottom
+        : event.clientY >= middleThirdTop && event.clientY <= middleThirdBottom;
     });
 
     if (targetTab) {
@@ -1439,7 +1429,7 @@ function createTabItem(tab){
                 <span class="tab-title" data-url="${tab.url}" id="title-display-${tab.id}">${tab.title}</span>
                 <input type="text" class="hidden" id="title-input-${tab.id}" value="${tab.title}">
                 <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note ? tab.note.replace(/\\/g, '').replace(/\n/g, '<br>') : ''}</div>
-                <textarea class="tab-note hidden" id="note-input-${tab.id}" rows="1">${tab.note ? tab.note.replace(/<br>/g, '\n') : ''}</textarea>
+                <textarea class="tab-note hidden" id="note-input-${tab.id}">${tab.note ? tab.note.replace(/<br>/g, '\n') : ''}</textarea>
                 <div class="date-display ${formattedDate ? '' : 'hidden'}" id="date-display-${tab.id}">${formattedDate || ''}</div>
             </div>
             <div class="tab-actions">
@@ -1531,6 +1521,8 @@ function createTabItem(tab){
             noteInput.classList.remove("hidden");
             noteDisplay.classList.add("hidden");
             noteInput.focus();
+            noteInput.style.height = "auto";
+            noteInput.style.height = (noteInput.scrollHeight) + "px";
             
             const length = noteInput.value.length;
             noteInput.setSelectionRange(length, length);
@@ -1560,6 +1552,9 @@ function createTabItem(tab){
     });
 
     noteInput.addEventListener("input", function () {
+        noteInput.style.height = "auto";
+        noteInput.style.height = (noteInput.scrollHeight) + "px";
+
         const note = noteInput.value;
         // Update the date display in real-time
         const dateDisplay = li.querySelector(`#date-display-${tab.id}`);
