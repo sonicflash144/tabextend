@@ -99,7 +99,7 @@ function deleteTab(id, column = null, li = null) {
             const index = tabs.findIndex(tab => tab.id === tabId);
             if (index !== -1) {
                 tabs.splice(index, 1); // Remove the tab at the specified index
-                console.log('Tab deleted:', tabId);
+                //console.log('Tab deleted:', tabId);
             }
         });
 
@@ -1149,6 +1149,7 @@ function handleDrop(event) {
         return;
     }
 
+    let earlyExit = false;
     itemsToProcess.forEach(item => {
         const columnId = column.id;
         let itemId = item.id;
@@ -1162,16 +1163,34 @@ function handleDrop(event) {
             window.open(item.dataset.url, '_blank');
             tabIdsToDelete.push(parseInt(itemId.replace('tab-', '')));
         }
+        else if (columnId === 'open-tabs-list' && itemId.startsWith('group')) {
+            const column = columnState.find(col => 
+                col.tabIds.some(id => Array.isArray(id) && id[0] === itemId)
+            );
+        
+            if (column) {
+                const columnElement = document.getElementById(column.id);
+                const subgroup = column.tabIds.find(id => Array.isArray(id) && id[0] === itemId);
+        
+                if (subgroup) {
+                    openAllInColumn(columnElement, subgroup);
+                    deleteSubgroup(itemId);
+                    earlyExit = true;
+                    return;
+                }
+            }
+        }
 
         itemsToInsert.push({ item, dropPosition });
 
         //Rearranging tabs in open-tabs-list
-        if (columnId === 'open-tabs-list') {
+        if (columnId === 'open-tabs-list' && itemId.startsWith('opentab')) {
             browser.tabs.move(parseInt(itemId.split('-')[1]), { index: dropPosition }, () => {
                 //console.log('Tab moved:', itemId, 'to index:', dropPosition);
             });
         }
     });
+    if (earlyExit) return;
 
     itemsToInsert.forEach(({ item, dropPosition }) => {
         if (dropPosition === tabItems.length) {
