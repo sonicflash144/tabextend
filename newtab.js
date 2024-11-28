@@ -90,7 +90,7 @@ function getBrowser() {
 const userBrowser = getBrowser();
 
 /* Tab and Subgroup Functions */
-function deleteTab(id, column = null) {
+function deleteTab(id, column = null, li = null) {
     if (!Array.isArray(id)) id = [id];
 
     browser.storage.local.get("savedTabs", (data) => {
@@ -105,6 +105,9 @@ function deleteTab(id, column = null) {
 
         if(column){
             column.remove();
+        }
+        else if(li){
+            li.remove();
         }
         browser.storage.local.set({ savedTabs: tabs, columnState: saveColumnState(true) }, () => {
             //console.log('Updated storage with remaining columns');
@@ -1309,7 +1312,7 @@ function createTabItem(tab){
             { text: noteButtonText, action: () => { editTabNote(tab, li); closeAllMenus() } },
             { text: "Clear Date", action: () => { removeDate(tab, dateDisplay); closeAllMenus() }, hidden: !formattedDate },
             { text: "Color", action: () => openColorMenu(tab, li, moreOptionsButton) },
-            { text: "Delete", action: () => deleteTab(tab.id) }
+            { text: "Delete", action: () => deleteTab(tab.id, null, li) }
         ];
     
         activeOptionsMenu = createMenuDropdown(menuItems, moreOptionsButton);
