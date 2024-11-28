@@ -90,7 +90,7 @@ function getBrowser() {
 const userBrowser = getBrowser();
 
 /* Tab and Subgroup Functions */
-function deleteTab(id, column = null) {
+function deleteTab(id, column = null, li = null) {
     if (!Array.isArray(id)) id = [id];
 
     chrome.storage.local.get("savedTabs", (data) => {
@@ -105,6 +105,9 @@ function deleteTab(id, column = null) {
 
         if(column){
             column.remove();
+        }
+        else if(li){
+            li.remove();
         }
         chrome.storage.local.set({ savedTabs: tabs, columnState: saveColumnState(true) }, () => {
             //console.log('Updated storage with remaining columns');
@@ -212,6 +215,9 @@ function createMenuDropdown(menuItems, button) {
 }
 function renameTab(tab, li) {
     li.removeEventListener('dragstart', handleDragStart);
+    li.draggable = false;
+    const column = li.closest('.column');
+    column.draggable = false;
     const titleDisplay = li.querySelector(`#title-display-${tab.id}`);
     const titleInput = li.querySelector(`#title-input-${tab.id}`);
 
@@ -276,7 +282,7 @@ function saveTabNote(id, note) {
         }
 
         chrome.storage.local.set({ savedTabs: tabs }, () => {
-            console.log('Tab note saved:', id, remainingNote);
+            //console.log('Tab note saved:', id, remainingNote);
         });
     });
 }
@@ -1306,7 +1312,7 @@ function createTabItem(tab){
             { text: noteButtonText, action: () => { editTabNote(tab, li); closeAllMenus() } },
             { text: "Clear Date", action: () => { removeDate(tab, dateDisplay); closeAllMenus() }, hidden: !formattedDate },
             { text: "Color", action: () => openColorMenu(tab, li, moreOptionsButton) },
-            { text: "Delete", action: () => deleteTab(tab.id) }
+            { text: "Delete", action: () => deleteTab(tab.id, null, li) }
         ];
     
         activeOptionsMenu = createMenuDropdown(menuItems, moreOptionsButton);
@@ -1322,10 +1328,7 @@ function createTabItem(tab){
     
     noteInput.addEventListener("blur", function () {
         const note = noteInput.value;
-        const column = li.closest('.column');
         saveTabNote(tab.id, note);
-        li.draggable = true;
-        column.draggable = true;
         noteDisplay.innerHTML = note ? note.replace(/\\/g, '').replace(/\n/g, '<br>') : '';
         noteInput.classList.add("hidden");
         noteDisplay.classList.remove("hidden");
@@ -1384,7 +1387,7 @@ function createColumn(title, id, minimized = false, emoji = null) {
         column.id = `column-${Date.now()}`;
     }
 
-    column.setAttribute('draggable', 'true');
+    column.draggable = true;
     column.addEventListener('dragstart', handleColumnDragStart);
     column.addEventListener('dragend', handleDragEnd);
 
@@ -1426,7 +1429,6 @@ function createColumn(title, id, minimized = false, emoji = null) {
         defaultText: 'New Column',
         onSave: (value) => {
             column.dataset.title = value;
-            column.setAttribute("draggable", "true");
             saveColumnState();
         }
     });
@@ -1555,12 +1557,6 @@ function createEditableTitle(options = {}) {
         titleInput.style.display = "none";
         titleSpan.style.display = "inline";
         onSave(trimmedValue);
-        const column = titleSpan.closest('.column');
-        column.draggable = true;
-        if(groupClass === 'subgroup-title-group'){
-            const subgroup = titleSpan.closest('.subgroup-item');
-            subgroup.draggable = true;
-        }
     });
 
     // Save on Enter
