@@ -99,7 +99,7 @@ function deleteTab(id, column = null, li = null) {
             const index = tabs.findIndex(tab => tab.id === tabId);
             if (index !== -1) {
                 tabs.splice(index, 1); // Remove the tab at the specified index
-                console.log('Tab deleted:', tabId);
+                //console.log('Tab deleted:', tabId);
             }
         });
 
@@ -383,7 +383,6 @@ function openAllInColumn(column, subgroup = null) {
     let urls;
     if (subgroup) {
         const favicons = Array.from(column.querySelectorAll(`#${subgroup[0]} .subgroup-favicon`));
-        console.log(subgroup);
         urls = favicons.map(favicon => favicon.dataset.url);
     }
     else{
