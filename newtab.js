@@ -78,6 +78,16 @@ function closeAllMenus() {
     });
     activeOptionsMenu = activeColorMenu = activeColumnMenu = null;
 }
+function getBrowser() {
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (userAgent.indexOf('firefox') > -1) {
+        return 'firefox';
+    }
+    else {
+        return 'chrome';
+    }
+}
+const userBrowser = getBrowser();
 
 /* Tab and Subgroup Functions */
 function deleteTab(id, column = null) {
@@ -105,7 +115,6 @@ function deleteSubgroup(groupId) {
     const li = document.getElementById(groupId);
     const tabIds = Array.from(li.querySelectorAll('.subgroup-favicon')).map(favicon => parseInt(favicon.id.split('-')[1]));
     li.remove();
-    saveColumnState();
     deleteTab(tabIds);
 }
 function ungroupSubgroup(groupId) {
@@ -242,7 +251,10 @@ function editTabNote(tab, li) {
     li.removeEventListener('dragstart', handleDragStart);
     const noteDisplay = li.querySelector(`#note-display-${tab.id}`);
     const noteInput = li.querySelector(`#note-input-${tab.id}`);
+    const column = li.closest('.column');
 
+    li.draggable = false;
+    column.draggable = false;
     noteInput.classList.remove("hidden");
     noteDisplay.classList.add("hidden");
     noteInput.focus();
@@ -379,34 +391,40 @@ function openAllInColumn(column, subgroup = null) {
         });
     }
 
-    // Open all tabs
-    const createTabs = urls.map(url => 
-        new Promise(resolve => {
-            chrome.tabs.create({ url: url, active: false }, resolve);
-        })
-    );
-    // After all tabs are created, group them
-    Promise.all(createTabs).then(tabs => {
-        const tabIds = tabs.map(tab => tab.id); // Extract tab IDs
-        chrome.tabs.group({ tabIds: tabIds }, groupId => {
-            // Set the title of the group
-            let title;
-            if(subgroup){
-                title = subgroup[subgroup.length - 2];
-            }
-            else{
-                title = column.querySelector('.column-title-text').textContent;
-            }
-            chrome.tabGroups.update(groupId, { title });
+    if(userBrowser === 'firefox'){
+        urls.forEach(url => {
+            browser.tabs.create({ url, active: false });
+        });   
+    }
+    else{
+        // Open all tabs
+        const createTabs = urls.map(url => 
+            new Promise(resolve => {
+                chrome.tabs.create({ url: url, active: false }, resolve);
+            })
+        );
+        // After all tabs are created, group them
+        Promise.all(createTabs).then(tabs => {
+            const tabIds = tabs.map(tab => tab.id); // Extract tab IDs
+            chrome.tabs.group({ tabIds: tabIds }, groupId => {
+                // Set the title of the group
+                let title;
+                if(subgroup){
+                    title = subgroup[subgroup.length - 2];
+                }
+                else{
+                    title = column.querySelector('.column-title-text').textContent;
+                }
+                chrome.tabGroups.update(groupId, { title });
+            });
         });
-    });
+    }
 }
 
 /* Column Functions */
 function saveColumnState(returnState = false) {
     const columns = columnsContainer.querySelectorAll('.column');
     const columnState = [];
-
     columns.forEach(column => {
         const columnId = column.id;
         const tabItems = Array.from(column.querySelectorAll('.tab-item')).filter(item => 
@@ -871,22 +889,27 @@ function handleDrop(event) {
     const itemsToInsert = [];
 
     if(deletionArea.contains(event.target)) {
+        let deletedSubgroup = false;
         itemsToProcess.forEach(item => {
             const itemId = item.id;
             if (itemId.startsWith('tab-')) {
                 tabIdsToDelete.push(parseInt(itemId.replace('tab-', '')));
+                item.remove();
             }
             else if (itemId.startsWith('opentab')) {
                 chrome.tabs.remove(parseInt(itemId.replace('opentab-', '')), () => {
                     //console.log('Tab closed:', itemId);
                 });
+                item.remove();
             }
             else if (itemId.startsWith('group')) {
                 deleteSubgroup(itemId);
+                deletedSubgroup = true;
             }
-            item.parentNode.removeChild(item);
         });
-        deleteTab(tabIdsToDelete);
+        if(!deletedSubgroup){
+            deleteTab(tabIdsToDelete);
+        }
         return;
     }
     else if(newColumnIndicator.contains(event.target)) {
@@ -1174,8 +1197,14 @@ function handleDragEnd(event) {
         item.classList.remove("dragging");
     });
     event.target.closest('.column')?.classList.remove("dragging");
-    if (deletionArea) deletionArea.style.display = 'none';
-    if (newColumnIndicator) newColumnIndicator.style.display = 'none';
+    if (deletionArea){
+        deletionArea.style.display = 'none';
+        deletionArea.classList.remove('deletion-area-active');
+    } 
+    if (newColumnIndicator){
+        newColumnIndicator.style.display = 'none';
+        newColumnIndicator.classList.remove('new-column-indicator-active');
+    } 
     if (dropIndicator) dropIndicator.style.display = 'none';
     document.querySelectorAll('.tab-item').forEach(item => {
         item.style.outline = 'none';
@@ -1293,7 +1322,10 @@ function createTabItem(tab){
     
     noteInput.addEventListener("blur", function () {
         const note = noteInput.value;
+        const column = li.closest('.column');
         saveTabNote(tab.id, note);
+        li.draggable = true;
+        column.draggable = true;
         noteDisplay.innerHTML = note ? note.replace(/\\/g, '').replace(/\n/g, '<br>') : '';
         noteInput.classList.add("hidden");
         noteDisplay.classList.remove("hidden");
@@ -1445,6 +1477,14 @@ function createColumn(title, id, minimized = false, emoji = null) {
 
     // Toggle emoji picker when clicking the emoji button
     emojiButton.addEventListener('click', () => {
+        // Hide all other pickers
+        const allPickers = document.querySelectorAll('.emoji-picker-on-top');
+        allPickers.forEach(picker => {
+            if (picker !== emojiPicker) {
+                picker.style.display = 'none';
+            }
+        });
+        
         if (emojiPicker.style.display === 'none') {
             const rect = emojiButton.getBoundingClientRect();
             emojiPicker.style.top = `${rect.bottom + 4}px`;
@@ -1500,6 +1540,12 @@ function createEditableTitle(options = {}) {
         titleInput.focus();
         const length = titleInput.value.length;
         titleInput.setSelectionRange(length, length);
+        const column = titleSpan.closest('.column');
+        column.draggable = false;
+        if(groupClass === 'subgroup-title-group'){
+            const subgroup = titleSpan.closest('.subgroup-item');
+            subgroup.draggable = false;
+        }
     });
 
     // Switch back to display mode
@@ -1509,6 +1555,12 @@ function createEditableTitle(options = {}) {
         titleInput.style.display = "none";
         titleSpan.style.display = "inline";
         onSave(trimmedValue);
+        const column = titleSpan.closest('.column');
+        column.draggable = true;
+        if(groupClass === 'subgroup-title-group'){
+            const subgroup = titleSpan.closest('.subgroup-item');
+            subgroup.draggable = true;
+        }
     });
 
     // Save on Enter
@@ -1721,6 +1773,7 @@ function fetchOpenTabs() {
             'opera://',
             'vivaldi://',
             'brave://',
+            'moz-extension://',
             'about:',
             'file://'
         ];      
@@ -1782,7 +1835,14 @@ function fetchOpenTabs() {
 }
 
 chrome.tabs.onUpdated.addListener(fetchOpenTabs);
-chrome.tabs.onRemoved.addListener(fetchOpenTabs);
+chrome.tabs.onRemoved.addListener(() => {
+    if(userBrowser === 'firefox'){
+        setTimeout(fetchOpenTabs, 150);
+    }
+    else{
+        fetchOpenTabs();
+    }
+});
 chrome.tabs.onMoved.addListener(fetchOpenTabs);
 chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== 'local') return;
@@ -1804,24 +1864,30 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
         displaySavedTabs(tabs_in_storage);
     }
     else if (changes.bgTabs) {
-        chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
-            const columnState = data.columnState || [];
-            const bgTabs = data.bgTabs || [];
-            const savedTabs = data.savedTabs || [];
-            const tabIds = bgTabs.map(tab => tab.id);
+        const oldBgTabs = changes.bgTabs.oldValue || [];
+        const newBgTabs = changes.bgTabs.newValue || [];
 
-            if (columnState.length === 0) {
-                columnState.push({ id: "defaultColumn", tabIds: [], title: "New Column" });
-            }
-            const firstColumn = columnState[0];
-            const formattedIds = tabIds.map(id => `tab-${id}`);
-            firstColumn.tabIds = firstColumn.tabIds.concat(formattedIds);
-            savedTabs = savedTabs.concat(bgTabs);
-
-            chrome.storage.local.set({ columnState: columnState, bgTabs: [], savedTabs: savedTabs }, () => {
-                console.log("Migrated bgTabs");
+        //Check if bgTabs has changed
+        if (JSON.stringify(oldBgTabs) !== JSON.stringify(newBgTabs)) {
+            chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
+                let columnState = data.columnState || [];
+                const bgTabs = data.bgTabs || [];
+                let savedTabs = data.savedTabs || [];
+                const tabIds = bgTabs.map(tab => tab.id);
+    
+                if (columnState.length === 0) {
+                    columnState.push({ id: "defaultColumn", tabIds: [], title: "New Column" });
+                }
+                const firstColumn = columnState[0];
+                const formattedIds = tabIds.map(id => `tab-${id}`);
+                firstColumn.tabIds = firstColumn.tabIds.concat(formattedIds);
+                savedTabs = savedTabs.concat(bgTabs);
+    
+                chrome.storage.local.set({ columnState: columnState, bgTabs: [], savedTabs: savedTabs }, () => {
+                    console.log("Migrated bgTabs");
+                });
             });
-        });
+        }
     }
     else if (changes.sidebarCollapsed) {
         if(changes.sidebarCollapsed.newValue) {
@@ -1835,7 +1901,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 fetchOpenTabs();
 
 chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
-    const columnState = data.columnState || [];
+    let columnState = data.columnState || [];
     const bgTabs = data.bgTabs || [];
     let savedTabs = data.savedTabs || [];
 

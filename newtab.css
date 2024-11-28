@@ -1,3 +1,8 @@
+:root {
+    --chrome-emoji-size: 2em;
+    --firefox-emoji-size: 1.4em;
+}
+
 body {
     font-family: 'Roboto';
     padding: 0;
@@ -6,8 +11,13 @@ body {
     box-sizing: border-box;
     overflow: hidden;
 }
-h1, h2 {
+h1 {
     text-align: center;
+    font-size: 24px;
+}
+h2 {
+    text-align: center;
+    font-size: 18px;
 }
 .hidden {
     display: none;
@@ -147,6 +157,7 @@ h1, h2 {
     width: fit-content;
     border-radius: 4px;
     padding: 2px 4px;
+    font-size: 12px;
 }
 .tab-note {
     margin-top: 5px;
@@ -346,7 +357,7 @@ h1, h2 {
     .emoji-button {
         background: none;
         border: none;
-        font-size: 2em;
+        font-size: var(--chrome-emoji-size);
         cursor: pointer;
     }
         .emoji-button:hover {
