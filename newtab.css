@@ -79,8 +79,7 @@ h2 {
     background-color: #f0f0f0;
     padding: 16px;
     margin: 12px;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden;
     box-sizing: border-box;
     border-radius: 10px;
     transition: all 0.3s ease;
@@ -107,7 +106,7 @@ h2 {
     list-style-type: none;
     padding: 0;
     overflow: auto;
-    height: calc(100vh - 120px);
+    height: calc(100vh - 108px);
 }
 
 #save-selected {
@@ -278,6 +277,7 @@ h2 {
     .minimize-column,
     .maximize-column {
         margin-right: auto;
+        background: none;
         border: none;
         cursor: pointer;
         opacity: 0.3;
