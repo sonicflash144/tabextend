@@ -106,7 +106,8 @@ h2 {
 #open-tabs-list {
     list-style-type: none;
     padding: 0;
-    height: calc(100vh - 150px);
+    overflow: auto;
+    height: calc(100vh - 128px);
 }
 
 #save-selected {
@@ -277,6 +278,7 @@ h2 {
     .minimize-column,
     .maximize-column {
         margin-right: auto;
+        background: none;
         border: none;
         cursor: pointer;
         opacity: 0.3;
