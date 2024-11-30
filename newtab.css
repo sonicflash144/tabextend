@@ -106,7 +106,8 @@ h2 {
 #open-tabs-list {
     list-style-type: none;
     padding: 0;
-    height: calc(100vh - 150px);
+    overflow: auto;
+    height: calc(100vh - 120px);
 }
 
 #save-selected {

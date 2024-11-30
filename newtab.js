@@ -218,6 +218,9 @@ function renameTab(tab, li) {
     li.draggable = false;
     const column = li.closest('.column');
     column.draggable = false;
+    const subgroup = li.closest('.subgroup-item');
+    if (subgroup) subgroup.draggable = false;
+
     const titleDisplay = li.querySelector(`#title-display-${tab.id}`);
     const titleInput = li.querySelector(`#title-input-${tab.id}`);
 
@@ -239,6 +242,9 @@ function renameTab(tab, li) {
 
     titleInput.addEventListener("blur", function () {
         const newTitle = titleInput.value;
+        li.draggable = true;
+        column.draggable = true;
+        if (subgroup) subgroup.draggable = true;
         chrome.storage.local.get("savedTabs", (data) => {
             const tabs = data.savedTabs || [];
             const tabIndex = tabs.findIndex(t => t.id === tab.id);
@@ -867,6 +873,9 @@ function handleDrop(event) {
         else {
             columnsContainer.insertBefore(droppedColumn, columns[dropPosition]);
         }
+
+        // Ensure newColumnIndicator is the last element
+        columnsContainer.appendChild(newColumnIndicator);
 
         saveColumnState();
         return;
@@ -1570,6 +1579,12 @@ function createEditableTitle(options = {}) {
 
     // Switch back to display mode
     titleInput.addEventListener("blur", () => {
+        const column = titleInput.closest('.column');
+        column.draggable = true;
+        if(groupClass === 'subgroup-title-group'){
+            const subgroup = titleSpan.closest('.subgroup-item');
+            subgroup.draggable = true;
+        }
         const trimmedValue = titleInput.value.trim();
         titleSpan.textContent = trimmedValue || defaultText;
         titleInput.style.display = "none";
