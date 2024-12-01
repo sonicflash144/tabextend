@@ -1190,7 +1190,7 @@ function handleDrop(event) {
             itemIdsToSave.push(itemId);
         }
         else if (columnId === 'open-tabs-list' && itemId.startsWith('tab')) {
-            window.open(item.dataset.url, '_blank');
+            chrome.tabs.create({ url: item.dataset.url, active: false });
             tabIdsToDelete.push(parseInt(itemId.replace('tab-', '')));
         }
         else if (columnId === 'open-tabs-list' && itemId.startsWith('group')) {
