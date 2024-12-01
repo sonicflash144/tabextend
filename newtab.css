@@ -1,10 +1,35 @@
 :root {
     --chrome-emoji-size: 2em;
     --firefox-emoji-size: 1.4em;
-}
 
+    color-scheme: light dark;
+    --text-color: light-dark(black, #f3f3f3);
+    --background-color: light-dark(white, #111);
+    --column-bg-color: light-dark(#f0f0f0, #2f2f2f);
+    --column-border-color: light-dark(#d6d6d6, #363636);
+    --note-text-color: light-dark(#363636, #e6e6e6);
+    --tab-item-bg-color: light-dark(white, #111);
+    --subgroup-bg-color: light-dark(#ddd, #4c4c4c);
+    --color-menu-bg-color: light-dark(#e9e9e9, #2e2e2e);
+    --menu-option-border-color: light-dark(#555, #ddd);
+    --selected-color: light-dark(#007BFF, #aed5ff);
+
+    --tab-default: light-dark(white, #111);
+    --tab-pink: light-dark(#ffc4c4, #ad6666);
+    --tab-yellow: light-dark(#fffdc4, #8f8f00);
+    --tab-blue: light-dark(#b0e5ff, #617d9b);
+    --tab-purple: light-dark(#ebc4ff, #88679e);
+}
+.light {
+    color-scheme: light;
+}
+.dark {
+    color-scheme: dark;
+}
 body {
     font-family: 'Roboto';
+    background-color: var(--background-color);
+    color: var(--text-color);
     padding: 0;
     margin: 0;
     display: flex;
@@ -34,6 +59,44 @@ h2 {
         display: flex;
         align-items: center;
     }
+    #add-column {
+        border: 1px solid #999;
+        border-radius: 2px;
+        opacity: 0.8;
+    }
+        #add-column:hover {
+            opacity: 1;
+        }
+    .settings-button {
+        position: relative;
+        background: none;
+        border: none;
+        cursor: pointer;
+        margin-right: 8px;
+    }
+        .settings-button svg {
+            opacity: 0.6;
+        }
+            .settings-button:hover svg {
+                opacity: 0.8;
+            }
+        .notification-circle {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 8px;
+            height: 8px;
+            background-color: red;
+            border-radius: 50%;
+            z-index: 10;
+        }
+            .inline-notification {
+                position: relative;
+                top: 0;
+                right: 0;
+                margin-right: 2px;
+                display: inline-block;
+            }
 
 .sidebar-header {
     display: flex;
@@ -76,7 +139,7 @@ h2 {
     min-width: 200px;
     width: 20vw;
     height: calc(100vh - 32px);
-    background-color: #f0f0f0;
+    background-color: var(--column-bg-color);
     padding: 16px;
     margin: 12px;
     overflow: hidden;
@@ -109,23 +172,8 @@ h2 {
     height: calc(100vh - 108px);
 }
 
-#save-selected {
-    display: block;
-    margin: 20px auto;
-    padding: 10px 20px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
-}
-    #save-selected:hover {
-        background-color: #45a049;
-    }
-
 #tab-list a {
     text-decoration: none;
-    color: black;
     font-size: 18px;
 }
 #tab-list img, #open-tabs-list img {
@@ -139,7 +187,7 @@ h2 {
 .note-display {
     margin-top: 5px;
     font-size: 14px;
-    color: #333;
+    color: var(--note-text-color);
     width: 100%;
     overflow: hidden;
     word-wrap: break-word;
@@ -176,7 +224,7 @@ h2 {
     }
 
 .tab-item {
-    background-color: #fff;
+    background-color: var(--tab-item-bg-color);
     display: flex;
     align-items: center;
     margin: 10px 0;
@@ -188,14 +236,29 @@ h2 {
     user-select: none;
 }
     .tab-item.subgroup-item {
-        background-color: #dddddd;
+        background-color: var(--subgroup-bg-color);
         padding: 4px 10px;
     }
     .tab-item.dragging {
         opacity: 0.5;
     }
-    .tab-item.selected {
-        border-color: #007BFF;
+    .tab-item.selected, .tab-item.targeted {
+        border-color: var(--selected-color);
+    }
+    .tab-item.tab-default {
+        background-color: var(--tab-default);
+    }
+    .tab-item.tab-pink {
+        background-color: var(--tab-pink);
+    }
+    .tab-item.tab-yellow {
+        background-color: var(--tab-yellow);
+    }
+    .tab-item.tab-blue {
+        background-color: var(--tab-blue);
+    }
+    .tab-item.tab-purple {
+        background-color: var(--tab-purple);
     }
 
 .tab-title {
@@ -234,26 +297,24 @@ h2 {
         #sidebar.collapsed .tab-actions {
             display: none;
         }
-        .tab-actions button, .menu-container button, .more-options {
+        .tab-actions button, .more-options {
             background: none;
             border: none;
             cursor: pointer;
-            width: 24px;
-            height: 24px;
+            opacity: 0.6;
         }
+            .tab-actions button:hover, .more-options:hover {
+                opacity: 0.9;
+            }
         .menu-item-icon {
             width: 16px;
             height: 16px;
         }
         .menu-container.vertical {
-            margin-left: 0 auto;
+            margin-left: 0;
         }
         .more-options.vertical {
             transform: rotate(90deg);
-        }
-        .tab-actions img, .more-options img {
-            width: 20px;
-            height: 20px;
         }
 
 .header-container {
@@ -321,13 +382,13 @@ h2 {
     overflow: auto;
 }
 .column {
-    border: 1px solid #ccc;
+    border: 1px solid var(--column-border-color);
     border-radius: 5px;
     padding: 10px;
     min-width: 240px;
     width: 20vw;
     height: calc(100vh - 152px);
-    background-color: #f0f0f0;
+    background-color: var(--column-bg-color);
     flex-shrink: 0;
     margin-right: 10px;
     list-style-type: none;
@@ -385,7 +446,7 @@ h2 {
         border-radius: 5px;
     }
     .column li.selected {
-        border-color: #007BFF; 
+        border-color: var(--selected-color); 
     }
     .column.dragging {
         opacity: 0.5;
@@ -409,7 +470,7 @@ h2 {
 .drop-indicator {
     position: absolute;
     height: 2px;
-    background-color: #007bff;
+    background-color: var(--selected-color);
     pointer-events: none;
     z-index: 1000;
 }
@@ -426,25 +487,35 @@ h2 {
 
 .close-button {
     cursor: pointer;
-    width: 16px;
-    height: 16px;
+    opacity: 0.5;
 }
+    .close-button:hover {
+        opacity: 0.8;
+    }
 
 .options-menu {
     position: absolute;
-    background: #ffffff;
-    border: 1px solid #ccc;
+    background: var(--background-color);
     border-radius: 4px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
     z-index: 1000;
 }
+.menu-option {
+    position: relative;
+    padding: 2px 4px;
+    border-radius: 2px;
+    border: 1px solid var(--menu-option-border-color);
+}
+.menu-option:hover {
+    background-color: var(--column-border-color);
+}
 
 .color-menu {
     position: absolute;
-    background: #e9e9e9;
-    border: 1px solid #ccc;
+    background: var(--color-menu-bg-color);
+    border: 1px solid var(--column-border-color);
     padding: 5px;
     display: flex;
     gap: 5px;
@@ -455,6 +526,21 @@ h2 {
     height: 20px;
     cursor: pointer;
 }
+    .color-option.tab-default {
+        background-color: var(--tab-default);
+    }
+    .color-option.tab-pink {
+        background-color: var(--tab-pink);
+    }
+    .color-option.tab-yellow {
+        background-color: var(--tab-yellow);
+    }
+    .color-option.tab-blue {
+        background-color: var(--tab-blue);
+    }
+    .color-option.tab-purple {
+        background-color: var(--tab-purple);
+    }
 
 #deletion-area {
     position: fixed;
@@ -468,7 +554,6 @@ h2 {
     justify-content: center;
     align-items: center;
     font-size: 18px;
-    color: white;
     margin: 0 auto;
     border-radius: 5px;
 }
@@ -477,8 +562,6 @@ h2 {
     }
 
 .delete-icon, .new-column-icon {
-    width: 40px;
-    height: 40px;
     opacity: 0.5;
 }
 
@@ -540,7 +623,6 @@ h2 {
             display: flex;
         }
     .favicon-wrapper {
-        background-color: #fff;
         padding: 4px 8px;
         border-radius: 5px;
         display: flex;
@@ -549,6 +631,21 @@ h2 {
         width: 32px;
         cursor: pointer;
     }
+        .favicon-wrapper.tab-default {
+            background-color: var(--tab-default);
+        }
+        .favicon-wrapper.tab-pink {
+            background-color: var(--tab-pink);
+        }
+        .favicon-wrapper.tab-yellow {
+            background-color: var(--tab-yellow);
+        }
+        .favicon-wrapper.tab-blue {
+            background-color: var(--tab-blue);
+        }
+        .favicon-wrapper.tab-purple {
+            background-color: var(--tab-purple);
+        }
     .favicon-title {
         white-space: nowrap;
         overflow: hidden;

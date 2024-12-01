@@ -1,22 +1,43 @@
 import { Chrono } from 'chrono-node';
 import 'emoji-picker-element';
-browser.storage.local.get("sidebarCollapsed", (data) => {
-    const sidebar = document.getElementById('sidebar');
-    if (data.sidebarCollapsed) {
-        sidebar.classList.add('collapsed', 'no-transition');
+let theme = 'light';
+browser.storage.local.get(["sidebarCollapsed", "theme"], (data) => {
+    try {
+        const sidebar = document.getElementById('sidebar');
+        sidebar.classList.add('no-transition');
+        if (data.sidebarCollapsed) {
+            sidebar.classList.add('collapsed');
+        }
+        if (data.theme) {
+            theme = data.theme;
+            document.body.className = data.theme;
+        }
+
         setTimeout(() => {
             sidebar.classList.remove('no-transition');
         }, 100);
+    } catch (error) {
+        console.error('Error updating sidebar:', error);
     }
 });
+function toggleTheme(){
+    theme = theme === 'light' ? 'dark' : 'light';
+    document.body.className = theme;
+    const emojiPickers = document.querySelectorAll('emoji-picker');
+    emojiPickers.forEach(picker => {
+        picker.className = picker.className.replace(/light|dark/g, theme);
+    });
+    browser.storage.local.set({ theme });
+}
 const scrollAnimation = {
     isScrolling: false,
     scrollX: 0,
     scrollY: 0,
     animationFrameId: null
 };
+const settingsButton = document.querySelector('.settings-button');
 const columnsContainer = document.getElementById('columns-container');
-const colorOptions = ['#FFFFFF', '#ffc4c4', '#fffdc4', '#b0e5ff', '#ebc4ff'];
+const colorOptions = ['tab-default', 'tab-pink', 'tab-yellow', 'tab-blue', 'tab-purple'];
 let dropIndicator = null;
 let dropType = null;
 let deletionArea = null;
@@ -25,6 +46,7 @@ let lastSelectedIndex = null;
 let activeColumnMenu = null;
 let activeOptionsMenu = null;
 let activeColorMenu = null;
+let activeSettingsMenu = null;
 let tabs_in_storage = [];
 function getToday(tabDate) {
     const today = new Date();
@@ -51,13 +73,16 @@ function createDeletionArea() {
     deletionArea = document.createElement('div');
     deletionArea.id = 'deletion-area';
 
-    // Create an img element for the SVG icon
-    const deleteIcon = document.createElement('img');
-    deleteIcon.src = '../icons/delete-icon.svg';
+    const deleteIcon = document.createElement('div');
+    deleteIcon.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="40" height="40" class="main-grid-item-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" x2="10" y1="11" y2="17" />
+      <line x1="14" x2="14" y1="11" y2="17" />
+    </svg>`;
     deleteIcon.alt = 'Delete Icon';
     deleteIcon.classList.add('delete-icon');
-
-    // Append the img element to the deletionArea
     deletionArea.appendChild(deleteIcon);
 
     deletionArea.addEventListener('dragover', handleDragOver);
@@ -71,12 +96,12 @@ function createDeletionArea() {
 }
 createDeletionArea();
 function closeAllMenus() {
-    [activeOptionsMenu, activeColorMenu, activeColumnMenu].forEach(menu => {
+    [activeOptionsMenu, activeColorMenu, activeColumnMenu, activeSettingsMenu].forEach(menu => {
         if (menu) {
             menu.remove();
         }
     });
-    activeOptionsMenu = activeColorMenu = activeColumnMenu = null;
+    activeOptionsMenu = activeColorMenu = activeColumnMenu = activeSettingsMenu = null;
 }
 function getBrowser() {
     const userAgent = navigator.userAgent.toLowerCase();
@@ -193,7 +218,6 @@ function createMenuDropdown(menuItems, button) {
         const menuItem = document.createElement("button");
         menuItem.classList.add("menu-option");
         menuItem.innerHTML = `
-            ${item.icon ? `<img src="${item.icon}" class="menu-item-icon" />` : ''}
             <span>${item.text}</span>
         `;
         menuItem.addEventListener("click", (e) => {
@@ -220,9 +244,10 @@ function renameTab(tab, li) {
     column.draggable = false;
     const subgroup = li.closest('.subgroup-item');
     if (subgroup) subgroup.draggable = false;
+    
     const titleDisplay = li.querySelector(`#title-display-${tab.id}`);
     const titleInput = li.querySelector(`#title-input-${tab.id}`);
-
+    
     titleInput.classList.remove("hidden");
     titleDisplay.classList.add("hidden");
     titleInput.focus();
@@ -341,7 +366,7 @@ function removeDate(tab, dateDisplay) {
         console.log('Tab date removed:', tab.id);
     });
 }
-function openColorMenu(tab, li, moreOptionsButton) {
+function openColorMenu(tab, moreOptionsButton) {
     if (activeColorMenu) {
         activeColorMenu.remove();
         activeColorMenu = null;
@@ -352,13 +377,11 @@ function openColorMenu(tab, li, moreOptionsButton) {
 
     colorOptions.forEach(color => {
         const colorOption = document.createElement('div');
-        colorOption.classList.add('color-option');
-        colorOption.style.backgroundColor = color;
+        colorOption.classList.add('color-option', color);
         colorOption.addEventListener('click', () => {
             tab.color = color;
-            li.style.backgroundColor = color;
             browser.storage.local.set({ savedTabs: tabs_in_storage }, () => {
-                console.log('Tab color saved:', tab.id, tab.color);
+                //console.log('Tab color saved:', tab.id, tab.color);
             });
             closeAllMenus();
         });
@@ -401,7 +424,6 @@ function openAllInColumn(column, subgroup = null) {
             }
         });
     }
-
     if(userBrowser === 'firefox'){
         urls.forEach(url => {
             browser.tabs.create({ url, active: false });
@@ -411,13 +433,13 @@ function openAllInColumn(column, subgroup = null) {
         // Open all tabs
         const createTabs = urls.map(url => 
             new Promise(resolve => {
-                chrome.tabs.create({ url: url, active: false }, resolve);
+                browser.tabs.create({ url: url, active: false }, resolve);
             })
         );
         // After all tabs are created, group them
         Promise.all(createTabs).then(tabs => {
             const tabIds = tabs.map(tab => tab.id); // Extract tab IDs
-            chrome.tabs.group({ tabIds: tabIds }, groupId => {
+            browser.tabs.group({ tabIds: tabIds }, groupId => {
                 // Set the title of the group
                 let title;
                 if(subgroup){
@@ -426,7 +448,7 @@ function openAllInColumn(column, subgroup = null) {
                 else{
                     title = column.querySelector('.column-title-text').textContent;
                 }
-                chrome.tabGroups.update(groupId, { title });
+                browser.tabGroups.update(groupId, { title });
             });
         });
     }
@@ -436,7 +458,6 @@ function openAllInColumn(column, subgroup = null) {
 function saveColumnState(returnState = false) {
     const columns = columnsContainer.querySelectorAll('.column');
     const columnState = [];
-
     columns.forEach(column => {
         const columnId = column.id;
         const tabItems = Array.from(column.querySelectorAll('.tab-item')).filter(item => 
@@ -772,10 +793,10 @@ function handleDragOver(event) {
         });
 
         document.querySelectorAll('.tab-item').forEach(item => {
-            item.style.outline = 'none';
+            item.classList.remove('targeted');
         });
         if (targetTab) {
-            targetTab.style.outline = '2px solid #007bff';
+            targetTab.classList.add('targeted');
             dropIndicator.style.display = 'none';
         } else {
             dropIndicator.style.display = 'block';
@@ -909,19 +930,20 @@ function handleDrop(event) {
             const itemId = item.id;
             if (itemId.startsWith('tab-')) {
                 tabIdsToDelete.push(parseInt(itemId.replace('tab-', '')));
+                item.remove();
             }
             else if (itemId.startsWith('opentab')) {
                 browser.tabs.remove(parseInt(itemId.replace('opentab-', '')), () => {
                     //console.log('Tab closed:', itemId);
                 });
+                item.remove();
             }
             else if (itemId.startsWith('group')) {
                 deleteSubgroup(itemId);
                 deletedSubgroup = true;
             }
-            item.parentNode.removeChild(item);
         });
-        if (!deletedSubgroup) {
+        if(!deletedSubgroup){
             deleteTab(tabIdsToDelete);
         }
         return;
@@ -1168,7 +1190,7 @@ function handleDrop(event) {
             itemIdsToSave.push(itemId);
         }
         else if (columnId === 'open-tabs-list' && itemId.startsWith('tab')) {
-            window.open(item.dataset.url, '_blank');
+            browser.tabs.create({ url: item.dataset.url, active: false });
             tabIdsToDelete.push(parseInt(itemId.replace('tab-', '')));
         }
         else if (columnId === 'open-tabs-list' && itemId.startsWith('group')) {
@@ -1198,7 +1220,7 @@ function handleDrop(event) {
             });
         }
     });
-    if (earlyExit) return;
+    if(earlyExit) return;
 
     itemsToInsert.forEach(({ item, dropPosition }) => {
         if (dropPosition === tabItems.length) {
@@ -1252,8 +1274,8 @@ function toggleSubgroupExpandedState(expandButton) {
 
     // Update button appearance
     expandButton.innerHTML = isExpanded 
-        ? `<img src="../icons/chevron-up.svg" />`
-        : `<img src="../icons/chevron-down.svg" />`;
+            ? `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-up"><path d="m18 15-6-6-6 6"/></svg>`
+            : `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>`;
 
     if (isExpanded) {
         faviconsContainer.style.display = 'none';
@@ -1283,12 +1305,37 @@ function createDraggableListItem(options = {}) {
 
     return li;
 }
+function getColorClass(color) {
+    switch (color) {
+        case '#FFFFFF':
+            return 'default-color';
+        case '#ffc4c4':
+        case '#f7c2d6':
+            return 'tab-pink';
+        case '#fffdc4':
+        case '#f9ffc4':
+            return 'tab-yellow';
+        case '#b0e5ff':
+        case '#c6e2e9':
+            return 'tab-blue';
+        case '#ebc4ff':
+        case '#e9c8fa':
+            return 'tab-purple';
+        default:
+            return 'default-color';
+    }
+}
 function createTabItem(tab){
     const li = createDraggableListItem({
         id: `tab-${tab.id}`
     });
-    li.style.backgroundColor = tab.color;
     li.dataset.url = tab.url;
+
+    let colorClass = tab.color;
+    if (!colorOptions.includes(colorClass)) {
+        colorClass = getColorClass(tab.color);
+    }
+    li.classList.add(colorClass);
 
     // Calculate the formatted date when displaying
     const { formattedDate, dateDisplayColor } = calculateFormattedDate(tab.parsedDate);
@@ -1306,7 +1353,11 @@ function createTabItem(tab){
             </div>
             <div class="tab-actions">
                 <button class="more-options" data-index="${tab.id}">
-                    <img src="../icons/morevertical.svg" />
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" class="main-grid-item-icon" fill="currentColor" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+                      <circle cx="12" cy="12" r="1" />
+                      <circle cx="12" cy="5" r="1" />
+                      <circle cx="12" cy="19" r="1" />
+                    </svg>                
                 </button>
             </div>
         </div>
@@ -1326,6 +1377,11 @@ function createTabItem(tab){
     const moreOptionsButton = li.querySelector('.more-options');
     moreOptionsButton.addEventListener('click', (event) => {
         event.stopPropagation();
+
+        const selectedItems = document.querySelectorAll('.selected');
+        selectedItems.forEach(item => {
+            item.classList.remove('selected');
+        });
     
         if (activeOptionsMenu && activeOptionsMenu.dataset.tabId === tab.id.toString()) {
             closeAllMenus();
@@ -1338,7 +1394,7 @@ function createTabItem(tab){
             { text: "Rename", action: () => { renameTab(tab, li); closeAllMenus() } },            
             { text: noteButtonText, action: () => { editTabNote(tab, li); closeAllMenus() } },
             { text: "Clear Date", action: () => { removeDate(tab, dateDisplay); closeAllMenus() }, hidden: !formattedDate },
-            { text: "Color", action: () => openColorMenu(tab, li, moreOptionsButton) },
+            { text: "Color", action: () => openColorMenu(tab, moreOptionsButton) },
             { text: "Delete", action: () => deleteTab(tab.id, null, li) }
         ];
     
@@ -1426,7 +1482,7 @@ function createColumn(title, id, minimized = false, emoji = null) {
     const minimizeButton = document.createElement("button");
     minimizeButton.classList.add("minimize-column");
     minimizeButton.title = "Minimize Column";
-    minimizeButton.innerHTML = `<img src="../icons/minimize.svg" />`;
+    minimizeButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left-to-line"> <path d="M3 19V5"/><path d="m13 6-6 6 6 6"/><path d="M7 12h14"/></svg>`;    
     minimizeButton.addEventListener("click", () => {
         minimizeColumn(column);
         browser.storage.local.set({ columnState: saveColumnState(true), animation: {columnId: column.id, minimized: true} }, () => {
@@ -1438,7 +1494,7 @@ function createColumn(title, id, minimized = false, emoji = null) {
     const maximizeButton = document.createElement("button");
     maximizeButton.classList.add("maximize-column");
     maximizeButton.title = "Maximize Column";
-    maximizeButton.innerHTML = `<img src="../icons/maximize.svg" />`;
+    maximizeButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-maximize-2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" x2="14" y1="3" y2="10"/><line x1="3" x2="10" y1="21" y2="14"/></svg>`;
     maximizeButton.addEventListener("click", () => {
         maximizeColumn(column);
         browser.storage.local.set({ columnState: saveColumnState(true), animation: {columnId: column.id, minimized: false} }, () => {
@@ -1467,10 +1523,16 @@ function createColumn(title, id, minimized = false, emoji = null) {
     // Create three-dot menu button
     const menuButton = document.createElement("button");
     menuButton.classList.add("more-options");
-    menuButton.innerHTML = `<img src="../icons/morevertical.svg" />`;
+    menuButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" class="main-grid-item-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="1" /><circle cx="12" cy="5" r="1" /><circle cx="12" cy="19" r="1" /></svg>`;
     menuContainer.appendChild(menuButton);
     menuButton.addEventListener("click", (e) => {
         e.stopPropagation();
+
+        const selectedItems = document.querySelectorAll('.selected');
+        selectedItems.forEach(item => {
+            item.classList.remove('selected');
+        });
+
         if(activeColumnMenu && activeColumnMenu.dataset.columnId === column.id){
             closeAllMenus();
             return;
@@ -1478,8 +1540,8 @@ function createColumn(title, id, minimized = false, emoji = null) {
         closeAllMenus();
 
         const menuItems = [
-            { text: "Open All", icon: "../icons/openall.svg", action: () => openAllInColumn(column) },
-            { text: "Delete Column", icon: "../icons/delete-icon.svg", action: () => deleteColumn(column) }
+            { text: "Open All", action: () => openAllInColumn(column) },
+            { text: "Delete Column", action: () => deleteColumn(column) }
         ];
         
         activeColumnMenu = createMenuDropdown(menuItems, menuButton);
@@ -1494,7 +1556,7 @@ function createColumn(title, id, minimized = false, emoji = null) {
 
     // Create and configure the emoji picker element
     const emojiPicker = document.createElement('emoji-picker');
-    emojiPicker.classList.add('emoji-picker-on-top');
+    emojiPicker.classList.add('emoji-picker-on-top', theme);
     emojiPicker.style.display = 'none';
     emojiPicker.addEventListener('emoji-click', (event) => {
         const newEmoji = event.detail.unicode;
@@ -1513,7 +1575,7 @@ function createColumn(title, id, minimized = false, emoji = null) {
                 picker.style.display = 'none';
             }
         });
-
+        
         if (emojiPicker.style.display === 'none') {
             const rect = emojiButton.getBoundingClientRect();
             emojiPicker.style.top = `${rect.bottom + 4}px`;
@@ -1610,6 +1672,7 @@ function createEditableTitle(options = {}) {
 }
 function handleFaviconClick(li, event) {
     event.stopPropagation();
+    closeAllMenus();
     const draggedItems = document.querySelectorAll('.selected');
     const allItems = Array.from(document.querySelectorAll('li'));
     const currentIndex = allItems.indexOf(li);
@@ -1686,7 +1749,7 @@ function displaySavedTabs(tabs) {
 
                     const expandButton = document.createElement("button");
                     expandButton.classList.add("expand-button");
-                    expandButton.innerHTML = `<img src="../icons/chevron-down.svg" />`;
+                    expandButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>`;
                     subgroupTabActions.appendChild(expandButton);
                 
                     tabId.forEach((subTabId, index) => {
@@ -1697,7 +1760,11 @@ function displaySavedTabs(tabs) {
                         if (tab) {
                             const faviconWrapper = document.createElement("div");
                             faviconWrapper.classList.add("favicon-wrapper");
-                            faviconWrapper.style.backgroundColor = tab.color || '#FFFFFF';
+                            let colorClass = tab.color;
+                            if (!colorOptions.includes(colorClass)) {
+                                colorClass = getColorClass(tab.color);
+                            }
+                            faviconWrapper.classList.add(colorClass);
                             
                             const favicon = document.createElement("img");
                             favicon.src = tab.favIconUrl;
@@ -1731,11 +1798,22 @@ function displaySavedTabs(tabs) {
 
                     const moreOptionsButton = document.createElement('button');
                     moreOptionsButton.classList.add('more-options');
-                    moreOptionsButton.innerHTML = `<img src="../icons/morevertical.svg" />`;
+                    moreOptionsButton.innerHTML = `
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" class="main-grid-item-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+                        <circle cx="12" cy="12" r="1" />
+                        <circle cx="12" cy="5" r="1" />
+                        <circle cx="12" cy="19" r="1" />
+                      </svg>
+                    `;
                     subgroupTabActions.appendChild(moreOptionsButton);
 
                     moreOptionsButton.addEventListener('click', (event) => {
                         event.stopPropagation();
+
+                        const selectedItems = document.querySelectorAll('.selected');
+                        selectedItems.forEach(item => {
+                            item.classList.remove('selected');
+                        });
                     
                         if (activeOptionsMenu && activeOptionsMenu.dataset.tabId === tabId[0]) {
                             closeAllMenus();
@@ -1782,10 +1860,16 @@ function displaySavedTabs(tabs) {
         });
         newColumnIndicator = document.createElement('div');
         newColumnIndicator.classList.add('new-column-indicator');
-        const img = document.createElement('img');
-        img.src = '../icons/newcolumn.svg';
-        img.classList.add('new-column-icon');
-        newColumnIndicator.appendChild(img);
+        const newColumnIcon = document.createElement('div');
+        newColumnIcon.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="40" height="40" class="main-grid-item-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            <line x1="12" x2="12" y1="11" y2="17" />
+            <line x1="9" x2="15" y1="14" y2="14" />
+            </svg>
+        `;
+        newColumnIcon.classList.add('new-column-icon');
+        newColumnIndicator.appendChild(newColumnIcon);
         newColumnIndicator.addEventListener('dragleave', (event) => {
             if (!newColumnIndicator.contains(event.relatedTarget)) {
                 newColumnIndicator.classList.remove('new-column-indicator-active');
@@ -1828,7 +1912,10 @@ function fetchOpenTabs() {
                         <span class="tab-title">${tab.title}</span>
                     </div>
                     <div class="tab-actions">
-                        <img src="../icons/close.svg" alt="Close" class="close-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" class="close-button" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+                            <line x1="18" x2="6" y1="6" y2="18" />
+                            <line x1="6" x2="18" y1="6" y2="18" />
+                        </svg>
                     </div>
                 </div>
             `;
@@ -1963,12 +2050,13 @@ document.querySelector('.maximize-sidebar').addEventListener('click', () => {
         //console.log("Sidebar expanded state saved");
     });
 });
+
 document.addEventListener('dragover', function(event) {
     event.preventDefault();
 });
 const handleClickOutside = (e) => {
-    const moreOptionsButtons = document.querySelectorAll('.more-options, .menu-option');
-    const isMoreOptionsButton = Array.from(moreOptionsButtons).some(button => button === e.target);
+    const clickedButton = e.target.closest('.more-options, .menu-option, .settings-button');
+    const isMoreOptionsButton = clickedButton !== null;
 
     const allItems = Array.from(document.querySelectorAll('li')).filter(item => !item.classList.contains('subgroup-item'));
     const isClickInside = allItems.some(item => item.contains(e.target));
@@ -1989,3 +2077,55 @@ const handleClickOutside = (e) => {
     }
 };
 document.addEventListener('click', handleClickOutside);
+
+browser.storage.local.get(['release', 'whatsNewClicked'], (data) => {
+    const release = browser.runtime.getManifest().version;
+    const previousRelease = data.release;
+    let whatsNewClicked = data.whatsNewClicked || false;
+
+    if (previousRelease !== release) {
+        const notification = document.createElement('div');
+        notification.classList.add('notification-circle');
+        settingsButton.appendChild(notification);
+        whatsNewClicked = false;
+        browser.storage.local.set({ whatsNewClicked: false });
+    }
+
+    settingsButton.addEventListener('click', () => {
+        if (activeSettingsMenu) {
+            closeAllMenus();
+            return;
+        }
+        closeAllMenus();
+
+        const settingsNotification = document.querySelector('.notification-circle:not(.inline-notification)');
+        if (settingsNotification) {
+            settingsNotification.remove();
+            browser.storage.local.set({ release: release });
+        }
+
+        let releaseNotesNotification = document.querySelector('.inline-notification');
+
+        const menuItems = [
+            { text: theme === 'dark' ? "Toggle Light Theme" : "Toggle Dark Theme", action: () => { toggleTheme(); closeAllMenus() } },
+            { text: "What's New", action: () => { 
+                if (releaseNotesNotification) {
+                    releaseNotesNotification.remove();
+                }
+                window.open('https://tabsmagic.com/releasenotes', '_blank');
+                closeAllMenus();
+                whatsNewClicked = true;
+                browser.storage.local.set({ whatsNewClicked: true });
+            }},
+            { text: "Feedback", action: () => { window.open('https://tabsmagic.com/contact', '_blank'); closeAllMenus() } },
+        ];
+        activeSettingsMenu = createMenuDropdown(menuItems, settingsButton);
+
+        if (!whatsNewClicked) {
+            const releaseNotesMenuItem = activeSettingsMenu.querySelector('button:nth-child(2)');
+            releaseNotesNotification = document.createElement('div');
+            releaseNotesNotification.classList.add('notification-circle', 'inline-notification');
+            releaseNotesMenuItem.insertBefore(releaseNotesNotification, releaseNotesMenuItem.firstChild);
+        }
+    });
+});
