@@ -1308,7 +1308,7 @@ function createDraggableListItem(options = {}) {
 function getColorClass(color) {
     switch (color) {
         case '#FFFFFF':
-            return 'default-color';
+            return 'tab-default';
         case '#ffc4c4':
         case '#f7c2d6':
             return 'tab-pink';
@@ -1322,7 +1322,7 @@ function getColorClass(color) {
         case '#e9c8fa':
             return 'tab-purple';
         default:
-            return 'default-color';
+            return 'tab-default';
     }
 }
 function createTabItem(tab){
