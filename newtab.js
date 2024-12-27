@@ -108,6 +108,9 @@ function getBrowser() {
     if (userAgent.indexOf('firefox') > -1) {
         return 'firefox';
     }
+    else if (userAgent.indexOf('safari') > -1) {
+        return 'safari';
+    }
     else {
         return 'chrome';
     }
@@ -1888,10 +1891,12 @@ function fetchOpenTabs() {
             'brave://',
             'moz-extension://',
             'about:',
-            'file://'
+            'file://',
+            'safari-web-extension://'
         ];      
         tabs = tabs.filter(tab => 
-            !excludedPrefixes.some(prefix => tab.url.startsWith(prefix))
+            (!excludedPrefixes.some(prefix => tab.url.startsWith(prefix))) && 
+            tab.url !== ""
         );
         const openTabsList = document.getElementById("open-tabs-list");
         openTabsList.addEventListener('dragover', handleDragOver);
@@ -1961,7 +1966,9 @@ browser.tabs.onRemoved.addListener(() => {
 });
 browser.tabs.onMoved.addListener(fetchOpenTabs);
 browser.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== 'local') return;
+    if (userBrowser !== 'safari'){
+        if (areaName !== 'local') return;
+    }
     if (changes.savedTabs || changes.columnState) {
         console.log("Changes detected", changes);
         if(changes.savedTabs){

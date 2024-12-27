@@ -21,6 +21,12 @@
     "default_icon": "icon.png"
   },
   "background": {
-    "scripts": ["background.js"]
+      "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+  {
+    "resources": ["*"],
+    "matches": ["<all_urls>"]
   }
+]
 }
