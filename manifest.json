@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tabs Magic",
-  "version": "1.0.17.4",
+  "version": "1.0.17",
   "description": "Save and manage your tabs into visual columns.",
   "permissions": ["tabs", "storage", "activeTab", "contextMenus"],
   "icons": {
@@ -12,21 +12,10 @@
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "sageywang@gmail.com"
-    }
-  },
   "action": {
     "default_icon": "icon.png"
   },
   "background": {
       "service_worker": "background.js"
-  },
-  "web_accessible_resources": [
-  {
-    "resources": ["*"],
-    "matches": ["<all_urls>"]
   }
-]
 }

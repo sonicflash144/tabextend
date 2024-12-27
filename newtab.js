@@ -186,7 +186,7 @@ function saveTab(tabId) {
             const newTab = {
                 title: tab.title,
                 url: tab.url,
-                favIconUrl: tab.favIconUrl || '',
+                favIconUrl: tab.favIconUrl || getFaviconUrl(tab.url),
                 id: numericId,
                 color: '#FFFFFF'
             };
@@ -427,7 +427,7 @@ function openAllInColumn(column, subgroup = null) {
             }
         });
     }
-    if(userBrowser === 'firefox'){
+    if(userBrowser !== 'chrome'){
         urls.forEach(url => {
             browser.tabs.create({ url, active: false });
         });   
@@ -559,10 +559,6 @@ function handleDragStart(event) {
     closeAllMenus();
     const tabItem = event.target.closest('.tab-item');
     if(!tabItem) return;
-    event.dataTransfer.setData("text/plain", tabItem.id);
-    event.dataTransfer.setDragImage(tabItem, 0, 0);
-    dropType = "list-item";
-
     const draggedItems = document.querySelectorAll('.selected');
     const isDraggedItemSelected = tabItem.classList.contains('selected');
     
@@ -574,6 +570,10 @@ function handleDragStart(event) {
         draggedItems.forEach(item => item.classList.remove('selected'));
         tabItem.classList.add('dragging');
     }
+
+    event.dataTransfer.setData("text/plain", tabItem.id);
+    event.dataTransfer.setDragImage(tabItem, 0, 0);
+    dropType = "list-item";
 }
 function calculateDropPosition(event, tabItems, isMinimized = false) {
     if(isMinimized){
@@ -1145,7 +1145,7 @@ function handleDrop(event) {
                             const newTab = {
                                 title: tab.title,
                                 url: tab.url,
-                                favIconUrl: tab.favIconUrl || '',
+                                favIconUrl: tab.favIconUrl || getFaviconUrl(tab.url),
                                 id: numericId,
                                 color: '#FFFFFF'
                             };
@@ -1270,6 +1270,15 @@ function handleDragEnd(event) {
 }
 
 /* Display Helper Functions */
+function getFaviconUrl(tabUrl) {
+    try {
+        const url = new URL(tabUrl);
+        return `${url.origin}/favicon.ico`;
+    } catch (error) {
+        console.error("Invalid URL:", tabUrl, error);
+        return '';
+    }
+}
 function toggleSubgroupExpandedState(expandButton) {
     const isExpanded = expandButton.classList.toggle('expanded');
     const faviconsContainer = expandButton.closest('.tab-group-container').querySelector('.favicons-container');
@@ -1345,7 +1354,7 @@ function createTabItem(tab){
     li.innerHTML += `
         <div class="tab-info-container">
             <div class="tab-info-left">
-                <img src="${tab.favIconUrl}">
+                <img src="${tab.favIconUrl}" draggable="false">
             </div>
             <div class="tab-info-right">
                 <span class="tab-title" data-url="${tab.url}" id="title-display-${tab.id}">${tab.title}</span>
@@ -1774,6 +1783,7 @@ function displaySavedTabs(tabs) {
                             favicon.id = `tab-${tab.id}`;
                             favicon.classList.add("subgroup-favicon");
                             favicon.dataset.url = tab.url;
+                            favicon.draggable = false;
                             
                             const title = document.createElement("div");
                             title.classList.add("favicon-title");
@@ -1911,7 +1921,7 @@ function fetchOpenTabs() {
             li.innerHTML += `
                 <div class="tab-info-container">
                     <div class="tab-info-left">
-                        <img src="${tab.favIconUrl}">
+                        <img src="${tab.favIconUrl || getFaviconUrl(tab.url)}">
                     </div>
                     <div class="tab-info-right">
                         <span class="tab-title">${tab.title}</span>

@@ -18,13 +18,22 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
+function getFaviconUrl(tabUrl) {
+  try {
+      const url = new URL(tabUrl);
+      return `${url.origin}/favicon.ico`;
+  } catch (error) {
+      console.error("Invalid URL:", tabUrl, error);
+      return '';
+  }
+}
 // Function to save the selected tab
 function saveSelectedTab(tabId, selectionText) {
   browser.tabs.get(tabId, (tab) => {
       const tabToSave = {
           title: tab.title,
           url: tab.url,
-          favIconUrl: tab.favIconUrl || '',
+          favIconUrl: tab.favIconUrl || getFaviconUrl(tab.url),
           id: tab.id,
           color: '#FFFFFF',
           note: selectionText || null

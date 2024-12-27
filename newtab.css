@@ -234,6 +234,7 @@ h2 {
     width: 100%;
     box-sizing: border-box;
     user-select: none;
+    -webkit-user-select: none;
 }
     .tab-item.subgroup-item {
         background-color: var(--subgroup-bg-color);
@@ -394,6 +395,8 @@ h2 {
     list-style-type: none;
     overflow-y: auto;
     overflow-x: hidden;
+    user-select: none;
+    -webkit-user-select: none;
 }
     .column:not(.dragging) {
         transition: all 0.3s ease;
@@ -433,6 +436,7 @@ h2 {
     .column-title-text {
         display: inline;
         user-select: none;
+        -webkit-user-select: none;
         overflow: hidden;
         white-space: nowrap;
         text-overflow: ellipsis;
