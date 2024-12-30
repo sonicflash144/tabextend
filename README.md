@@ -1,4 +1,6 @@
-<img src="logo.png" alt="Tabs Magic Logo" width="200" />
+<div align="center">
+    <img src="logo.png" alt="Tabs Magic Logo" width="200"/>
+</div>
 
 # Tabs Magic
 
