@@ -2,7 +2,7 @@ chrome.runtime.onInstalled.addListener(() => {
   // Create a context menu item for saving the selected tab
   chrome.contextMenus.create({
       id: "saveTab",
-      title: "Save to Tab Manager",
+      title: "Save to Tabs Magic",
       contexts: ["page", "selection"]
   });
 });
