@@ -2,6 +2,8 @@
 
 Tabs Magic is a browser extension designed to help you organize and manage your tabs through a visual, drag-and-drop interface. It allows you to create collapsible columns and subgroups, personalize tabs with colors and custom names, and set reminders using natural language scheduling. 
 
+![Tabs Magic Screenshot](screenshot.png)
+
 ## Features
 
 - **Organize Without Limits**: Create collapsible columns and subgroups to keep your workspace tidy and navigate with ease.
@@ -14,7 +16,7 @@ Tabs Magic is a browser extension designed to help you organize and manage your 
 
 Tabs Magic is available for multiple browsers:
 
-- **Chrome and Other Chromium Browsers**: Available on the [Chrome Web Store](https://chromewebstore.google.com/detail/tabs-magic/epjcnbdchmflcppaajkbckidicdmpmnc) 
+- **Chrome and Other Chromium Browsers**: Available on the [Chrome Web Store](https://chromewebstore.google.com/detail/tabs-magic/epjcnbdchmflcppaajkbckidicdmpmnc). 
 
 - **Firefox**: Available on the [Firefox Add-ons site](https://addons.mozilla.org/en-US/firefox/addon/tabs-magic/).
 
@@ -30,7 +32,7 @@ Tabs Magic is available for multiple browsers:
 
 ## Contributing
 
-We welcome contributions from the community. To contribute:
+Contributions from the community are welcome. To contribute:
 
 1. **Fork the Repository**: Click the 'Fork' button at the top right of this page to create a copy of this repository under your GitHub account.
 
@@ -50,4 +52,4 @@ We welcome contributions from the community. To contribute:
 
 Tabs Magic was developed by Sage Wang. Special thanks to all users who have provided feedback and support.
 
-For more information, visit our [website](https://tabsmagic.com/).
+For more information, visit the [official website](https://tabsmagic.com/).
