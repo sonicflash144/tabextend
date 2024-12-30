@@ -1,8 +1,16 @@
+<img src="logo.png" alt="Tabs Magic Logo" width="200" />
+
 # Tabs Magic
 
-Tabs Magic is a browser extension designed to help you organize and manage your tabs through a visual, drag-and-drop interface. It allows you to create collapsible columns and subgroups, personalize tabs with colors and custom names, and set reminders using natural language scheduling. 
+Tabs Magic is a browser extension designed to help you organize and manage your tabs through a visual, drag-and-drop interface. It allows you to create collapsible columns and subgroups, personalize tabs with colors and custom names, and set reminders using natural language scheduling.
 
-![Tabs Magic Screenshot](screenshot.png)
+## Table of Contents
+
+1. [Features](#features)
+2. [Installation](#installation)
+3. [Usage](#usage)
+4. [Contributing](#contributing)
+5. [Acknowledgements](#acknowledgements)
 
 ## Features
 
@@ -11,6 +19,8 @@ Tabs Magic is a browser extension designed to help you organize and manage your 
 - **Personalization**: Customize your tabs with color coding, custom names, and natural language scheduling for due dates.
 
 - **User-Friendly Interface**: Enjoy a clean interface with intuitive drag-and-drop functionality and bulk actions for multi-select, making tab management effortless.
+
+![Tabs Magic Screenshot](screenshot.png)
 
 ## Installation
 
