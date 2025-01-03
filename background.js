@@ -1,10 +1,46 @@
+const CHROME_STRING = 'chrome';
+const excludedPrefixes = [
+    `${CHROME_STRING}://`,
+    'edge://',
+    'opera://',
+    'vivaldi://',
+    'brave://',
+    'moz-extension://',
+    'about:',
+    'file://',
+    'safari-web-extension://'
+];
+
+function isValidUrl(url) {
+    return !excludedPrefixes.some(prefix => url.toLowerCase().startsWith(prefix));
+}
+
 chrome.runtime.onInstalled.addListener(() => {
-  // Create a context menu item for saving the selected tab
-  chrome.contextMenus.create({
-      id: "saveTab",
-      title: "Save to Tabs Magic",
-      contexts: ["page", "selection"]
-  });
+    chrome.contextMenus.create({
+        id: "saveTab",
+        title: "Save to Tabs Magic",
+        contexts: ["page", "selection"],
+        visible: false // Start hidden
+    });
+});
+
+// Update context menu visibility when tabs are updated
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (tab.url) {
+        chrome.contextMenus.update("saveTab", {
+            visible: isValidUrl(tab.url)
+        });
+    }
+});
+
+chrome.tabs.onActivated.addListener(({tabId}) => {
+    chrome.tabs.get(tabId, (tab) => {
+        if (tab.url) {
+            chrome.contextMenus.update("saveTab", {
+                visible: isValidUrl(tab.url)
+            });
+        }
+    });
 });
 
 chrome.action.onClicked.addListener((tab) => {
