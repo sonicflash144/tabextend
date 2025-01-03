@@ -161,6 +161,8 @@ h2 {
     width: 75%;
     padding: 20px;
     flex-grow: 1;
+    user-select: none;
+    -webkit-user-select: none;
 }
     #main-content.expanded {
         width: 100%;
@@ -196,6 +198,8 @@ h2 {
     -webkit-line-clamp: 6;
     line-clamp: 6;
     -webkit-box-orient: vertical;
+    user-select: none;
+    -webkit-user-select: none;
 }
     .note-display.hidden {
         display: none;
