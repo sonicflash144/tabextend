@@ -1908,6 +1908,13 @@ function fetchOpenTabs() {
             (!excludedPrefixes.some(prefix => tab.url.startsWith(prefix))) && 
             tab.url !== ""
         );
+        const sidebar = document.getElementById('sidebar');
+        const isCollapsed = sidebar.classList.contains('collapsed');
+        const classes = ['tab-item'];
+        if (isCollapsed) {
+            classes.push('collapsed');
+        }
+
         const openTabsList = document.getElementById("open-tabs-list");
         openTabsList.addEventListener('dragover', handleDragOver);
         openTabsList.addEventListener('drop', handleDrop);
@@ -1915,7 +1922,9 @@ function fetchOpenTabs() {
 
         tabs.forEach((tab, index) => {
             const li = createDraggableListItem({
-                id: `opentab-${tab.id}`
+                id: `opentab-${tab.id}`,
+                isSubgroup: false,
+                classes: classes
             });
 
             li.innerHTML += `
@@ -2060,11 +2069,17 @@ browser.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
 document.querySelector('.minimize-sidebar').addEventListener('click', () => {
     browser.storage.local.set({ sidebarCollapsed: true }, () => {
         //console.log("Sidebar collapsed state saved");
+        document.querySelectorAll('#open-tabs-list .tab-item').forEach(tab => {
+            tab.classList.add('collapsed');
+        });
     });
 });
 document.querySelector('.maximize-sidebar').addEventListener('click', () => {
     browser.storage.local.set({ sidebarCollapsed: false }, () => {
         //console.log("Sidebar expanded state saved");
+        document.querySelectorAll('#open-tabs-list .tab-item').forEach(tab => {
+            tab.classList.remove('collapsed');
+        });
     });
 });
 

@@ -150,6 +150,7 @@ h2 {
     #sidebar.collapsed {
         min-width: 80px;
         width: 80px;
+        padding-right: 0px;
         overflow: hidden;
     }
     #sidebar.no-transition {
@@ -236,6 +237,9 @@ h2 {
     user-select: none;
     -webkit-user-select: none;
 }
+    .tab-item.collapsed {
+        max-width: 48px;
+    }
     .tab-item.subgroup-item {
         background-color: var(--subgroup-bg-color);
         padding: 4px 10px;
