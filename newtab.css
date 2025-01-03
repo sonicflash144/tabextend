@@ -196,6 +196,8 @@ h2 {
     -webkit-line-clamp: 6;
     line-clamp: 6;
     -webkit-box-orient: vertical;
+    user-select: none;
+    -webkit-user-select: none;
 }
     .note-display.hidden {
         display: none;

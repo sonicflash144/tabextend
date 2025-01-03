@@ -1273,9 +1273,9 @@ function handleDragEnd(event) {
 function getFaviconUrl(tabUrl) {
     try {
         const url = new URL(tabUrl);
-        return `${url.origin}/favicon.ico`;
+        return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`;
     } catch (error) {
-        console.error("Invalid URL:", tabUrl, error);
+        console.error("Invalid favicon URL:", tabUrl, error);
         return '';
     }
 }
