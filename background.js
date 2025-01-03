@@ -54,13 +54,22 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
+function getFaviconUrl(tabUrl) {
+  try {
+      const url = new URL(tabUrl);
+      return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`;
+  } catch (error) {
+      console.error("Invalid favicon URL:", tabUrl, error);
+      return '';
+  }
+}
 // Function to save the selected tab
 function saveSelectedTab(tabId, selectionText) {
   chrome.tabs.get(tabId, (tab) => {
       const tabToSave = {
           title: tab.title,
           url: tab.url,
-          favIconUrl: tab.favIconUrl || '',
+          favIconUrl: tab.favIconUrl || getFaviconUrl(tab.url),
           id: tab.id,
           color: '#FFFFFF',
           note: selectionText || null
