@@ -1183,6 +1183,8 @@ function handleDrop(event) {
     }
 
     let earlyExit = false;
+    const sidebar = document.getElementById('sidebar');
+    const isCollapsed = sidebar.classList.contains('collapsed');
     itemsToProcess.forEach(item => {
         const columnId = column.id;
         let itemId = item.id;
@@ -1195,6 +1197,9 @@ function handleDrop(event) {
         else if (columnId === 'open-tabs-list' && itemId.startsWith('tab')) {
             browser.tabs.create({ url: item.dataset.url, active: false });
             tabIdsToDelete.push(parseInt(itemId.replace('tab-', '')));
+            if(isCollapsed){
+                item.classList.add('collapsed');
+            }
         }
         else if (columnId === 'open-tabs-list' && itemId.startsWith('group')) {
             const column = columnState.find(col => 

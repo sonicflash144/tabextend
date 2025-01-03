@@ -161,6 +161,8 @@ h2 {
     width: 75%;
     padding: 20px;
     flex-grow: 1;
+    user-select: none;
+    -webkit-user-select: none;
 }
     #main-content.expanded {
         width: 100%;
