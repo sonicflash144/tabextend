@@ -150,7 +150,7 @@ h2 {
     #sidebar.collapsed {
         min-width: 80px;
         width: 80px;
-        padding-right: 0px;
+        padding-right: 4px;
         overflow: hidden;
     }
     #sidebar.no-transition {
