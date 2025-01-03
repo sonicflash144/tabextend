@@ -85,9 +85,6 @@ function createDeletionArea() {
     deleteIcon.alt = 'Delete Icon';
     deleteIcon.classList.add('delete-icon');
     deletionArea.appendChild(deleteIcon);
-
-    //deletionArea.addEventListener('dragover', handleDragOver);
-    //deletionArea.addEventListener('drop', handleDrop);
     deletionArea.addEventListener('dragleave', function(event) {
         if (!deletionArea.contains(event.relatedTarget)) {
             deletionArea.classList.remove('deletion-area-active');
@@ -359,15 +356,23 @@ function parseAndSaveDate(note) {
     const remainingNote = parsedDate ? note.replace(detectedDateText, '').trim() : note;
     return { parsedDate, remainingNote, detectedDateText };
 }
-function removeDate(tab, dateDisplay) {
-    tab.parsedDate = null;
+function removeDate(tabIds, dateDisplay) {
+    if (!Array.isArray(tabIds)) tabIds = [tabIds];
+    tabIds.forEach(tabId => {
+        const tab = tabs_in_storage.find(t => t.id === tabId);
+        if (tab) {
+            tab.parsedDate = null;
+        }
+    });
     dateDisplay.textContent = '';
     dateDisplay.classList.add('hidden');
     chrome.storage.local.set({ savedTabs: tabs_in_storage }, () => {
-        console.log('Tab date removed:', tab.id);
+        console.log('Tab dates removed:', tabIds);
     });
 }
-function openColorMenu(tab, moreOptionsButton) {
+function openColorMenu(tabIds, moreOptionsButton) {
+    if (!Array.isArray(tabIds)) tabIds = [tabIds];
+    console.log(tabIds);
     if (activeColorMenu) {
         activeColorMenu.remove();
         activeColorMenu = null;
@@ -380,9 +385,14 @@ function openColorMenu(tab, moreOptionsButton) {
         const colorOption = document.createElement('div');
         colorOption.classList.add('color-option', color);
         colorOption.addEventListener('click', () => {
-            tab.color = color;
+            tabIds.forEach(tabId => {
+                const tab = tabs_in_storage.find(t => t.id === tabId);
+                if (tab) {
+                    tab.color = color;
+                }
+            });
             chrome.storage.local.set({ savedTabs: tabs_in_storage }, () => {
-                //console.log('Tab color saved:', tab.id, tab.color);
+                console.log('Tab colors saved:', tabIds);
             });
             closeAllMenus();
         });
@@ -395,7 +405,6 @@ function openColorMenu(tab, moreOptionsButton) {
     colorMenu.style.right = `${window.innerWidth - rect.right}px`;
     activeColorMenu = colorMenu;
 }
-
 /* Column Menu Actions */
 function deleteColumn(event) {
     closeAllMenus();
@@ -1418,11 +1427,16 @@ function createTabItem(tab){
     const moreOptionsButton = li.querySelector('.more-options');
     moreOptionsButton.addEventListener('click', (event) => {
         event.stopPropagation();
-
+    
         const selectedItems = document.querySelectorAll('.selected');
-        selectedItems.forEach(item => {
-            item.classList.remove('selected');
-        });
+        const isCurrentTabSelected = li.classList.contains('selected');
+        
+        // Only clear selection if clicking an unselected tab's menu
+        if (!isCurrentTabSelected) {
+            selectedItems.forEach(item => {
+                item.classList.remove('selected');
+            });
+        }
     
         if (activeOptionsMenu && activeOptionsMenu.dataset.tabId === tab.id.toString()) {
             closeAllMenus();
@@ -1430,16 +1444,33 @@ function createTabItem(tab){
         }
         closeAllMenus();
     
-        const noteButtonText = tab.note && tab.note.trim() !== '' ? 'Edit Note' : 'Add Note';
-        const menuItems = [
-            { text: "Rename", action: () => { renameTab(tab, li); closeAllMenus() } },            
-            { text: noteButtonText, action: () => { editTabNote(tab, li); closeAllMenus() } },
-            { text: "Clear Date", action: () => { removeDate(tab, dateDisplay); closeAllMenus() }, hidden: !formattedDate },
-            { text: "Color", action: () => openColorMenu(tab, moreOptionsButton) },
-            { text: "Delete", action: () => deleteTab(tab.id, null, li) }
-        ];
+        // Show limited menu for multi-selection
+        if (selectedItems.length > 1 && isCurrentTabSelected) {
+            const selectedTabIds = Array.from(selectedItems).map(item => parseInt(item.id.split('-')[1]));
+            const hasDate = selectedTabIds.some(tabId => {
+                const tab = tabs_in_storage.find(t => t.id === tabId);
+                return tab && tab.parsedDate;
+            });
+        
+            const menuItems = [
+                { text: "Clear Date", action: () => { removeDate(selectedTabIds, dateDisplay); closeAllMenus() }, hidden: !hasDate },
+                { text: "Color", action: () => openColorMenu(selectedTabIds, moreOptionsButton) },
+                { text: "Delete", action: () => deleteTab(selectedTabIds) }
+            ];
+            activeOptionsMenu = createMenuDropdown(menuItems, moreOptionsButton);
+        } else {
+            // Show full menu for single item
+            const noteButtonText = tab.note && tab.note.trim() !== '' ? 'Edit Note' : 'Add Note';
+            const menuItems = [
+                { text: "Rename", action: () => { renameTab(tab, li); closeAllMenus() } },            
+                { text: noteButtonText, action: () => { editTabNote(tab, li); closeAllMenus() } },
+                { text: "Clear Date", action: () => { removeDate(tab.id, dateDisplay); closeAllMenus() }, hidden: !formattedDate },
+                { text: "Color", action: () => openColorMenu(tab.id, moreOptionsButton) },
+                { text: "Delete", action: () => deleteTab(tab.id, null, li) }
+            ];
+            activeOptionsMenu = createMenuDropdown(menuItems, moreOptionsButton);
+        }
     
-        activeOptionsMenu = createMenuDropdown(menuItems, moreOptionsButton);
         activeOptionsMenu.dataset.tabId = tab.id.toString();
     });
     
@@ -1715,7 +1746,8 @@ function handleFaviconClick(li, event) {
     event.stopPropagation();
     closeAllMenus();
     const draggedItems = document.querySelectorAll('.selected');
-    const allItems = Array.from(document.querySelectorAll('li'));
+    const allItems = Array.from(document.querySelectorAll('li:not(.subgroup-item)')).filter(item => item.offsetParent !== null);
+    console.log('All items:', allItems);
     const currentIndex = allItems.indexOf(li);
 
     if (event.ctrlKey || event.metaKey) {
@@ -1745,9 +1777,6 @@ function handleFaviconClick(li, event) {
 /* Tab Display */
 function displaySavedTabs(tabs) {
     const columnsContainer = document.getElementById("columns-container");
-    const mainContent = document.getElementById("main-content");
-    //mainContent.addEventListener('dragover', handleDragOver);
-    //mainContent.addEventListener('drop', handleDrop);
     columnsContainer.innerHTML = "";
 
     chrome.storage.local.get('columnState', (result) => {
@@ -1944,8 +1973,6 @@ function fetchOpenTabs() {
         }
 
         const openTabsList = document.getElementById("open-tabs-list");
-        //openTabsList.addEventListener('dragover', handleDragOver);
-        //openTabsList.addEventListener('drop', handleDrop);
         openTabsList.innerHTML = "";
 
         tabs.forEach((tab, index) => {
