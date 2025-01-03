@@ -35,6 +35,7 @@ const scrollAnimation = {
     scrollY: 0,
     animationFrameId: null
 };
+const CHROME_STRING = 'chrome';
 const settingsButton = document.querySelector('.settings-button');
 const columnsContainer = document.getElementById('columns-container');
 const colorOptions = ['tab-default', 'tab-pink', 'tab-yellow', 'tab-blue', 'tab-purple'];
@@ -85,8 +86,8 @@ function createDeletionArea() {
     deleteIcon.classList.add('delete-icon');
     deletionArea.appendChild(deleteIcon);
 
-    deletionArea.addEventListener('dragover', handleDragOver);
-    deletionArea.addEventListener('drop', handleDrop);
+    //deletionArea.addEventListener('dragover', handleDragOver);
+    //deletionArea.addEventListener('drop', handleDrop);
     deletionArea.addEventListener('dragleave', function(event) {
         if (!deletionArea.contains(event.relatedTarget)) {
             deletionArea.classList.remove('deletion-area-active');
@@ -109,7 +110,7 @@ function getBrowser() {
         return 'firefox';
     }
     else {
-        return 'chrome';
+        return CHROME_STRING;
     }
 }
 const userBrowser = getBrowser();
@@ -183,7 +184,7 @@ function saveTab(tabId) {
             const newTab = {
                 title: tab.title,
                 url: tab.url,
-                favIconUrl: tab.favIconUrl || '',
+                favIconUrl: tab.favIconUrl || getFaviconUrl(tab.url),
                 id: numericId,
                 color: '#FFFFFF'
             };
@@ -406,7 +407,7 @@ function deleteColumn(event) {
     const tabIds = Array.from(tabItems).map(tabItem => tabItem.id);
     deleteTab(tabIds.map(id => parseInt(id.replace('tab-', ''))), column);
 }
-function openAllInColumn(column, subgroup = null) {
+function openAllInColumn(column, subgroup = null, dropPosition = null) {
     closeAllMenus();
     let urls;
     if (subgroup) {
@@ -424,16 +425,24 @@ function openAllInColumn(column, subgroup = null) {
             }
         });
     }
-    if(userBrowser === 'firefox'){
-        urls.forEach(url => {
-            browser.tabs.create({ url, active: false });
+    if(userBrowser !== CHROME_STRING){
+        urls.forEach((url, i) => {
+            const createProperties = { url: url, active: false };
+            if (dropPosition !== null) {
+                createProperties.index = dropPosition + i;
+            }
+            browser.tabs.create(createProperties);
         });   
     }
     else{
         // Open all tabs
-        const createTabs = urls.map(url => 
+        const createTabs = urls.map((url, i) => 
             new Promise(resolve => {
-                chrome.tabs.create({ url: url, active: false }, resolve);
+                const createProperties = { url: url, active: false };
+                if (dropPosition !== null) {
+                    createProperties.index = dropPosition + i;
+                }
+                chrome.tabs.create(createProperties, resolve);
             })
         );
         // After all tabs are created, group them
@@ -692,12 +701,15 @@ function handleDragOver(event) {
     }
     
     const column = event.target.closest('.column');
-    const openTabsList = event.target.closest('#open-tabs-list');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarRect = sidebar.getBoundingClientRect();
+    const sidebarCheck = event.target.closest('#sidebar');
+    const openTabsList = document.getElementById('open-tabs-list');
     const spaceContainer = document.getElementById('space-container');
     const spaceContainerRect = spaceContainer.getBoundingClientRect();
     const spaceContainerLeft = spaceContainerRect.left;
     const spaceContainerRight = spaceContainerRect.right;
-    const containerScrollTop = openTabsList ? sidebar.scrollTop : columnsContainer.scrollTop;
+    const containerScrollTop = sidebarCheck ? sidebar.scrollTop : columnsContainer.scrollTop;
 
     if (!dropIndicator) {
         dropIndicator = document.createElement('div');
@@ -711,10 +723,15 @@ function handleDragOver(event) {
     /* List Item Drag Over */
     if (dropType === "list-item") {
         newColumnIndicator.style.display = 'flex';
-        const sidebar = document.getElementById('sidebar');
-        const sidebarRect = sidebar.getBoundingClientRect();
-        const element = openTabsList || column;
-        if(!element){
+        let element;
+        if(sidebarCheck){
+            element = openTabsList;
+        }
+        else if(column){
+            element = column;
+        }
+        else{
+            dropIndicator.style.display = 'none';
             return;
         }
         const rect = element.getBoundingClientRect();
@@ -727,7 +744,7 @@ function handleDragOver(event) {
 
         let indicatorLeft = rect.left;
         let width = rect.width;
-        if(openTabsList){
+        if(sidebarCheck){
             indicatorLeft = sidebarRect.left;
             width = sidebarRect.width;
         }
@@ -877,7 +894,7 @@ function handleDragOver(event) {
 function handleDrop(event) {
     event.preventDefault();
     const eventDropData = event.dataTransfer.getData("text/plain");
-
+    
     /* Column Drop */
     const droppedColumn = document.getElementById(eventDropData);
     if (droppedColumn && droppedColumn.classList.contains('column')) {
@@ -904,12 +921,22 @@ function handleDrop(event) {
     }
 
     /* List Item Drop */
-    const column = event.target.closest('.column') || event.target.closest('#open-tabs-list');
-    const columnState = saveColumnState(true);
-    const isMinimized = column && column.classList.contains('minimized');
-    if (!column && !deletionArea.contains(event.target) && !newColumnIndicator.contains(event.target)) {
+    const columnCheck = event.target.closest('.column');
+    const sidebarCheck = event.target.closest('#sidebar');
+    let column;
+    if(columnCheck){
+        column = columnCheck;
+    }
+    else if(sidebarCheck){
+        column = document.getElementById('open-tabs-list');
+    }
+    else if(!deletionArea.contains(event.target) && !newColumnIndicator.contains(event.target)){
+        console.log('No column found');
         return;
     }
+    const columnState = saveColumnState(true);
+    const isMinimized = column && column.classList.contains('minimized');
+
     const tabId = eventDropData;
     const tabItem = document.querySelector(`li#${tabId}`);
     if (!tabItem || !tabItem.classList.contains('tab-item')){
@@ -1142,7 +1169,7 @@ function handleDrop(event) {
                             const newTab = {
                                 title: tab.title,
                                 url: tab.url,
-                                favIconUrl: tab.favIconUrl || '',
+                                favIconUrl: tab.favIconUrl || getFaviconUrl(tab.url),
                                 id: numericId,
                                 color: '#FFFFFF'
                             };
@@ -1192,7 +1219,7 @@ function handleDrop(event) {
             itemIdsToSave.push(itemId);
         }
         else if (columnId === 'open-tabs-list' && itemId.startsWith('tab')) {
-            chrome.tabs.create({ url: item.dataset.url, active: false });
+            chrome.tabs.create({ url: item.dataset.url, active: false, index: dropPosition });
             tabIdsToDelete.push(parseInt(itemId.replace('tab-', '')));
             if(isCollapsed){
                 item.classList.add('collapsed');
@@ -1208,7 +1235,7 @@ function handleDrop(event) {
                 const subgroup = column.tabIds.find(id => Array.isArray(id) && id[0] === itemId);
         
                 if (subgroup) {
-                    openAllInColumn(columnElement, subgroup);
+                    openAllInColumn(columnElement, subgroup, dropPosition);
                     deleteSubgroup(itemId);
                     earlyExit = true;
                     return;
@@ -1272,6 +1299,15 @@ function handleDragEnd(event) {
 }
 
 /* Display Helper Functions */
+function getFaviconUrl(tabUrl) {
+    try {
+        const url = new URL(tabUrl);
+        return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`;
+    } catch (error) {
+        console.error("Invalid favicon URL:", tabUrl, error);
+        return '';
+    }
+}
 function toggleSubgroupExpandedState(expandButton) {
     const isExpanded = expandButton.classList.toggle('expanded');
     const faviconsContainer = expandButton.closest('.tab-group-container').querySelector('.favicons-container');
@@ -1347,7 +1383,7 @@ function createTabItem(tab){
     li.innerHTML += `
         <div class="tab-info-container">
             <div class="tab-info-left">
-                <img src="${tab.favIconUrl}">
+                <img src="${tab.favIconUrl}" draggable="false">
             </div>
             <div class="tab-info-right">
                 <span class="tab-title" data-url="${tab.url}" id="title-display-${tab.id}">${tab.title}</span>
@@ -1710,8 +1746,8 @@ function handleFaviconClick(li, event) {
 function displaySavedTabs(tabs) {
     const columnsContainer = document.getElementById("columns-container");
     const mainContent = document.getElementById("main-content");
-    mainContent.addEventListener('dragover', handleDragOver);
-    mainContent.addEventListener('drop', handleDrop);
+    //mainContent.addEventListener('dragover', handleDragOver);
+    //mainContent.addEventListener('drop', handleDrop);
     columnsContainer.innerHTML = "";
 
     chrome.storage.local.get('columnState', (result) => {
@@ -1776,6 +1812,7 @@ function displaySavedTabs(tabs) {
                             favicon.id = `tab-${tab.id}`;
                             favicon.classList.add("subgroup-favicon");
                             favicon.dataset.url = tab.url;
+                            favicon.draggable = false;
                             
                             const title = document.createElement("div");
                             title.classList.add("favicon-title");
@@ -1886,17 +1923,18 @@ function displaySavedTabs(tabs) {
 function fetchOpenTabs() {
     chrome.tabs.query({ currentWindow: true }, (tabs) => {
         const excludedPrefixes = [
-            'chrome://',
+            `${CHROME_STRING}://`,
             'edge://',
             'opera://',
             'vivaldi://',
             'brave://',
             'moz-extension://',
             'about:',
-            'file://'
+            'file://',
+            'safari-web-extension://'
         ];      
         tabs = tabs.filter(tab => 
-            !excludedPrefixes.some(prefix => tab.url.startsWith(prefix))
+            (!excludedPrefixes.some(prefix => tab.url.startsWith(prefix))) && tab.url !== ""
         );
         const sidebar = document.getElementById('sidebar');
         const isCollapsed = sidebar.classList.contains('collapsed');
@@ -1906,8 +1944,8 @@ function fetchOpenTabs() {
         }
 
         const openTabsList = document.getElementById("open-tabs-list");
-        openTabsList.addEventListener('dragover', handleDragOver);
-        openTabsList.addEventListener('drop', handleDrop);
+        //openTabsList.addEventListener('dragover', handleDragOver);
+        //openTabsList.addEventListener('drop', handleDrop);
         openTabsList.innerHTML = "";
 
         tabs.forEach((tab, index) => {
@@ -1920,7 +1958,7 @@ function fetchOpenTabs() {
             li.innerHTML += `
                 <div class="tab-info-container">
                     <div class="tab-info-left">
-                        <img src="${tab.favIconUrl}">
+                        <img src="${tab.favIconUrl || getFaviconUrl(tab.url)}">
                     </div>
                     <div class="tab-info-right">
                         <span class="tab-title">${tab.title}</span>
@@ -2097,6 +2135,8 @@ const handleClickOutside = (e) => {
     }
 };
 document.addEventListener('click', handleClickOutside);
+document.addEventListener('drop', handleDrop);
+document.addEventListener('dragover', handleDragOver);
 
 chrome.storage.local.get(['release', 'whatsNewClicked'], (data) => {
     const release = chrome.runtime.getManifest().version;
