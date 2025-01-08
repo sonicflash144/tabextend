@@ -2199,12 +2199,12 @@ browser.storage.local.get(['release', 'whatsNewClicked'], (data) => {
                 if (releaseNotesNotification) {
                     releaseNotesNotification.remove();
                 }
-                window.open('https://tabsmagic.com/releasenotes', '_blank');
+                browser.tabs.create({ url: 'https://tabsmagic.com/releasenotes', active: true });
                 closeAllMenus();
                 whatsNewClicked = true;
                 browser.storage.local.set({ whatsNewClicked: true });
             }},
-            { text: "Feedback", action: () => { window.open('https://tabsmagic.com/contact', '_blank'); closeAllMenus() } },
+            { text: "Feedback", action: () => { browser.tabs.create({ url: 'https://tabsmagic.com/contact', active: true }); closeAllMenus() } },
         ];
         activeSettingsMenu = createMenuDropdown(menuItems, settingsButton);
 
