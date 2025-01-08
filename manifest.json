@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tabs Magic",
-  "version": "1.0.17.1",
+  "version": "1.0.17.5",
   "description": "Save and manage your tabs into visual columns.",
   "permissions": ["tabs", "storage", "activeTab", "contextMenus"],
   "icons": {
