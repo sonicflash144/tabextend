@@ -2199,7 +2199,7 @@ browser.storage.local.get(['release', 'whatsNewClicked'], (data) => {
                 if (releaseNotesNotification) {
                     releaseNotesNotification.remove();
                 }
-                window.open('https://tabsmagic.com/releasenotes', '_blank');
+                browser.tabs.create({ url: 'https://tabsmagic.com/releasenotes', active: true });
                 closeAllMenus();
                 whatsNewClicked = true;
                 browser.storage.local.set({ whatsNewClicked: true });
