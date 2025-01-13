@@ -106,6 +106,9 @@ function getBrowser() {
     if (userAgent.indexOf('firefox') > -1) {
         return 'firefox';
     }
+    else if (userAgent.indexOf('safari') > -1) {
+        return 'safari';
+    }
     else {
         return CHROME_STRING;
     }
@@ -2039,8 +2042,7 @@ browser.tabs.onRemoved.addListener(() => {
     }
 });
 browser.tabs.onMoved.addListener(fetchOpenTabs);
-browser.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== 'local') return;
+browser.storage.onChanged.addListener(changes => {
     if (changes.savedTabs || changes.columnState) {
         console.log("Changes detected", changes);
         if(changes.savedTabs){
