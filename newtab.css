@@ -375,6 +375,7 @@ h2 {
     display: flex;
     justify-content: flex-start;
     width: 100%;
+    height: calc(100vh - 120px);
     max-width: 100%;
     overflow: hidden;
     box-sizing: border-box;
@@ -396,7 +397,6 @@ h2 {
     padding: 10px;
     min-width: 240px;
     width: 20vw;
-    height: calc(100vh - 152px);
     background-color: var(--column-bg-color);
     flex-shrink: 0;
     margin-right: 10px;
@@ -414,7 +414,6 @@ h2 {
         border-radius: 5px;
         min-width: 240px;
         width: 20vw;
-        height: calc(100vh - 152px);
         flex-shrink: 0;
         display: none;
         justify-content: center;
