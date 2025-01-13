@@ -102,16 +102,20 @@ function closeAllMenus() {
     activeOptionsMenu = activeColorMenu = activeColumnMenu = activeSettingsMenu = null;
 }
 function getBrowser() {
-    const userAgent = navigator.userAgent.toLowerCase();
-    if (userAgent.indexOf('firefox') > -1) {
-        return 'firefox';
+    let userAgent = navigator.userAgent.toLowerCase();
+    if(userAgent.indexOf(CHROME_STRING) > -1){
+        userAgent = CHROME_STRING;
+    }
+    else if (userAgent.indexOf('firefox') > -1) {
+        userAgent = 'firefox';
     }
     else if (userAgent.indexOf('safari') > -1) {
-        return 'safari';
+        userAgent = 'safari';
     }
     else {
-        return CHROME_STRING;
+        userAgent = CHROME_STRING;
     }
+    return userAgent;
 }
 const userBrowser = getBrowser();
 
