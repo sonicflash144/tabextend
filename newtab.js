@@ -1402,7 +1402,7 @@ function createTabItem(tab){
                 <img src="${tab.favIconUrl}" draggable="false">
             </div>
             <div class="tab-info-right">
-                <span class="tab-title" data-url="${tab.url}" id="title-display-${tab.id}">${tab.title}</span>
+                <a href="${tab.url}" class="tab-title" id="title-display-${tab.id}" style="color: black; text-decoration: none;">${tab.title}</a>
                 <input type="text" class="hidden" id="title-input-${tab.id}" value="${tab.title}">
                 <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note ? tab.note.replace(/\\/g, '').replace(/\n/g, '<br>') : ''}</div>
                 <textarea class="tab-note hidden" id="note-input-${tab.id}">${tab.note ? tab.note.replace(/<br>/g, '\n') : ''}</textarea>
@@ -1426,11 +1426,6 @@ function createTabItem(tab){
     const favicon = li.querySelector(".tab-info-left");
     favicon.addEventListener("click", (event) => handleFaviconClick(li, event));
 
-    const tabLink = li.querySelector('.tab-title');
-    tabLink.addEventListener('click', () => {
-        window.location.href = tabLink.dataset.url;
-    });
-    
     const moreOptionsButton = li.querySelector('.more-options');
     moreOptionsButton.addEventListener('click', (event) => {
         event.stopPropagation();
@@ -1754,7 +1749,6 @@ function handleFaviconClick(li, event) {
     closeAllMenus();
     const draggedItems = document.querySelectorAll('.selected');
     const allItems = Array.from(document.querySelectorAll('li:not(.subgroup-item)')).filter(item => item.offsetParent !== null);
-    console.log('All items:', allItems);
     const currentIndex = allItems.indexOf(li);
 
     if (event.ctrlKey || event.metaKey) {
