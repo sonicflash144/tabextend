@@ -1829,8 +1829,11 @@ function displaySavedTabs(tabs) {
                     
                         const tab = tabs.find(t => `${t.id}` === subTabId.split('-')[1]);
                         if (tab) {
-                            const faviconWrapper = document.createElement("div");
+                            const faviconWrapper = document.createElement("a");
+                            faviconWrapper.href = tab.url;
                             faviconWrapper.classList.add("favicon-wrapper");
+                            faviconWrapper.style.textDecoration = "none";
+                            faviconWrapper.style.color = "black";
                             let colorClass = tab.color;
                             if (!colorOptions.includes(colorClass)) {
                                 colorClass = getColorClass(tab.color);
@@ -1851,9 +1854,6 @@ function displaySavedTabs(tabs) {
                 
                             faviconWrapper.appendChild(favicon);
                             faviconWrapper.appendChild(title);
-                            faviconWrapper.addEventListener("click", () => {
-                                window.location.href = tab.url;
-                            });
                             faviconsContainer.appendChild(faviconWrapper);
                         }
                     });
