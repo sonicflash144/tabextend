@@ -1402,7 +1402,7 @@ function createTabItem(tab){
                 <img src="${tab.favIconUrl}" draggable="false">
             </div>
             <div class="tab-info-right">
-                <span class="tab-title" data-url="${tab.url}" id="title-display-${tab.id}">${tab.title}</span>
+                <a href="${tab.url}" class="tab-title" id="title-display-${tab.id}" style="color: black; text-decoration: none;">${tab.title}</a>
                 <input type="text" class="hidden" id="title-input-${tab.id}" value="${tab.title}">
                 <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note ? tab.note.replace(/\\/g, '').replace(/\n/g, '<br>') : ''}</div>
                 <textarea class="tab-note hidden" id="note-input-${tab.id}">${tab.note ? tab.note.replace(/<br>/g, '\n') : ''}</textarea>
@@ -1425,11 +1425,6 @@ function createTabItem(tab){
 
     const favicon = li.querySelector(".tab-info-left");
     favicon.addEventListener("click", (event) => handleFaviconClick(li, event));
-
-    const tabLink = li.querySelector('.tab-title');
-    tabLink.addEventListener('click', () => {
-        window.location.href = tabLink.dataset.url;
-    });
     
     const moreOptionsButton = li.querySelector('.more-options');
     moreOptionsButton.addEventListener('click', (event) => {
@@ -1754,7 +1749,6 @@ function handleFaviconClick(li, event) {
     closeAllMenus();
     const draggedItems = document.querySelectorAll('.selected');
     const allItems = Array.from(document.querySelectorAll('li:not(.subgroup-item)')).filter(item => item.offsetParent !== null);
-    console.log('All items:', allItems);
     const currentIndex = allItems.indexOf(li);
 
     if (event.ctrlKey || event.metaKey) {
@@ -1835,8 +1829,11 @@ function displaySavedTabs(tabs) {
                     
                         const tab = tabs.find(t => `${t.id}` === subTabId.split('-')[1]);
                         if (tab) {
-                            const faviconWrapper = document.createElement("div");
+                            const faviconWrapper = document.createElement("a");
+                            faviconWrapper.href = tab.url;
                             faviconWrapper.classList.add("favicon-wrapper");
+                            faviconWrapper.style.textDecoration = "none";
+                            faviconWrapper.style.color = "black";
                             let colorClass = tab.color;
                             if (!colorOptions.includes(colorClass)) {
                                 colorClass = getColorClass(tab.color);
@@ -1857,9 +1854,6 @@ function displaySavedTabs(tabs) {
                 
                             faviconWrapper.appendChild(favicon);
                             faviconWrapper.appendChild(title);
-                            faviconWrapper.addEventListener("click", () => {
-                                window.location.href = tab.url;
-                            });
                             faviconsContainer.appendChild(faviconWrapper);
                         }
                     });
