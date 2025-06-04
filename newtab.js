@@ -1402,7 +1402,7 @@ function createTabItem(tab){
                 <img src="${tab.favIconUrl}" draggable="false">
             </div>
             <div class="tab-info-right">
-                <a href="${tab.url}" class="tab-title" id="title-display-${tab.id}" style="color: black; text-decoration: none;">${tab.title}</a>
+                <a href="${tab.url}" class="tab-title" id="title-display-${tab.id}" style="text-decoration: none;">${tab.title}</a>
                 <input type="text" class="hidden" id="title-input-${tab.id}" value="${tab.title}">
                 <div class="note-display fixed-width" id="note-display-${tab.id}">${tab.note ? tab.note.replace(/\\/g, '').replace(/\n/g, '<br>') : ''}</div>
                 <textarea class="tab-note hidden" id="note-input-${tab.id}">${tab.note ? tab.note.replace(/<br>/g, '\n') : ''}</textarea>
@@ -1833,7 +1833,6 @@ function displaySavedTabs(tabs) {
                             faviconWrapper.href = tab.url;
                             faviconWrapper.classList.add("favicon-wrapper");
                             faviconWrapper.style.textDecoration = "none";
-                            faviconWrapper.style.color = "black";
                             let colorClass = tab.color;
                             if (!colorOptions.includes(colorClass)) {
                                 colorClass = getColorClass(tab.color);
