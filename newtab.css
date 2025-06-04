@@ -44,6 +44,9 @@ h2 {
     text-align: center;
     font-size: 18px;
 }
+a {
+    color: var(--text-color);
+}
 .hidden {
     display: none;
 }
