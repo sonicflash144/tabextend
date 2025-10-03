@@ -2228,8 +2228,7 @@ function exportAllData() {
         try {
             const payload = {
                 exportedAt: new Date().toISOString(),
-                extensionVersion: browser.runtime.getManifest().version,
-                data: all
+                exportedData: all
             };
             const json = JSON.stringify(payload, null, 2);
 
@@ -2266,7 +2265,7 @@ function importAllData() {
             try {
                 const text = e.target.result;
                 const parsed = JSON.parse(text);
-                const data = parsed.data || parsed;
+                const data = parsed.exportedData || parsed;
 
                 if (!data || !Array.isArray(data.savedTabs) || !Array.isArray(data.columnState)) {
                     alert('Invalid export file: required keys missing.');
