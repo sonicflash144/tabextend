@@ -1425,7 +1425,7 @@ function createTabItem(tab){
 
     const favicon = li.querySelector(".tab-info-left");
     favicon.addEventListener("click", (event) => handleFaviconClick(li, event));
-    
+
     const moreOptionsButton = li.querySelector('.more-options');
     moreOptionsButton.addEventListener('click', (event) => {
         event.stopPropagation();
@@ -2194,6 +2194,8 @@ browser.storage.local.get(['release', 'whatsNewClicked'], (data) => {
 
         const menuItems = [
             { text: theme === 'dark' ? "Toggle Light Theme" : "Toggle Dark Theme", action: () => { toggleTheme(); closeAllMenus() } },
+            { text: "Export Data", action: () => { exportAllData(); closeAllMenus(); } },
+            { text: "Import Data", action: () => { importAllData(); closeAllMenus(); } },
             { text: "What's New", action: () => { 
                 if (releaseNotesNotification) {
                     releaseNotesNotification.remove();
@@ -2203,15 +2205,91 @@ browser.storage.local.get(['release', 'whatsNewClicked'], (data) => {
                 whatsNewClicked = true;
                 browser.storage.local.set({ whatsNewClicked: true });
             }},
-            { text: "Feedback", action: () => { browser.tabs.create({ url: 'https://tabsmagic.com/contact', active: true }); closeAllMenus() } },
+            { text: "Feedback", action: () => { browser.tabs.create({ url: 'https://tabsmagic.com/contact', active: true }); closeAllMenus() } }
         ];
         activeSettingsMenu = createMenuDropdown(menuItems, settingsButton);
 
         if (!whatsNewClicked) {
-            const releaseNotesMenuItem = activeSettingsMenu.querySelector('button:nth-child(2)');
-            releaseNotesNotification = document.createElement('div');
-            releaseNotesNotification.classList.add('notification-circle', 'inline-notification');
-            releaseNotesMenuItem.insertBefore(releaseNotesNotification, releaseNotesMenuItem.firstChild);
+            const whatsNewButton = Array
+                .from(activeSettingsMenu.querySelectorAll('button.menu-option'))
+                .find(btn => btn.textContent.trim().startsWith("What's New"));
+
+            if (whatsNewButton) {
+                releaseNotesNotification = document.createElement('div');
+                releaseNotesNotification.classList.add('notification-circle', 'inline-notification');
+                whatsNewButton.insertBefore(releaseNotesNotification, whatsNewButton.firstChild);
+            }
         }
     });
 });
+
+function exportAllData() {
+    browser.storage.local.get(null, (all) => {
+        try {
+            const payload = {
+                exportedAt: new Date().toISOString(),
+                extensionVersion: browser.runtime.getManifest().version,
+                data: all
+            };
+            const json = JSON.stringify(payload, null, 2);
+
+            // Trigger download
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `tabextend-export-${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 0);
+        } catch (e) {
+            console.error('Export failed:', e);
+        }
+    });
+}
+function importAllData() {
+    if (!confirm('Importing will overwrite existing data. Proceed?')) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+
+    input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const text = e.target.result;
+                const parsed = JSON.parse(text);
+                const data = parsed.data || parsed;
+
+                if (!data || !Array.isArray(data.savedTabs) || !Array.isArray(data.columnState)) {
+                    alert('Invalid export file: required keys missing.');
+                    return;
+                }
+
+                // Clean temp markers and add a fresh one
+                data.savedTabs = data.savedTabs.filter(t => !('temp' in t));
+                data.savedTabs.push({ temp: Date.now() });
+
+                browser.storage.local.clear(() => {
+                    browser.storage.local.set(data, () => {
+                        location.reload();
+                    });
+                });
+   
+            } catch (err) {
+                console.error('Import failed:', err);
+                alert('Import failed: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    });
+
+    input.click();
+}
