@@ -356,7 +356,8 @@ function calculateFormattedDate(parsedDate) {
 function parseAndSaveDate(note) {
     const chrono = new Chrono();
     const parsedNote = note.replace(/\\\w+/g, '');
-    const parsedDate = chrono.parseDate(parsedNote);
+    const today = new Date();
+    const parsedDate = chrono.parseDate(parsedNote, today, { forwardDate: true });
     const detectedDateText = parsedDate ? chrono.parse(note)[0].text : '';
     
     // Remove the parsed date from the note
@@ -1514,7 +1515,8 @@ function createTabItem(tab){
         const dateDisplay = li.querySelector(`#date-display-${tab.id}`);
         const chrono = new Chrono();
         const parsedNote = note.replace(/\\\w+/g, '');
-        const parsedDate = chrono.parseDate(parsedNote);
+        const today = new Date();
+        const parsedDate = chrono.parseDate(parsedNote, today, { forwardDate: true });
         if (parsedDate) {
             const { formattedDate, dateDisplayColor } = calculateFormattedDate(parsedDate);
             dateDisplay.textContent = formattedDate;
