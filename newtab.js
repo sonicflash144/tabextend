@@ -1066,7 +1066,9 @@ function handleDrop(event) {
         const newColumn = createColumn();
         itemsToProcess.forEach(item => {
             if(item.id.startsWith('opentab-')) {
-                itemIdsToSave.push(item.id.replace('opentab-', ''));
+                const newItemId = item.id.replace('opentab-', 'tab-');
+                item.id = newItemId;
+                itemIdsToSave.push(newItemId);
             }
             newColumn.appendChild(item);
         });
@@ -1247,39 +1249,61 @@ function handleDrop(event) {
             const isOpenTabsList = draggedTabIds.some(id => id.startsWith('opentab-'));
             if (isOpenTabsList) {
                 let updatedTabs = [];
-                draggedTabIds.filter(draggedTabId => draggedTabId.startsWith('opentab-')).forEach(draggedTabId => {
+                const idMappings = [];
+                const openTabsToProcess = draggedTabIds.filter(draggedTabId => draggedTabId.startsWith('opentab-'));
+                let processedCount = 0;
+                
+                openTabsToProcess.forEach(draggedTabId => {
                     const originalDraggedTabId = draggedTabId;
-                    draggedTabId = draggedTabId.replace('opentab-', 'tab-');
-                    const numericId = parseInt(draggedTabId.replace('tab-', ''));
+                    const oldTabId = draggedTabId.replace('opentab-', 'tab-');
+                    const numericId = parseInt(draggedTabId.replace('opentab-', ''));
                     browser.tabs.get(numericId, (tab) => {
-                        if (originalDraggedTabId.startsWith('opentab-')) {
-                            const newTab = {
-                                title: tab.title,
-                                url: tab.url,
-                                favIconUrl: tab.favIconUrl || getFaviconUrl(tab.url),
-                                id: numericId,
-                                color: '#FFFFFF'
-                            };
-                            updatedTabs.push(newTab);
-                        }
-                    });
-                });
-                browser.storage.local.get('savedTabs', (data) => {
-                    let existingTabs = data.savedTabs || [];
-                    updatedTabs = existingTabs.concat(updatedTabs);
-    
-                    browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                        let activeTab = tabs[0];
-                        _draggedTabIds.forEach(draggedTabId => {
-                            const numericId = parseInt(draggedTabId.replace('tab-', ''));
-                            browser.tabs.remove(numericId, () => {
-                                browser.tabs.update(activeTab.id, { active: true });
+                        const uniqueId = generateUniqueId();
+                        const newTabId = `tab-${uniqueId}`;
+                        idMappings.push({ oldId: oldTabId, newId: newTabId });
+                        
+                        const newTab = {
+                            title: tab.title,
+                            url: tab.url,
+                            favIconUrl: tab.favIconUrl || getFaviconUrl(tab.url),
+                            id: uniqueId,
+                            color: '#FFFFFF'
+                        };
+                        updatedTabs.push(newTab);
+                        processedCount++;
+                        
+                        if (processedCount === openTabsToProcess.length) {
+                            // Update columnState with new unique IDs
+                            idMappings.forEach(({ oldId, newId }) => {
+                                for (let col of columnState) {
+                                    col.tabIds = col.tabIds.map(id => {
+                                        if (Array.isArray(id)) {
+                                            return id.map(subId => subId === oldId ? newId : subId);
+                                        }
+                                        return id === oldId ? newId : id;
+                                    });
+                                }
                             });
-                        });
-    
-                        browser.storage.local.set({ columnState: columnState, savedTabs: updatedTabs }, () => {
-                            //console.log('Updated storage with new tab:', updatedTabs);
-                        });
+                            
+                            browser.storage.local.get('savedTabs', (data) => {
+                                let existingTabs = data.savedTabs || [];
+                                updatedTabs = existingTabs.concat(updatedTabs);
+                
+                                browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                                    let activeTab = tabs[0];
+                                    openTabsToProcess.forEach(draggedTabId => {
+                                        const numericId = parseInt(draggedTabId.replace('opentab-', ''));
+                                        browser.tabs.remove(numericId, () => {
+                                            browser.tabs.update(activeTab.id, { active: true });
+                                        });
+                                    });
+                
+                                    browser.storage.local.set({ columnState: columnState, savedTabs: updatedTabs }, () => {
+                                        //console.log('Updated storage with new tab:', updatedTabs);
+                                    });
+                                });
+                            });
+                        }
                     });
                 });
             }
