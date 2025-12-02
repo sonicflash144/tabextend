@@ -63,14 +63,20 @@ function getFaviconUrl(tabUrl) {
       return '';
   }
 }
+
+function generateUniqueId() {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+}
+
 // Function to save the selected tab
 function saveSelectedTab(tabId, selectionText) {
   chrome.tabs.get(tabId, (tab) => {
+      const uniqueId = generateUniqueId();
       const tabToSave = {
           title: tab.title,
           url: tab.url,
           favIconUrl: tab.favIconUrl || getFaviconUrl(tab.url),
-          id: tab.id,
+          id: uniqueId,
           color: '#FFFFFF',
           note: selectionText || null
       };
