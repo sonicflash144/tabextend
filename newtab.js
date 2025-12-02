@@ -2210,8 +2210,6 @@ browser.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
         savedTabs = migrationResult.savedTabs;
         columnState = migrationResult.columnState;
         console.log("Migrated tab IDs to unique format");
-        // Persist migration immediately to avoid data loss
-        browser.storage.local.set({ columnState: columnState, savedTabs: savedTabs });
     }
 
     if(bgTabs.length > 0) {
