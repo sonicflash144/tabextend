@@ -49,6 +49,65 @@ let activeOptionsMenu = null;
 let activeColorMenu = null;
 let activeSettingsMenu = null;
 let tabs_in_storage = [];
+
+function generateUniqueId() {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+}
+function migrateToUniqueIds(savedTabs, columnState) {
+    if (!savedTabs || savedTabs.length === 0) 
+        return { savedTabs, columnState: columnState || [], migrated: false };
+    if (!columnState) 
+        columnState = [];
+    
+    // Check if migration is needed (if any tab has a numeric ID)
+    const needsMigration = savedTabs.some(tab => typeof tab.id === 'number');
+    if (!needsMigration) 
+        return { savedTabs, columnState, migrated: false };
+    
+    // Create a mapping from old numeric IDs to new unique IDs
+    const idMap = new Map();
+    
+    const migratedTabs = savedTabs.map(tab => {
+        if (typeof tab.id === 'number') {
+            const newId = generateUniqueId();
+            idMap.set(tab.id, newId);
+            return { ...tab, id: newId };
+        }
+        return tab;
+    });
+    
+    // Helper to convert old tab reference to new one
+    const convertTabRef = (tabRef) => {
+        if (typeof tabRef !== 'string' || !tabRef.startsWith('tab-')) return tabRef;
+        const idPart = tabRef.split('-')[1];
+        const numericId = Number(idPart);
+        // Only convert if the ID part was originally numeric
+        if (!isNaN(numericId) && idMap.has(numericId)) {
+            return `tab-${idMap.get(numericId)}`;
+        }
+        return tabRef;
+    };
+    
+    // Update columnState references
+    const migratedColumnState = columnState.map(column => {
+        const newTabIds = column.tabIds.map(tabId => {
+            if (Array.isArray(tabId)) {
+                // Handle subgroups: [groupId, tab1, tab2, ..., title, expanded]
+                return tabId.map((item, index) => {
+                    if (index === 0) return tabId[0]; // Keep group ID as-is
+                    if (index >= tabId.length - 2) return item; // Keep title and expanded flag
+                    // Convert tab references
+                    return convertTabRef(item);
+                });
+            }
+            return convertTabRef(tabId);
+        });
+        return { ...column, tabIds: newTabIds };
+    });
+    
+    return { savedTabs: migratedTabs, columnState: migratedColumnState, migrated: true };
+}
+
 function getToday(tabDate) {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Normalize to start of the day
@@ -146,7 +205,7 @@ function deleteTab(id, column = null, li = null) {
 }
 function deleteSubgroup(groupId) {
     const li = document.getElementById(groupId);
-    const tabIds = Array.from(li.querySelectorAll('.subgroup-favicon')).map(favicon => parseInt(favicon.id.split('-')[1]));
+    const tabIds = Array.from(li.querySelectorAll('.subgroup-favicon')).map(favicon => favicon.id.split('-')[1]);
     li.remove();
     deleteTab(tabIds);
 }
@@ -181,20 +240,31 @@ function ungroupSubgroup(groupId) {
 function saveTab(tabId) {
     const tabIds = Array.isArray(tabId) ? tabId : [tabId];
     const newTabs = [];
+    const idMappings = [];
 
     tabIds.forEach(id => {
-        const numericId = parseInt(id.replace('tab-', ''));
-        browser.tabs.get(numericId, (tab) => {
+        const browserTabId = parseInt(id.replace('tab-', ''));
+        browser.tabs.get(browserTabId, (tab) => {
+            const uniqueId = generateUniqueId();
             const newTab = {
                 title: tab.title,
                 url: tab.url,
                 favIconUrl: tab.favIconUrl || getFaviconUrl(tab.url),
-                id: numericId,
+                id: uniqueId,
                 color: '#FFFFFF'
             };
             newTabs.push(newTab);
+            idMappings.push({ oldId: id, newId: `tab-${uniqueId}` });
 
             if (newTabs.length === tabIds.length) {
+                // Update DOM element IDs before saving column state
+                idMappings.forEach(({ oldId, newId }) => {
+                    const element = document.getElementById(oldId);
+                    if (element) {
+                        element.id = newId;
+                    }
+                });
+
                 browser.storage.local.get("savedTabs", (data) => {
                     const existingTabs = data.savedTabs || [];
                     const updatedTabs = [...existingTabs, ...newTabs];
@@ -1449,9 +1519,9 @@ function createTabItem(tab){
     
         // Show limited menu for multi-selection
         if (selectedItems.length > 1 && isCurrentTabSelected) {
-            const selectedTabIds = Array.from(selectedItems).map(item => parseInt(item.id.split('-')[1]));
+            const selectedTabIds = Array.from(selectedItems).map(item => item.id.split('-')[1]);
             const hasDate = selectedTabIds.some(tabId => {
-                const tab = tabs_in_storage.find(t => t.id === tabId);
+                const tab = tabs_in_storage.find(t => `${t.id}` === tabId);
                 return tab && tab.parsedDate;
             });
         
@@ -1862,11 +1932,12 @@ function displaySavedTabs(tabs) {
                     const allFaviconWrappers = faviconsContainer.querySelectorAll('.favicon-wrapper');
                     allFaviconWrappers.forEach(wrapper => {
                         const favicon = wrapper.querySelector('.subgroup-favicon');
-                        const tabId = parseInt(favicon.id.split('-')[1]);
-                        const tab = tabs.find(t => t.id === tabId);
-                        
-                        const expandedTab = createTabItem(tab);
-                        expandedContainer.appendChild(expandedTab);
+                        const tabId = favicon.id.split('-')[1];
+                        const tab = tabs.find(t => `${t.id}` === tabId);
+                        if (tab) {
+                            const expandedTab = createTabItem(tab);
+                            expandedContainer.appendChild(expandedTab);
+                        }
                     });
 
                     const moreOptionsButton = document.createElement('button');
@@ -2069,7 +2140,15 @@ browser.storage.onChanged.addListener(changes => {
                 let columnState = data.columnState || [];
                 const bgTabs = data.bgTabs || [];
                 let savedTabs = data.savedTabs || [];
-                const tabIds = bgTabs.map(tab => tab.id);
+                
+                // Migrate any bgTabs that have old numeric IDs
+                const migratedBgTabs = bgTabs.map(tab => {
+                    if (typeof tab.id === 'number') {
+                        return { ...tab, id: generateUniqueId() };
+                    }
+                    return tab;
+                });
+                const tabIds = migratedBgTabs.map(tab => tab.id);
     
                 if (columnState.length === 0) {
                     columnState.push({ id: "defaultColumn", tabIds: [], title: "New Column" });
@@ -2077,7 +2156,7 @@ browser.storage.onChanged.addListener(changes => {
                 const firstColumn = columnState[0];
                 const formattedIds = tabIds.map(id => `tab-${id}`);
                 firstColumn.tabIds = firstColumn.tabIds.concat(formattedIds);
-                savedTabs = savedTabs.concat(bgTabs);
+                savedTabs = savedTabs.concat(migratedBgTabs);
     
                 browser.storage.local.set({ columnState: columnState, bgTabs: [], savedTabs: savedTabs }, () => {
                     console.log("Migrated bgTabs");
@@ -2101,15 +2180,32 @@ browser.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
     const bgTabs = data.bgTabs || [];
     let savedTabs = data.savedTabs || [];
 
+    // Migrate old numeric tab IDs to unique string IDs
+    const migrationResult = migrateToUniqueIds(savedTabs, columnState);
+    if (migrationResult.migrated) {
+        savedTabs = migrationResult.savedTabs;
+        columnState = migrationResult.columnState;
+        console.log("Migrated tab IDs to unique format");
+        // Persist migration immediately to avoid data loss
+        browser.storage.local.set({ columnState: columnState, savedTabs: savedTabs });
+    }
+
     if(bgTabs.length > 0) {
-        const tabIds = bgTabs.map(tab => tab.id);
+        // Migrate any bgTabs that have old numeric IDs
+        const migratedBgTabs = bgTabs.map(tab => {
+            if (typeof tab.id === 'number') {
+                return { ...tab, id: generateUniqueId() };
+            }
+            return tab;
+        });
+        const tabIds = migratedBgTabs.map(tab => tab.id);
         if (columnState.length === 0) {
             columnState.push({ id: "defaultColumn", tabIds: [], title: "New Column", emoji: getRandomEmoji() });
         }
         const firstColumn = columnState[0];
         const formattedIds = tabIds.map(id => `tab-${id}`);
         firstColumn.tabIds = firstColumn.tabIds.concat(formattedIds);
-        savedTabs = savedTabs.concat(bgTabs);
+        savedTabs = savedTabs.concat(migratedBgTabs);
     }
 
     savedTabs = savedTabs.filter(tab => !('temp' in tab));
