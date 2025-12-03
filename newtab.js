@@ -35,7 +35,7 @@ const scrollAnimation = {
     scrollY: 0,
     animationFrameId: null
 };
-const CHROME_STRING = 'chrome';
+const CHROME_STRING = 'browser';
 const settingsButton = document.querySelector('.settings-button');
 const columnsContainer = document.getElementById('columns-container');
 const colorOptions = ['tab-default', 'tab-pink', 'tab-yellow', 'tab-blue', 'tab-purple'];
@@ -323,6 +323,9 @@ function renameTab(tab, li) {
     const titleDisplay = li.querySelector(`#title-display-${tab.id}`);
     const titleInput = li.querySelector(`#title-input-${tab.id}`);
 
+    // Store original value for cancel functionality (Escape key)
+    const originalTitle = titleInput.value;
+
     titleInput.classList.remove("hidden");
     titleDisplay.classList.add("hidden");
     titleInput.focus();
@@ -335,6 +338,12 @@ function renameTab(tab, li) {
             titleDisplay.textContent = titleInput.value;
             titleInput.classList.add("hidden");
             titleDisplay.classList.remove("hidden");
+            titleInput.removeEventListener('keydown', handleKeydown);
+        }
+        else if (event.key === 'Escape') {
+            // Restore original value to cancel the edit
+            titleInput.value = originalTitle;
+            titleInput.blur();
             titleInput.removeEventListener('keydown', handleKeydown);
         }
     });
@@ -364,6 +373,9 @@ function editTabNote(tab, li) {
     const noteInput = li.querySelector(`#note-input-${tab.id}`);
     const column = li.closest('.column');
     const subgroup = li.closest('.subgroup-item');
+
+    // Store original value for cancel functionality (Escape key)
+    noteInput.dataset.originalValue = noteInput.value;
 
     li.draggable = false;
     column.draggable = false;
@@ -1594,8 +1606,16 @@ function createTabItem(tab){
         li.addEventListener('dragstart', handleDragStart);
     });
 
+    // Store original value for cancel functionality
+    noteInput.dataset.originalValue = noteInput.value;
+
     noteInput.addEventListener("keydown", function (event) {
-        if ((event.key === "Enter" && !event.shiftKey) || event.key === "Escape") {
+        if (event.key === "Enter" && !event.shiftKey) {
+            noteInput.blur();
+        }
+        else if (event.key === "Escape") {
+            // Restore original value to cancel the edit
+            noteInput.value = noteInput.dataset.originalValue || '';
             noteInput.blur();
         }
         else if (event.key === "Enter" && event.shiftKey) {
@@ -1803,6 +1823,8 @@ function createEditableTitle(options = {}) {
     // Switch to edit mode
     titleSpan.addEventListener("click", () => {
         titleInput.value = titleSpan.textContent;
+        // Store original value for cancel functionality (Escape key)
+        titleInput.dataset.originalValue = titleInput.value;
         titleInput.style.display = "inline";
         titleSpan.style.display = "none";
         titleInput.focus();
@@ -1831,9 +1853,14 @@ function createEditableTitle(options = {}) {
         onSave(trimmedValue);
     });
 
-    // Save on Enter
+    // Save on Enter, cancel on Escape
     titleInput.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
+            titleInput.blur();
+        }
+        else if (event.key === "Escape") {
+            // Restore original value to cancel the edit
+            titleInput.value = titleInput.dataset.originalValue || '';
             titleInput.blur();
         }
     });
