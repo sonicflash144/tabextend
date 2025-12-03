@@ -363,9 +363,11 @@ function editTabNote(tab, li) {
     const noteDisplay = li.querySelector(`#note-display-${tab.id}`);
     const noteInput = li.querySelector(`#note-input-${tab.id}`);
     const column = li.closest('.column');
+    const subgroup = li.closest('.subgroup-item');
 
     li.draggable = false;
     column.draggable = false;
+    if (subgroup) subgroup.draggable = false;
     noteInput.classList.remove("hidden");
     noteDisplay.classList.add("hidden");
     noteInput.focus();
@@ -1580,6 +1582,11 @@ function createTabItem(tab){
     
     noteInput.addEventListener("blur", function () {
         const note = noteInput.value;
+        const column = li.closest('.column');
+        const subgroup = li.closest('.subgroup-item');
+        li.draggable = true;
+        column.draggable = true;
+        if (subgroup) subgroup.draggable = true;
         saveTabNote(tab.id, note);
         noteDisplay.innerHTML = note ? note.replace(/\\/g, '').replace(/\n/g, '<br>') : '';
         noteInput.classList.add("hidden");
@@ -1588,7 +1595,7 @@ function createTabItem(tab){
     });
 
     noteInput.addEventListener("keydown", function (event) {
-        if (event.key === "Enter" && !event.shiftKey) {
+        if ((event.key === "Enter" && !event.shiftKey) || event.key === "Escape") {
             noteInput.blur();
         }
         else if (event.key === "Enter" && event.shiftKey) {
