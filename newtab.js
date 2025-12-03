@@ -1595,7 +1595,7 @@ function createTabItem(tab){
     });
 
     noteInput.addEventListener("keydown", function (event) {
-        if (event.key === "Enter" && !event.shiftKey) {
+        if ((event.key === "Enter" && !event.shiftKey) || event.key === "Escape") {
             noteInput.blur();
         }
         else if (event.key === "Enter" && event.shiftKey) {
