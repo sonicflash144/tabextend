@@ -662,6 +662,12 @@ function maximizeColumn(column) {
 
 /* Tab Drag and Drop */
 function handleDragStart(event) {
+    // Don't initiate tab drag if dragging from an input/textarea (e.g., text selection)
+    if (event.target.tagName === 'TEXTAREA' || event.target.tagName === 'INPUT') {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+    }
     event.stopPropagation();
     closeAllMenus();
     const tabItem = event.target.closest('.tab-item');
@@ -706,13 +712,27 @@ function calculateDropPosition(event, tabItems, isMinimized = false) {
 
 /* Column Drag and Drop */
 function handleColumnDragStart(event) {
+    // Don't initiate column drag if dragging from an input/textarea (e.g., text selection)
+    if (event.target.tagName === 'TEXTAREA' || event.target.tagName === 'INPUT') {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+    }
+    
+    const column = event.target.closest('.column');
+    if(!column) return;
+    
+    // Don't initiate drag if the column is in edit mode (draggable is false)
+    if (!column.draggable) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+    }
     closeAllMenus();
     if (event.target.closest('.tab-item')) {
         event.preventDefault();
         return;
     }
-    const column = event.target.closest('.column');
-    if(!column) return;
 
     // Remove .selected class from all items
     const draggedItems = document.querySelectorAll('.selected');
