@@ -108,6 +108,55 @@ function migrateToUniqueIds(savedTabs, columnState) {
     return { savedTabs: migratedTabs, columnState: migratedColumnState, migrated: true };
 }
 
+function cleanupOrphanedTabs(savedTabs, columnState) {
+    if (!savedTabs || savedTabs.length === 0 || !columnState || columnState.length === 0) {
+        return { savedTabs: savedTabs || [], cleaned: false };
+    }
+
+    // Collect all tab IDs referenced in columnState
+    const referencedIds = new Set();
+    
+    columnState.forEach(column => {
+        if (!column.tabIds) return;
+        column.tabIds.forEach(tabId => {
+            if (Array.isArray(tabId)) {
+                // Subgroup: [groupId, tab1, tab2, ..., title, expanded]
+                tabId.forEach((item, index) => {
+                    if (index === 0 || index >= tabId.length - 2) return; // Skip groupId, title, expanded
+                    if (typeof item === 'string' && item.startsWith('tab-')) {
+                        referencedIds.add(item.replace('tab-', ''));
+                    }
+                });
+            } else if (typeof tabId === 'string' && tabId.startsWith('tab-')) {
+                referencedIds.add(tabId.replace('tab-', ''));
+            }
+        });
+    });
+
+    // Safety check: if no tab references found in columnState but savedTabs exist,
+    // don't delete anything (columnState might be corrupted)
+    const actualTabs = savedTabs.filter(tab => !('temp' in tab));
+    if (referencedIds.size === 0 && actualTabs.length > 0) {
+        console.warn('No tab references found in columnState but savedTabs exist - skipping cleanup');
+        return { savedTabs, cleaned: false };
+    }
+
+    // Filter savedTabs to only keep referenced tabs (and temp marker)
+    const originalCount = actualTabs.length;
+    const cleanedTabs = savedTabs.filter(tab => {
+        if ('temp' in tab) return true; // Keep temp marker
+        return referencedIds.has(String(tab.id));
+    });
+    const cleanedCount = cleanedTabs.filter(tab => !('temp' in tab)).length;
+    
+    const removed = originalCount - cleanedCount;
+    if (removed > 0) {
+        console.log(`Cleaned up ${removed} orphaned tab(s) from storage`);
+    }
+
+    return { savedTabs: cleanedTabs, cleaned: removed > 0 };
+}
+
 function getToday(tabDate) {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Normalize to start of the day
@@ -505,8 +554,8 @@ function deleteColumn(event) {
         column = event.target.closest(".column");
     }
     const tabItems = column.querySelectorAll('.tab-item');
-    const tabIds = Array.from(tabItems).map(tabItem => tabItem.id);
-    deleteTab(tabIds.map(id => parseInt(id.replace('tab-', ''))), column);
+    const tabIds = Array.from(tabItems).map(tabItem => tabItem.id.replace('tab-', ''));
+    deleteTab(tabIds, column);
 }
 function openAllInColumn(column, subgroup = null, dropPosition = null) {
     closeAllMenus();
@@ -1077,7 +1126,7 @@ function handleDrop(event) {
         itemsToProcess.forEach(item => {
             const itemId = item.id;
             if (itemId.startsWith('tab-')) {
-                tabIdsToDelete.push(parseInt(itemId.replace('tab-', '')));
+                tabIdsToDelete.push(itemId.replace('tab-', ''));
                 item.remove();
             }
             else if (itemId.startsWith('opentab')) {
@@ -1365,7 +1414,7 @@ function handleDrop(event) {
         }
         else if (columnId === 'open-tabs-list' && itemId.startsWith('tab')) {
             chrome.tabs.create({ url: item.dataset.url, active: false, index: dropPosition });
-            tabIdsToDelete.push(parseInt(itemId.replace('tab-', '')));
+            tabIdsToDelete.push(itemId.replace('tab-', ''));
             if(isCollapsed){
                 item.classList.add('collapsed');
             }
@@ -2285,6 +2334,11 @@ chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
     }
 
     savedTabs = savedTabs.filter(tab => !('temp' in tab));
+    
+    // Clean up orphaned tabs (tabs in savedTabs not referenced in columnState)
+    const cleanupResult = cleanupOrphanedTabs(savedTabs, columnState);
+    savedTabs = cleanupResult.savedTabs;
+    
     savedTabs.push({"temp": Date.now()});
 
     chrome.storage.local.set({ columnState: columnState, bgTabs: [], savedTabs: savedTabs }, () => {
