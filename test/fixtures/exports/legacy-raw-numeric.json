@@ -1,0 +1,31 @@
+{
+  "savedTabs": [
+    {
+      "id": 101,
+      "title": "Old standalone tab",
+      "url": "https://example.com/standalone",
+      "favIconUrl": "https://example.com/favicon.ico",
+      "color": "#FFFFFF"
+    },
+    {
+      "id": 102,
+      "title": "Old grouped tab",
+      "url": "https://example.com/grouped",
+      "favIconUrl": "",
+      "color": "#ffc4c4",
+      "note": "Review tomorrow",
+      "parsedDate": 1735689600000
+    }
+  ],
+  "columnState": [
+    {
+      "id": "defaultColumn",
+      "title": "Legacy column",
+      "tabIds": [
+        "tab-101",
+        ["group-1700000000000", "tab-102", "Legacy group", true]
+      ]
+    }
+  ],
+  "theme": "light"
+}

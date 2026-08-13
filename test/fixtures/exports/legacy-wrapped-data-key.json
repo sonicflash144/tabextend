@@ -1,0 +1,26 @@
+{
+  "exportedAt": "2024-09-20T15:30:00.000Z",
+  "extensionVersion": "1.0.18",
+  "data": {
+    "savedTabs": [
+      {
+        "id": 7001,
+        "title": "Export from the original importer",
+        "url": "https://example.com/original-export",
+        "favIconUrl": "",
+        "color": "#FFFFFF",
+        "note": "Preserve this"
+      }
+    ],
+    "columnState": [
+      {
+        "id": "column-1726846200000",
+        "title": "Original export",
+        "emoji": "🍎",
+        "minimized": false,
+        "tabIds": ["tab-7001"]
+      }
+    ],
+    "sidebarCollapsed": true
+  }
+}
