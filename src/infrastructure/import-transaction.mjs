@@ -7,9 +7,33 @@ export class ImportTransactionError extends Error {
     }
 }
 
-function storageValuesMatch(expected, actual) {
-    return Object.keys(expected).every(key =>
-        JSON.stringify(expected[key]) === JSON.stringify(actual[key])
+function jsonValuesMatch(expected, actual) {
+    if (expected === actual) return true;
+    if (expected === null || actual === null) return false;
+    if (typeof expected !== typeof actual) return false;
+
+    if (Array.isArray(expected) || Array.isArray(actual)) {
+        if (!Array.isArray(expected) || !Array.isArray(actual) ||
+            expected.length !== actual.length) {
+            return false;
+        }
+        return expected.every((value, index) => jsonValuesMatch(value, actual[index]));
+    }
+
+    if (typeof expected !== 'object') return false;
+    const expectedKeys = Object.keys(expected).sort();
+    const actualKeys = Object.keys(actual).sort();
+    if (expectedKeys.length !== actualKeys.length ||
+        expectedKeys.some((key, index) => key !== actualKeys[index])) {
+        return false;
+    }
+    return expectedKeys.every(key => jsonValuesMatch(expected[key], actual[key]));
+}
+
+function mismatchedStorageKeys(expected, actual) {
+    return Object.keys(expected).filter(key =>
+        !Object.prototype.hasOwnProperty.call(actual, key) ||
+        !jsonValuesMatch(expected[key], actual[key])
     );
 }
 
@@ -56,8 +80,11 @@ export async function importStorageSafely(options) {
         await storage.set(importedData);
 
         const storedData = await storage.get(importedKeys);
-        if (!storageValuesMatch(importedData, storedData)) {
-            throw new Error('Imported data could not be verified after writing.');
+        const mismatchedKeys = mismatchedStorageKeys(importedData, storedData);
+        if (mismatchedKeys.length > 0) {
+            throw new Error(
+                `Imported data could not be verified after writing. Mismatched keys: ${mismatchedKeys.join(', ')}.`
+            );
         }
 
         return { previousStorage, importedKeys };

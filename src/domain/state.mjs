@@ -137,7 +137,33 @@ export function validateCanonicalState(state) {
 
     const columnIds = new Set();
     const groupIds = new Set();
+    const tabPlacements = new Map();
+
+    function recordTabPlacement(tabId, path, groupTabIds = null) {
+        if (groupTabIds?.has(tabId)) {
+            errors.push(`${path} contains duplicate tab ${JSON.stringify(tabId)}.`);
+        }
+        groupTabIds?.add(tabId);
+
+        const previousPath = tabPlacements.get(tabId);
+        if (previousPath) {
+            errors.push(
+                `Tab ${JSON.stringify(tabId)} is placed more than once at ${previousPath} and ${path}.`
+            );
+        } else {
+            tabPlacements.set(tabId, path);
+        }
+
+        if (!state.tabs.has(tabId)) {
+            errors.push(`${path} refers to missing tab ${JSON.stringify(tabId)}.`);
+        }
+    }
+
     state.columns.forEach((column, columnIndex) => {
+        if (!isObject(column)) {
+            errors.push(`columns[${columnIndex}] must be an object.`);
+            return;
+        }
         if (columnIds.has(column.id)) errors.push(`Duplicate column id ${JSON.stringify(column.id)}.`);
         columnIds.add(column.id);
         if (!Array.isArray(column.items)) {
@@ -146,8 +172,12 @@ export function validateCanonicalState(state) {
         }
         column.items.forEach((item, itemIndex) => {
             const path = `columns[${columnIndex}].items[${itemIndex}]`;
+            if (!isObject(item)) {
+                errors.push(`${path} must be an object.`);
+                return;
+            }
             if (item.type === 'tab') {
-                if (!state.tabs.has(item.tabId)) errors.push(`${path} refers to missing tab ${JSON.stringify(item.tabId)}.`);
+                recordTabPlacement(item.tabId, path);
                 return;
             }
             if (item.type !== 'group') {
@@ -156,8 +186,13 @@ export function validateCanonicalState(state) {
             }
             if (groupIds.has(item.id)) errors.push(`Duplicate group id ${JSON.stringify(item.id)}.`);
             groupIds.add(item.id);
-            item.tabIds.forEach(tabId => {
-                if (!state.tabs.has(tabId)) errors.push(`${path} refers to missing tab ${JSON.stringify(tabId)}.`);
+            if (!Array.isArray(item.tabIds)) {
+                errors.push(`${path}.tabIds must be an array.`);
+                return;
+            }
+            const groupTabIds = new Set();
+            item.tabIds.forEach((tabId, tabIndex) => {
+                recordTabPlacement(tabId, `${path}.tabIds[${tabIndex}]`, groupTabIds);
             });
         });
     });

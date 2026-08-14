@@ -10,6 +10,14 @@ function clone(value) {
     return value === undefined ? undefined : structuredClone(value);
 }
 
+function reverseObjectKeys(value) {
+    if (Array.isArray(value)) return value.map(reverseObjectKeys);
+    if (value === null || typeof value !== 'object') return value;
+    return Object.fromEntries(
+        Object.keys(value).reverse().map(key => [key, reverseObjectKeys(value[key])])
+    );
+}
+
 function createFakeStorage(initial, options = {}) {
     let values = clone(initial);
     let setCalls = 0;
@@ -25,7 +33,9 @@ function createFakeStorage(initial, options = {}) {
             if (options.corruptReadBack && setCalls >= 2 && keys.includes('savedTabs')) {
                 selected.savedTabs = [];
             }
-            return selected;
+            return options.reorderReadBack && setCalls >= 2
+                ? reverseObjectKeys(selected)
+                : selected;
         },
         async set(updates) {
             setCalls += 1;
@@ -75,6 +85,32 @@ test('writes a backup, imports data, and verifies the result', async () => {
     });
 });
 
+test('verification accepts equivalent objects returned with reordered properties', async () => {
+    const initial = {
+        savedTabs: [{ id: 'old' }],
+        columnState: []
+    };
+    const storage = createFakeStorage(initial, { reorderReadBack: true });
+    const imported = {
+        savedTabs: [{
+            id: 'new',
+            title: 'New',
+            metadata: { source: 'legacy', flags: { reviewed: true, pinned: false } }
+        }],
+        columnState: [{
+            id: 'new-column',
+            title: 'Column',
+            minimized: false,
+            tabIds: ['tab-new']
+        }]
+    };
+
+    await importStorageSafely({ storage, data: imported, backupKey });
+
+    assert.deepEqual(storage.snapshot().savedTabs, imported.savedTabs);
+    assert.deepEqual(storage.snapshot().columnState, imported.columnState);
+});
+
 test('rolls back all changes when verification fails', async () => {
     const initial = {
         savedTabs: [{ id: 'old' }],
@@ -96,6 +132,7 @@ test('rolls back all changes when verification fails', async () => {
             assert.ok(error instanceof ImportTransactionError);
             assert.equal(error.rolledBack, true);
             assert.match(error.message, /could not be verified/);
+            assert.match(error.message, /Mismatched keys: savedTabs/);
             return true;
         }
     );

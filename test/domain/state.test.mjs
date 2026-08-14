@@ -93,6 +93,91 @@ test('canonical validation catches missing references', () => {
     assert.match(result.errors.join('\n'), /missing tab/);
 });
 
+test('canonical validation enforces complete and unique tab ordering', () => {
+    const state = canonicalStateFromLegacy([
+        { id: 'one', title: 'One', url: 'https://example.com/one' },
+        { id: 'two', title: 'Two', url: 'https://example.com/two' }
+    ], []);
+    state.tabOrder = ['one', 'one', 'missing'];
+
+    const result = validateCanonicalState(state);
+    const errors = result.errors.join('\n');
+
+    assert.equal(result.valid, false);
+    assert.match(errors, /tabOrder contains duplicate id "one"/);
+    assert.match(errors, /tabOrder\[2\] refers to missing tab "missing"/);
+    assert.match(errors, /Tab "two" is missing from tabOrder/);
+});
+
+test('canonical validation enforces unique column and group identities', () => {
+    const state = canonicalStateFromLegacy(
+        [
+            { id: 'one', title: 'One', url: 'https://example.com/one' },
+            { id: 'two', title: 'Two', url: 'https://example.com/two' }
+        ],
+        [
+            {
+                id: 'duplicate-column',
+                title: 'First',
+                tabIds: [['duplicate-group', 'tab-one', 'First group', false]]
+            },
+            {
+                id: 'duplicate-column',
+                title: 'Second',
+                tabIds: [['duplicate-group', 'tab-two', 'Second group', false]]
+            }
+        ]
+    );
+
+    const result = validateCanonicalState(state);
+    const errors = result.errors.join('\n');
+
+    assert.equal(result.valid, false);
+    assert.match(errors, /Duplicate column id "duplicate-column"/);
+    assert.match(errors, /Duplicate group id "duplicate-group"/);
+});
+
+test('canonical validation rejects duplicate placements within and outside groups', () => {
+    const state = canonicalStateFromLegacy(
+        [
+            { id: 'one', title: 'One', url: 'https://example.com/one' },
+            { id: 'two', title: 'Two', url: 'https://example.com/two' }
+        ],
+        [{
+            id: 'column-1',
+            title: 'Column',
+            tabIds: [
+                'tab-one',
+                ['group-1', 'tab-one', 'tab-two', 'tab-two', 'Group', false]
+            ]
+        }]
+    );
+
+    const result = validateCanonicalState(state);
+    const errors = result.errors.join('\n');
+
+    assert.equal(result.valid, false);
+    assert.match(errors, /Tab "one" is placed more than once/);
+    assert.match(errors, /contains duplicate tab "two"/);
+    assert.match(errors, /Tab "two" is placed more than once/);
+});
+
+test('canonical validation reports malformed columns, items, and group tab lists', () => {
+    const state = canonicalStateFromLegacy([], []);
+    state.columns = [
+        null,
+        { id: 'column-1', items: [null, { type: 'group', id: 'group-1', tabIds: null }] }
+    ];
+
+    const result = validateCanonicalState(state);
+    const errors = result.errors.join('\n');
+
+    assert.equal(result.valid, false);
+    assert.match(errors, /columns\[0\] must be an object/);
+    assert.match(errors, /columns\[1\]\.items\[0\] must be an object/);
+    assert.match(errors, /columns\[1\]\.items\[1\]\.tabIds must be an array/);
+});
+
 test('state store replaces legacy state and notifies subscribers', () => {
     const store = createStateStore();
     const seen = [];

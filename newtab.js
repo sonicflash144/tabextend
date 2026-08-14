@@ -2,14 +2,12 @@ import { Chrono } from 'chrono-node';
 import 'emoji-picker-element';
 import {
     CURRENT_EXPORT_FORMAT_VERSION,
-    migrateToUniqueIds,
-    prepareImportData,
-    recoverOrphanedTabs
+    prepareImportData
 } from './src/compatibility/legacy-data.mjs';
+import { createStateStorageService } from './src/application/state-storage.mjs';
 import { importStorageSafely } from './src/infrastructure/import-transaction.mjs';
 import { createChromeApiAdapters } from './src/infrastructure/chrome-api.mjs';
 import {
-    canonicalStateToLegacy,
     createStateStore,
     getTab
 } from './src/domain/state.mjs';
@@ -94,30 +92,25 @@ let dropType = null;
 let deletionArea;
 let newColumnIndicator = null;
 const appState = createStateStore();
+const stateStorage = createStateStorageService({
+    storage: chrome.storage.local,
+    stateStore: appState,
+    idFactory: generateUniqueId,
+    createDefaultColumn: () => ({
+        id: 'defaultColumn',
+        title: 'New Column',
+        minimized: false,
+        emoji: getRandomEmoji(),
+        items: []
+    })
+});
 const menuController = createMenuController();
 const selectionController = createSelectionController(document);
 
-function replaceCanonicalState(savedTabs, columnState) {
-    return appState.replaceLegacy(savedTabs || [], columnState || []);
-}
-
 function persistCanonicalState(nextState, options = {}) {
-    const {
-        includeTabs = true,
-        includeColumns = true,
-        extra = {},
-        callback
-    } = options;
-    appState.replace(nextState);
-    const legacyState = canonicalStateToLegacy(
-        nextState,
-        includeTabs ? { tempMarker: Date.now() } : {}
-    );
-    const updates = { ...extra };
-    if (includeTabs) updates.savedTabs = legacyState.savedTabs;
-    if (includeColumns) updates.columnState = legacyState.columnState;
-    if (callback) chrome.storage.local.set(updates, callback);
-    else chrome.storage.local.set(updates);
+    stateStorage.persist(nextState, options).catch(error => {
+        console.error('Could not persist canonical state:', error);
+    });
     return nextState;
 }
 
@@ -125,32 +118,6 @@ function generateUniqueId() {
     return Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
 }
 
-function appendBackgroundTabs(state, backgroundTabs) {
-    if (!Array.isArray(backgroundTabs) || backgroundTabs.length === 0) return state;
-    const tabs = backgroundTabs.map(tab => typeof tab.id === 'number'
-        ? { ...tab, id: generateUniqueId() }
-        : tab
-    );
-    let nextState = state;
-    if (nextState.columns.length === 0) {
-        nextState = addColumn(nextState, {
-            id: 'defaultColumn',
-            title: 'New Column',
-            minimized: false,
-            emoji: getRandomEmoji(),
-            items: []
-        });
-    }
-    nextState = addTabs(nextState, tabs);
-    return applyDrop(nextState, {
-        dragged: tabs.map(tab => ({ type: 'tab', tabId: String(tab.id) })),
-        target: {
-            type: 'column',
-            columnId: nextState.columns[0].id,
-            index: nextState.columns[0].items.length
-        }
-    });
-}
 function getToday(tabDate) {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Normalize to start of the day
@@ -307,7 +274,7 @@ function calculateFormattedDate(parsedDate) {
 
     parsedDate = new Date(parsedDate);
     const diffDays = getToday(parsedDate);
-    let formattedDate = '';
+    let formattedDate;
     let dateDisplayColor = '#ababab';
 
     if (diffDays === 0) {
@@ -788,21 +755,20 @@ function handleDragOver(event) {
         const width = 2;
         let height = containerRect.height;
 
-        // Left boundary
-        if (indicatorLeft < spaceContainerLeft) {
-            indicatorLeft = spaceContainerLeft;
-        }
-        // Right boundary
-        if (indicatorLeft > spaceContainerRight - width) {
-            indicatorLeft = spaceContainerRight - width;
-        }
-
         if (dropPosition === columns.length) {
             const lastColumn = columns[columns.length - 1];
             indicatorLeft = lastColumn ? lastColumn.getBoundingClientRect().right : containerRect.left;
         } else {
             const targetColumn = columns[dropPosition];
             indicatorLeft = targetColumn.getBoundingClientRect().left;
+        }
+
+        // Keep the indicator within the visible column container.
+        if (indicatorLeft < spaceContainerLeft) {
+            indicatorLeft = spaceContainerLeft;
+        }
+        if (indicatorLeft > spaceContainerRight - width) {
+            indicatorLeft = spaceContainerRight - width;
         }
 
         dropIndicator.style.width = `${width}px`;
@@ -1057,8 +1023,6 @@ function createTabItem(tab){
     const {
         item: li,
         infoLeft: tabInfoLeft,
-        titleDisplay,
-        titleInput,
         noteDisplay,
         noteInput,
         dateDisplay,
@@ -1475,11 +1439,11 @@ chrome.tabs.onRemoved.addListener(() => {
     }
 });
 chrome.tabs.onMoved.addListener(fetchOpenTabs);
-chrome.storage.onChanged.addListener(changes => {
-    if (changes.savedTabs || changes.columnState) {
-        console.log("Changes detected", changes);
-        chrome.storage.local.get(['savedTabs', 'columnState'], data => {
-            const state = replaceCanonicalState(data.savedTabs, data.columnState);
+chrome.storage.onChanged.addListener(async changes => {
+    try {
+        const synchronized = await stateStorage.synchronize(changes);
+        if (synchronized?.type === 'state') {
+            console.log("Changes detected", changes);
             if(changes.columnState && changes.animation){
                 const column = document.getElementById(changes.animation.newValue.columnId);
                 if(changes.animation.newValue.minimized === true){
@@ -1490,23 +1454,16 @@ chrome.storage.onChanged.addListener(changes => {
                 }
                 return;
             }
-            displaySavedTabs(state);
-        });
-    }
-    else if (changes.bgTabs) {
-        const oldBgTabs = changes.bgTabs.oldValue || [];
-        const newBgTabs = changes.bgTabs.newValue || [];
-
-        //Check if bgTabs has changed
-        if (JSON.stringify(oldBgTabs) !== JSON.stringify(newBgTabs)) {
-            chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
-                const state = replaceCanonicalState(data.savedTabs, data.columnState);
-                const nextState = appendBackgroundTabs(state, data.bgTabs);
-                persistCanonicalState(nextState, { extra: { bgTabs: [] } });
-            });
+            displaySavedTabs(synchronized.state);
+            return;
         }
+        if (synchronized?.type === 'background-tabs') return;
+    } catch (error) {
+        console.error('Could not synchronize extension storage:', error);
+        return;
     }
-    else if (changes.sidebarCollapsed) {
+
+    if (changes.sidebarCollapsed) {
         if(changes.sidebarCollapsed.newValue) {
             document.getElementById('sidebar').classList.add('collapsed');
         } 
@@ -1517,43 +1474,22 @@ chrome.storage.onChanged.addListener(changes => {
 });
 fetchOpenTabs();
 
-chrome.storage.local.get(["columnState", "bgTabs", "savedTabs"], (data) => {
-    let columnState = data.columnState || [];
-    const bgTabs = data.bgTabs || [];
-    let savedTabs = data.savedTabs || [];
-
-    // Migrate old numeric tab IDs to unique string IDs
-    const migrationResult = migrateToUniqueIds(savedTabs, columnState);
-    if (migrationResult.migrated) {
-        savedTabs = migrationResult.savedTabs;
-        columnState = migrationResult.columnState;
-        console.log("Migrated tab IDs to unique format");
+async function initializeStoredState() {
+    try {
+        const result = await stateStorage.initialize();
+        if (result.migrated) {
+            console.log("Migrated tab IDs to unique format");
+        }
+        if (result.recovered > 0) {
+            console.log(`Recovered ${result.recovered} orphaned tab(s)`);
+        }
+        displaySavedTabs(result.state);
+    } catch (error) {
+        console.error('Could not initialize extension storage:', error);
     }
+}
 
-    savedTabs = savedTabs.filter(tab => !('temp' in tab));
-    
-    // Make unreferenced tabs visible instead of deleting user data.
-    const recovery = recoverOrphanedTabs(savedTabs, columnState, generateUniqueId);
-    savedTabs = recovery.savedTabs;
-    columnState = recovery.columnState;
-    if (recovery.recovered > 0) {
-        console.log(`Recovered ${recovery.recovered} orphaned tab(s)`);
-    }
-    
-    let state = replaceCanonicalState(savedTabs, columnState);
-    state = appendBackgroundTabs(state, bgTabs);
-    appState.replace(state);
-    displaySavedTabs(state);
-    const legacyState = canonicalStateToLegacy(state, { tempMarker: Date.now() });
-
-    chrome.storage.local.set({
-        columnState: legacyState.columnState,
-        bgTabs: [],
-        savedTabs: legacyState.savedTabs
-    }, () => {
-        //console.log("Migrated bgTabs");
-    });
-});
+initializeStoredState();
 
 document.querySelector('.minimize-sidebar').addEventListener('click', () => {
     chrome.storage.local.set({ sidebarCollapsed: true }, () => {
@@ -1664,7 +1600,9 @@ chrome.storage.local.get(['release', 'whatsNewClicked'], (data) => {
 function exportAllData() {
     chrome.storage.local.get(null, (all) => {
         try {
-            const { tabsMagicImportBackup, ...exportedData } = all;
+            const exportedData = { ...all };
+            delete exportedData.tabsMagicImportBackup;
+            delete exportedData.animation;
             const payload = {
                 formatVersion: CURRENT_EXPORT_FORMAT_VERSION,
                 exportedAt: new Date().toISOString(),
