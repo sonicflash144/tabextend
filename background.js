@@ -1,6 +1,6 @@
-import { createChromeApiAdapters } from './src/infrastructure/chrome-api.mjs';
+import { createBrowserApiFromGlobal } from './src/infrastructure/browser-api.mjs';
 
-const chrome = createChromeApiAdapters(globalThis.chrome);
+const chrome = createBrowserApiFromGlobal(globalThis);
 const CHROME_STRING = 'chrome';
 const excludedPrefixes = [
     `${CHROME_STRING}://`,

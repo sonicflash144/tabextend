@@ -1,12 +1,11 @@
 import { Chrono } from 'chrono-node';
-import 'emoji-picker-element';
 import {
-    CURRENT_EXPORT_FORMAT_VERSION,
     prepareImportData
 } from './src/compatibility/legacy-data.mjs';
 import { createStateStorageService } from './src/application/state-storage.mjs';
+import { createExportPayload } from './src/application/data-transfer.mjs';
 import { importStorageSafely } from './src/infrastructure/import-transaction.mjs';
-import { createChromeApiAdapters } from './src/infrastructure/chrome-api.mjs';
+import { createBrowserApiFromGlobal } from './src/infrastructure/browser-api.mjs';
 import {
     createStateStore,
     getTab
@@ -47,7 +46,7 @@ import {
     safePageUrl,
     textToLegacyStoredNote
 } from './src/security/content.mjs';
-const chrome = createChromeApiAdapters(globalThis.chrome);
+const chrome = createBrowserApiFromGlobal(globalThis);
 let theme = 'light';
 chrome.storage.local.get(["sidebarCollapsed", "theme"], (data) => {
     try {
@@ -71,7 +70,7 @@ chrome.storage.local.get(["sidebarCollapsed", "theme"], (data) => {
 function toggleTheme(){
     theme = theme === 'light' ? 'dark' : 'light';
     document.body.className = theme;
-    const emojiPickers = document.querySelectorAll('emoji-picker');
+    const emojiPickers = document.querySelectorAll('.emoji-picker-on-top');
     emojiPickers.forEach(picker => {
         picker.className = picker.className.replace(/light|dark/g, theme);
     });
@@ -166,6 +165,7 @@ function getBrowser() {
     return userAgent;
 }
 const userBrowser = getBrowser();
+document.documentElement.dataset.browser = userBrowser;
 
 /* Tab and Subgroup Functions */
 function deleteTab(id) {
@@ -378,7 +378,7 @@ function openAllInColumn(column, subgroup = null, dropPosition = null) {
     }
     urls = urls.filter(Boolean);
     if (urls.length === 0) return;
-    if(userBrowser !== CHROME_STRING){
+    if(!chrome.capabilities.tabGroups){
         urls.forEach((url, i) => {
             const createProperties = { url: url, active: false };
             if (dropPosition !== null) {
@@ -1525,7 +1525,7 @@ const handleClickOutside = (e) => {
         selectionController.clear();
     }
 
-    const emojiPickers = document.querySelectorAll('emoji-picker');
+    const emojiPickers = document.querySelectorAll('.emoji-picker-on-top');
     const emojiButtons = document.querySelectorAll('.emoji-button');
     const isEmojiClick = Array.from(emojiButtons).some(btn => btn.contains(e.target)) || 
                         Array.from(emojiPickers).some(picker => picker.contains(e.target));
@@ -1600,14 +1600,7 @@ chrome.storage.local.get(['release', 'whatsNewClicked'], (data) => {
 function exportAllData() {
     chrome.storage.local.get(null, (all) => {
         try {
-            const exportedData = { ...all };
-            delete exportedData.tabsMagicImportBackup;
-            delete exportedData.animation;
-            const payload = {
-                formatVersion: CURRENT_EXPORT_FORMAT_VERSION,
-                exportedAt: new Date().toISOString(),
-                exportedData
-            };
+            const payload = createExportPayload(all);
             const json = JSON.stringify(payload, null, 2);
 
             // Trigger download

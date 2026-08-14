@@ -5,6 +5,10 @@
   "scripts": {
     "test": "node --test",
     "build": "webpack --mode production",
+    "build:browsers": "node scripts/build-browsers.mjs all",
+    "build:chrome": "node scripts/build-browsers.mjs chrome",
+    "build:firefox": "node scripts/build-browsers.mjs firefox",
+    "build:safari": "node scripts/build-browsers.mjs safari",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -15,8 +19,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "chrono-node": "^2.7.7",
-    "emoji-picker-element": "^1.23.0"
+    "chrono-node": "^2.7.7"
   },
   "devDependencies": {
     "@babel/core": "^7.25.9",

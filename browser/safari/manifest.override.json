@@ -1,0 +1,8 @@
+{
+  "permissions": ["tabs", "storage", "activeTab", "contextMenus"],
+  "background": {
+    "scripts": ["dist/background.js"],
+    "service_worker": "dist/background.js",
+    "preferred_environment": ["service_worker"]
+  }
+}

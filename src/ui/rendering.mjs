@@ -1,18 +1,118 @@
-const COLLAPSE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>`;
-const EXPAND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-up"><path d="m18 15-6-6-6 6"/></svg>`;
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+const ICON_DEFINITIONS = {
+    'chevron-down': [
+        ['path', { d: 'm6 9 6 6 6-6' }]
+    ],
+    'chevron-up': [
+        ['path', { d: 'm18 15-6-6-6 6' }]
+    ],
+    close: [
+        ['line', { x1: '18', x2: '6', y1: '6', y2: '18' }],
+        ['line', { x1: '6', x2: '18', y1: '6', y2: '18' }]
+    ],
+    delete: [
+        ['polyline', { points: '3 6 5 6 21 6' }],
+        ['path', { d: 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' }],
+        ['line', { x1: '10', x2: '10', y1: '11', y2: '17' }],
+        ['line', { x1: '14', x2: '14', y1: '11', y2: '17' }]
+    ],
+    maximize: [
+        ['polyline', { points: '15 3 21 3 21 9' }],
+        ['polyline', { points: '9 21 3 21 3 15' }],
+        ['line', { x1: '21', x2: '14', y1: '3', y2: '10' }],
+        ['line', { x1: '3', x2: '10', y1: '21', y2: '14' }]
+    ],
+    minimize: [
+        ['path', { d: 'M3 19V5' }],
+        ['path', { d: 'm13 6-6 6 6 6' }],
+        ['path', { d: 'M7 12h14' }]
+    ],
+    more: [
+        ['circle', { cx: '12', cy: '12', r: '1' }],
+        ['circle', { cx: '12', cy: '5', r: '1' }],
+        ['circle', { cx: '12', cy: '19', r: '1' }]
+    ],
+    'new-column': [
+        ['path', { d: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z' }],
+        ['line', { x1: '12', x2: '12', y1: '11', y2: '17' }],
+        ['line', { x1: '9', x2: '15', y1: '14', y2: '14' }]
+    ]
+};
+
+const EMOJI_OPTIONS = [
+    '🍎', '🍊', '🍋', '🍉', '🍇', '🍓', '🫐', '🍒',
+    '🍑', '🥭', '🍍', '🥝', '🍅', '🥑', '🥦', '🥕',
+    '🌽', '🍄', '🥐', '🍞', '🧀', '🍕', '🌮', '🍜',
+    '🍣', '🍪', '🍩', '🍰', '☕', '🫖', '🥤', '🍿'
+];
+
+function createIcon(document, name, options = {}) {
+    const definition = ICON_DEFINITIONS[name];
+    if (!definition) throw new Error(`Unknown icon ${JSON.stringify(name)}.`);
+    const {
+        width = 24,
+        height = width,
+        filled = false,
+        classes = []
+    } = options;
+    const svg = document.createElementNS(SVG_NAMESPACE, 'svg');
+    const attributes = {
+        xmlns: SVG_NAMESPACE,
+        width: String(width),
+        height: String(height),
+        viewBox: '0 0 24 24',
+        fill: filled ? 'currentColor' : 'none',
+        stroke: 'currentColor',
+        'stroke-width': '2',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+        'aria-hidden': 'true'
+    };
+    Object.entries(attributes).forEach(([key, value]) => svg.setAttribute(key, value));
+    svg.classList.add('main-grid-item-icon', ...classes);
+
+    definition.forEach(([tagName, childAttributes]) => {
+        const child = document.createElementNS(SVG_NAMESPACE, tagName);
+        Object.entries(childAttributes).forEach(([key, value]) => child.setAttribute(key, value));
+        svg.appendChild(child);
+    });
+    return svg;
+}
+
+function setButtonIcon(button, name, options) {
+    button.replaceChildren(createIcon(button.ownerDocument, name, options));
+}
+
+function createEmojiPicker(document, theme) {
+    const picker = document.createElement('div');
+    picker.classList.add('emoji-picker-on-top', theme);
+    picker.setAttribute('role', 'listbox');
+    picker.setAttribute('aria-label', 'Choose a column emoji');
+    picker.style.display = 'none';
+
+    EMOJI_OPTIONS.forEach(emoji => {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.classList.add('emoji-picker-option');
+        option.textContent = emoji;
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-label', emoji);
+        option.addEventListener('click', () => {
+            picker.dispatchEvent(new CustomEvent('emoji-click', {
+                detail: { unicode: emoji }
+            }));
+        });
+        picker.appendChild(option);
+    });
+    return picker;
+}
 
 export function createDeletionArea(document, onDragLeave) {
     const deletionArea = document.createElement('div');
     deletionArea.id = 'deletion-area';
 
     const deleteIcon = document.createElement('div');
-    deleteIcon.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="40" height="40" class="main-grid-item-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-          <polyline points="3 6 5 6 21 6" />
-          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-          <line x1="10" x2="10" y1="11" y2="17" />
-          <line x1="14" x2="14" y1="11" y2="17" />
-        </svg>`;
+    deleteIcon.appendChild(createIcon(document, 'delete', { width: 40 }));
     deleteIcon.classList.add('delete-icon');
     deletionArea.appendChild(deleteIcon);
     deletionArea.addEventListener('dragleave', event => {
@@ -101,7 +201,7 @@ export function setSubgroupExpanded(expandButton, expanded) {
     const expandedContainer = container.querySelector('.expanded-tabs');
 
     expandButton.classList.toggle('expanded', nextExpanded);
-    expandButton.innerHTML = nextExpanded ? EXPAND_ICON : COLLAPSE_ICON;
+    setButtonIcon(expandButton, nextExpanded ? 'chevron-up' : 'chevron-down');
     faviconsContainer.style.display = nextExpanded ? 'none' : 'flex';
     expandedContainer.style.display = nextExpanded ? 'flex' : 'none';
     return nextExpanded;
@@ -127,14 +227,6 @@ export function getColorClass(color) {
             return 'tab-default';
     }
 }
-
-const MORE_OPTIONS_ICON = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" class="main-grid-item-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-      <circle cx="12" cy="12" r="1" />
-      <circle cx="12" cy="5" r="1" />
-      <circle cx="12" cy="19" r="1" />
-    </svg>`;
-const FILLED_MORE_OPTIONS_ICON = MORE_OPTIONS_ICON.replace('fill="none"', 'fill="currentColor"');
 
 export function createSavedTabView(document, options) {
     const {
@@ -200,7 +292,10 @@ export function createSavedTabView(document, options) {
     const moreOptionsButton = document.createElement('button');
     moreOptionsButton.classList.add('more-options');
     moreOptionsButton.dataset.index = String(tab.id);
-    moreOptionsButton.innerHTML = FILLED_MORE_OPTIONS_ICON;
+    moreOptionsButton.appendChild(createIcon(document, 'more', {
+        width: 20,
+        filled: true
+    }));
     actions.appendChild(moreOptionsButton);
     infoContainer.append(infoLeft, infoRight, actions);
     item.appendChild(infoContainer);
@@ -241,24 +336,22 @@ export function createColumnView(document, options) {
     const minimizeButton = document.createElement('button');
     minimizeButton.classList.add('minimize-column');
     minimizeButton.title = 'Minimize Column';
-    minimizeButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left-to-line"><path d="M3 19V5"/><path d="m13 6-6 6 6 6"/><path d="M7 12h14"/></svg>`;
+    minimizeButton.appendChild(createIcon(document, 'minimize'));
     const maximizeButton = document.createElement('button');
     maximizeButton.classList.add('maximize-column');
     maximizeButton.title = 'Maximize Column';
-    maximizeButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-maximize-2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" x2="14" y1="3" y2="10"/><line x1="3" x2="10" y1="21" y2="14"/></svg>`;
+    maximizeButton.appendChild(createIcon(document, 'maximize'));
     const menuContainer = document.createElement('div');
     menuContainer.classList.add('menu-container');
     const menuButton = document.createElement('button');
     menuButton.classList.add('more-options');
-    menuButton.innerHTML = MORE_OPTIONS_ICON;
+    menuButton.appendChild(createIcon(document, 'more', { width: 20 }));
     menuContainer.appendChild(menuButton);
     const emojiButton = document.createElement('button');
     emojiButton.classList.add('emoji-button');
     emojiButton.textContent = emoji || fallbackEmoji;
     column.dataset.emoji = emojiButton.textContent;
-    const emojiPicker = document.createElement('emoji-picker');
-    emojiPicker.classList.add('emoji-picker-on-top', theme);
-    emojiPicker.style.display = 'none';
+    const emojiPicker = createEmojiPicker(document, theme);
 
     titleGroup.insertBefore(emojiPicker, titleGroup.firstChild);
     titleGroup.insertBefore(emojiButton, titleGroup.firstChild);
@@ -289,10 +382,10 @@ export function createSubgroupView(document, options) {
     actions.classList.add('subgroup-tab-actions');
     const expandButton = document.createElement('button');
     expandButton.classList.add('expand-button');
-    expandButton.innerHTML = COLLAPSE_ICON;
+    expandButton.appendChild(createIcon(document, 'chevron-down'));
     const moreOptionsButton = document.createElement('button');
     moreOptionsButton.classList.add('more-options');
-    moreOptionsButton.innerHTML = MORE_OPTIONS_ICON;
+    moreOptionsButton.appendChild(createIcon(document, 'more', { width: 20 }));
     actions.append(expandButton, moreOptionsButton);
     titleGroup.appendChild(actions);
     infoContainer.append(faviconsContainer, expandedContainer);
@@ -345,17 +438,21 @@ export function createOpenTabView(document, options) {
     infoRight.appendChild(title);
     const actions = document.createElement('div');
     actions.classList.add('tab-actions');
-    actions.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" class="close-button" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>`;
+    const closeButton = createIcon(document, 'close', {
+        width: 20,
+        classes: ['close-button']
+    });
+    actions.appendChild(closeButton);
     infoContainer.append(infoLeft, infoRight, actions);
     item.appendChild(infoContainer);
-    return { item, infoLeft, title, closeButton: actions.querySelector('.close-button') };
+    return { item, infoLeft, title, closeButton };
 }
 
 export function createNewColumnIndicator(document) {
     const indicator = document.createElement('div');
     indicator.classList.add('new-column-indicator');
     const icon = document.createElement('div');
-    icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="40" height="40" class="main-grid-item-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" x2="12" y1="11" y2="17"/><line x1="9" x2="15" y1="14" y2="14"/></svg>`;
+    icon.appendChild(createIcon(document, 'new-column', { width: 40 }));
     icon.classList.add('new-column-icon');
     indicator.appendChild(icon);
     indicator.addEventListener('dragleave', event => {

@@ -37,20 +37,20 @@ The ongoing refactor is moving the monolithic `newtab.js` toward tested applicat
 - `src/application/state-storage.mjs` now owns startup reads, migration and orphan recovery, one-time background-tab consumption, default-column creation, canonical persistence, legacy write-back, reloads, and external storage synchronization. Persistence intentionally continues writing `savedTabs` and `columnState`.
 - Imports use a transactional backup/write/verify flow with rollback. Verification compares JSON structurally instead of depending on object-property order and identifies mismatched storage keys when verification genuinely fails.
 - Current exports are versioned and omit the transient `tabsMagicImportBackup` and `animation` keys. Readers remain compatible with old exports that contain those keys.
-- Chrome API and storage boundaries have initial adapters under `src/infrastructure/`; stored notes and URLs pass through safe-content helpers under `src/security/`.
+- WebExtension API and storage boundaries have initial adapters under `src/infrastructure/`; stored notes and URLs pass through safe-content helpers under `src/security/`.
+- Chrome, Firefox, and Safari now build from the same source and bundles. Small manifest overrides under `browser/` select Chrome's service worker and tab-group permission, Firefox's background script and Gecko metadata, and Safari's preferred background environment. The browser API boundary normalizes callback and promise implementations.
 - Rendering is extracted to `src/ui/rendering.mjs`. Menu, selection, and editable-title behavior lives in focused controllers under `src/ui/controllers/`, with controller tests.
 - ESLint flat configuration and npm lint/format scripts are installed. The first lint pass also fixed the column drag indicator boundary check, which previously ran before its position was calculated.
-- The automated suite currently has 63 passing tests covering compatibility, canonical state and operations, storage lifecycle/synchronization, transactional imports, adapters, safe content, and UI controllers. Production bundles have been rebuilt from the current source.
+- The automated suite currently has 78 passing tests covering compatibility, canonical state and operations, storage lifecycle/synchronization, transactional imports, adapters, safe content, UI controllers, ZIP browser packaging, and every Chrome/Firefox/Safari export-import pairing. Production bundles have been rebuilt from the current source.
 
 `newtab.js` remains the composition root. It still owns open-tab workflows, settings/release/export/import coordination, storage event UI effects, and complex drag event wiring. `background.js` still contains direct browser API and background-storage workflows.
 
 ### Remaining Work, in Priority Order
 
-1. Merge this state/storage slice into `main`, then unify Chrome, Firefox, and Safari from one source line. Keep browser-neutral application code and small per-browser manifest/build/packaging overrides instead of long-lived divergent product branches. Confirm export/import round trips across all three browsers.
-2. Complete browser-boundary extraction. Route remaining direct `chrome.*` calls in `newtab.js` and `background.js` through focused adapters/repositories, with particular attention to open-tab/group behavior, settings, import/export, release state, context menus, and queued background tabs.
-3. Extract remaining application workflows from `newtab.js`, then move drag/event coordination into a focused controller. Preserve the grouped-tab drag/drop fix and column-indicator clamping behavior, and add tests before moving each behavior.
-4. Add a suitable DOM test environment and focused integration tests for rendering, editing, selection, menus, drag targeting, and storage-driven UI updates. Split `src/ui/rendering.mjs` into smaller view modules only when that improves maintainability.
-5. Establish Prettier settings that preserve the repository's four-space style, apply the initial full formatting in a standalone commit, and add lint/test/build/format checks to CI.
+1. Complete browser-boundary extraction. Route remaining browser workflows in `newtab.js` and `background.js` through focused adapters/repositories, with particular attention to open-tab/group behavior, settings, release state, context menus, and queued background tabs.
+2. Extract remaining application workflows from `newtab.js`, then move drag/event coordination into a focused controller. Preserve the grouped-tab drag/drop fix and column-indicator clamping behavior, and add tests before moving each behavior.
+3. Add a suitable DOM test environment and focused integration tests for rendering, editing, selection, menus, drag targeting, and storage-driven UI updates. Split `src/ui/rendering.mjs` into smaller view modules only when that improves maintainability.
+4. Establish Prettier settings that preserve the repository's four-space style, apply the initial full formatting in a standalone commit, and add lint/test/build/format checks to CI.
 
 Do not remove legacy readers or writers, silently change export shapes, discard unknown supported metadata, or weaken import rollback. Existing users' stored and exported data must remain readable. Never render stored notes or URLs through unsafe HTML APIs; existing `innerHTML` usage is limited to static application-owned SVG markup.
 

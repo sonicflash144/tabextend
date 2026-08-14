@@ -6,6 +6,7 @@ export default [
     {
         ignores: [
             'dist/**',
+            'build/**',
             'node_modules/**',
             'coverage/**'
         ]
@@ -29,6 +30,14 @@ export default [
     },
     {
         files: ['test/**/*.mjs'],
+        languageOptions: {
+            ecmaVersion: 'latest',
+            sourceType: 'module',
+            globals: globals.node
+        }
+    },
+    {
+        files: ['scripts/**/*.mjs'],
         languageOptions: {
             ecmaVersion: 'latest',
             sourceType: 'module',
