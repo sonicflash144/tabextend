@@ -9,6 +9,7 @@
     "build:chrome": "node scripts/build-browsers.mjs chrome",
     "build:firefox": "node scripts/build-browsers.mjs firefox",
     "build:safari": "node scripts/build-browsers.mjs safari",
+    "build:safari:xcode": "npm run build && node scripts/write-safari-manifest.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

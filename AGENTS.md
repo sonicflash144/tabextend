@@ -13,6 +13,8 @@ Testable code belongs in `src/`: application workflows in `application/`, migrat
 - `npm run lint`: run ESLint across source, tests, and configuration files.
 - `npm run lint:fix`: apply ESLint's safe automatic fixes.
 - `npm run build`: create production bundles and source maps in `dist/`.
+- `npm run build:browsers` / `build:chrome` / `build:firefox` / `build:safari`: merge the matching `browser/<name>/manifest.override.json` over `manifest.json`, then stage and zip a per-browser package to `build/<name>.zip`. These zips are for manual side-loading and are **not** what the macOS/Safari App Store build consumes (see "Safari App Packaging (Xcode)" below).
+- `npm run build:safari:xcode`: builds `dist/` and writes the merged Safari manifest to `browser/safari/manifest.json` (gitignored, generated). This is what the Xcode project actually runs.
 - `npm run format` / `npm run format:check`: write or check Prettier formatting. Do not mix a repository-wide formatting pass into a behavioral refactor.
 
 For manual testing, build, enable browser developer mode, and load this repository as an unpacked extension. Reload it after rebuilding.
@@ -61,6 +63,24 @@ The ongoing refactor is moving the monolithic `newtab.js` toward tested applicat
 The column emoji picker is the `emoji-picker` custom element from `emoji-picker-element`, registered by the page importing the package and created in `createEmojiPicker`. It was once replaced by a hand-rolled grid of thirty-two emoji during an unrelated change, which silently dropped search and the full emoji set; do not substitute a static list for it.
 
 Do not remove legacy readers or writers, silently change export shapes, discard unknown supported metadata, or weaken import rollback. Existing users' stored and exported data must remain readable. Never render stored notes or URLs through unsafe HTML APIs; existing `innerHTML` usage is limited to static application-owned SVG markup.
+
+## Safari App Packaging (Xcode)
+
+The distributable macOS app that hosts this extension as a Safari Web Extension lives in a sibling directory, `../Tabs Magic` (Xcode project `Tabs Magic.xcodeproj`, target `Tabs Magic Extension`). That project does **not** build from `build/safari.zip`. Its Resources build phase references files straight out of this repo's working tree by relative path (`../../tabextend/...`): `dist/`, `icon.png`, `icons/`, `newtab.html`, `newtab.css`, and `browser/safari/manifest.json`.
+
+Because of that direct reference:
+
+- `browser/safari/manifest.json` is a **generated, gitignored** file, distinct from the tracked `browser/safari/manifest.override.json`. It's produced by `scripts/write-safari-manifest.mjs`, which calls `createTargetManifest('safari')` (exported from `scripts/build-browsers.mjs`) to merge the override over the base `manifest.json`, then writes the result there — this is exactly the merge `npm run build:safari` performs internally before zipping, just persisted to a fixed path instead of a temp staging dir.
+- The Xcode project has a Run Script build phase ("Build tabextend (Safari)", `alwaysOutOfDate = 1` so it runs on every build) on the `Tabs Magic Extension` target that runs `npm run build:safari:xcode` before Resources are copied. This keeps `dist/` and the Safari manifest fresh every time someone hits Run/⌘R in Xcode, without a manual build step.
+- The script exports `PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"` first, because Xcode's build environment doesn't reliably inherit a Homebrew `npm` on `PATH`.
+
+Do not:
+
+- Hand-edit `browser/safari/manifest.json` — it's regenerated and gitignored; edit `manifest.json` or `browser/safari/manifest.override.json` instead.
+- Assume `build/safari.zip` (from `npm run build:safari`) is what ships in the Mac App Store build — it isn't consumed anywhere in the Xcode project. It exists only for manual/unpacked testing.
+- Drop the Safari override's `background.scripts`/`preferred_environment` keys or reintroduce `tabGroups` into the Safari permission set — Safari's MV3 support needs the `scripts` fallback alongside `service_worker`, and does not support `tabGroups`.
+
+If the Xcode project's extension target file references are ever re-pointed (e.g. during an Xcode project regeneration), keep them aimed at `browser/safari/manifest.json`, `dist/`, `icon.png`, and `icons/` under this repo — that coupling is by convention only, not enforced by any check.
 
 ## Commits & Pull Requests
 
