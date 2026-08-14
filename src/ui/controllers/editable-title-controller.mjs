@@ -9,14 +9,19 @@ export function createEditableTitleController(document, options = {}) {
         container = 'span'
     } = options;
 
+    // classList rejects empty tokens, so unnamed classes are simply skipped.
+    function addClass(element, className) {
+        if (className) element.classList.add(className);
+    }
+
     const titleGroup = document.createElement('div');
-    titleGroup.classList.add(groupClass);
+    addClass(titleGroup, groupClass);
     const titleSpan = document.createElement(container);
-    titleSpan.classList.add(spanClass);
+    addClass(titleSpan, spanClass);
     titleSpan.textContent = initialText || defaultText;
     const titleInput = document.createElement('input');
     titleInput.type = 'text';
-    titleInput.classList.add(inputClass);
+    addClass(titleInput, inputClass);
     titleInput.style.display = 'none';
 
     titleSpan.addEventListener('click', () => {

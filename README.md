@@ -26,11 +26,13 @@ Tabs Magic is a browser extension designed to help you organize and manage your 
 
 ## Installation
 
-Tabs Magic is available for multiple browsers:
+Tabs Magic is available for all major browsers:
 
 - **Chrome and Other Chromium Browsers**: Available on the [Chrome Web Store](https://chromewebstore.google.com/detail/tabs-magic/epjcnbdchmflcppaajkbckidicdmpmnc). 
 
 - **Firefox**: Available on the [Firefox Add-ons site](https://addons.mozilla.org/en-US/firefox/addon/tabs-magic/).
+
+- **Safari**: Available on the [App Store](https://apps.apple.com/us/app/tabs-magic/id6740145686).
 
 ## Cross-Browser Builds
 

@@ -109,6 +109,36 @@ export function getTab(state, tabId) {
     return state.tabs.get(String(tabId)) || null;
 }
 
+export function getColumn(state, columnId) {
+    return state.columns.find(column => column.id === String(columnId)) || null;
+}
+
+/** Locate a group and the column holding it. */
+export function findGroup(state, groupId) {
+    const id = String(groupId);
+    for (const column of state.columns) {
+        const group = column.items.find(item => item.type === 'group' && item.id === id);
+        if (group) return { column, group };
+    }
+    return { column: null, group: null };
+}
+
+export function getGroupTabs(state, groupId) {
+    const { group } = findGroup(state, groupId);
+    if (!group) return [];
+    return group.tabIds.map(tabId => getTab(state, tabId)).filter(Boolean);
+}
+
+/** Every tab a column holds, in order, with its groups flattened in place. */
+export function getColumnTabs(state, columnId) {
+    const column = getColumn(state, columnId);
+    if (!column) return [];
+    return column.items.flatMap(item => item.type === 'group'
+        ? item.tabIds.map(tabId => getTab(state, tabId))
+        : [getTab(state, item.tabId)]
+    ).filter(Boolean);
+}
+
 export function replaceColumnsFromLegacy(state, columnState) {
     const legacy = canonicalStateToLegacy(state);
     return canonicalStateFromLegacy(legacy.savedTabs, columnState);

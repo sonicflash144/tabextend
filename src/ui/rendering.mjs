@@ -39,13 +39,6 @@ const ICON_DEFINITIONS = {
     ]
 };
 
-const EMOJI_OPTIONS = [
-    '🍎', '🍊', '🍋', '🍉', '🍇', '🍓', '🫐', '🍒',
-    '🍑', '🥭', '🍍', '🥝', '🍅', '🥑', '🥦', '🥕',
-    '🌽', '🍄', '🥐', '🍞', '🧀', '🍕', '🌮', '🍜',
-    '🍣', '🍪', '🍩', '🍰', '☕', '🫖', '🥤', '🍿'
-];
-
 function createIcon(document, name, options = {}) {
     const definition = ICON_DEFINITIONS[name];
     if (!definition) throw new Error(`Unknown icon ${JSON.stringify(name)}.`);
@@ -83,27 +76,32 @@ function setButtonIcon(button, name, options) {
     button.replaceChildren(createIcon(button.ownerDocument, name, options));
 }
 
-function createEmojiPicker(document, theme) {
-    const picker = document.createElement('div');
-    picker.classList.add('emoji-picker-on-top', theme);
-    picker.setAttribute('role', 'listbox');
-    picker.setAttribute('aria-label', 'Choose a column emoji');
-    picker.style.display = 'none';
+/**
+ * Roughly the picker's natural width: eight columns of emoji at the element's
+ * default sizes. Only used when the element cannot be measured.
+ */
+export const EMOJI_PICKER_WIDTH = 320;
 
-    EMOJI_OPTIONS.forEach(emoji => {
-        const option = document.createElement('button');
-        option.type = 'button';
-        option.classList.add('emoji-picker-option');
-        option.textContent = emoji;
-        option.setAttribute('role', 'option');
-        option.setAttribute('aria-label', emoji);
-        option.addEventListener('click', () => {
-            picker.dispatchEvent(new CustomEvent('emoji-click', {
-                detail: { unicode: emoji }
-            }));
-        });
-        picker.appendChild(option);
-    });
+/**
+ * Where a popover anchored to a button should start, in viewport
+ * coordinates. It normally lines up with the button's left edge, but near the
+ * right of the window it lines its right edge up with the button's instead,
+ * so it stays on screen.
+ */
+export function popoverLeftForAnchor(anchorRect, popoverWidth, viewportWidth) {
+    if (anchorRect.left + popoverWidth <= viewportWidth) return anchorRect.left;
+    return Math.max(0, anchorRect.right - popoverWidth);
+}
+
+/**
+ * The `emoji-picker` custom element from `emoji-picker-element`, which the
+ * page registers on load. It reports a choice as an `emoji-click` event
+ * carrying `detail.unicode`.
+ */
+function createEmojiPicker(document, theme) {
+    const picker = document.createElement('emoji-picker');
+    picker.classList.add('emoji-picker-on-top', theme);
+    picker.style.display = 'none';
     return picker;
 }
 
@@ -150,6 +148,37 @@ export function createMenuDropdown(document, menuItems, button) {
     menuDropdown.style.right = `${window.innerWidth - buttonRect.right}px`;
     document.body.appendChild(menuDropdown);
     return menuDropdown;
+}
+
+/** The swatch grid shown under a tab's menu button. */
+export function createColorMenu(document, options) {
+    const { colors, button, onSelect } = options;
+    const colorMenu = document.createElement('div');
+    colorMenu.classList.add('color-menu');
+
+    colors.forEach(color => {
+        const colorOption = document.createElement('div');
+        colorOption.classList.add('color-option', color);
+        colorOption.addEventListener('click', () => onSelect(color));
+        colorMenu.appendChild(colorOption);
+    });
+
+    document.body.appendChild(colorMenu);
+    const buttonRect = button.getBoundingClientRect();
+    colorMenu.style.top = `${buttonRect.bottom + 5}px`;
+    colorMenu.style.right = `${window.innerWidth - buttonRect.right}px`;
+    return colorMenu;
+}
+
+/**
+ * The dot marking something unread. The inline form sits inside a menu
+ * option rather than on a toolbar button.
+ */
+export function createNotificationDot(document, options = {}) {
+    const dot = document.createElement('div');
+    dot.classList.add('notification-circle');
+    if (options.inline) dot.classList.add('inline-notification');
+    return dot;
 }
 
 export function createDraggableListItem(document, options = {}) {

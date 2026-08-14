@@ -7,6 +7,10 @@ import {
     canonicalStateFromLegacy,
     canonicalStateToLegacy,
     createStateStore,
+    findGroup,
+    getColumn,
+    getColumnTabs,
+    getGroupTabs,
     getTab,
     replaceColumnsFromLegacy,
     validateCanonicalState
@@ -189,4 +193,69 @@ test('state store replaces legacy state and notifies subscribers', () => {
 
     assert.deepEqual(seen, [1]);
     assert.equal(store.getState().columns.length, 0);
+});
+
+function boardState() {
+    return canonicalStateFromLegacy([
+        { id: 'alpha', title: 'Alpha', url: 'https://example.com/alpha' },
+        { id: 'beta', title: 'Beta', url: 'https://example.com/beta' },
+        { id: 'gamma', title: 'Gamma', url: 'https://example.com/gamma' },
+        { id: 'delta', title: 'Delta', url: 'https://example.com/delta' }
+    ], [
+        {
+            id: 'column-1',
+            title: 'Research',
+            tabIds: [
+                'tab-alpha',
+                ['group-1', 'tab-beta', 'tab-gamma', 'Reading', false]
+            ]
+        },
+        { id: 'column-2', title: 'Later', tabIds: ['tab-delta'] }
+    ]);
+}
+
+test('columns and groups are found by their identity', () => {
+    const state = boardState();
+
+    assert.equal(getColumn(state, 'column-2').title, 'Later');
+    assert.equal(getColumn(state, 'missing'), null);
+
+    const located = findGroup(state, 'group-1');
+    assert.equal(located.column.id, 'column-1');
+    assert.equal(located.group.title, 'Reading');
+    assert.deepEqual(findGroup(state, 'missing'), { column: null, group: null });
+});
+
+test('a column lists its tabs in order with its groups flattened in place', () => {
+    const state = boardState();
+
+    assert.deepEqual(getColumnTabs(state, 'column-1').map(tab => tab.id), [
+        'alpha',
+        'beta',
+        'gamma'
+    ]);
+    assert.deepEqual(getColumnTabs(state, 'column-2').map(tab => tab.id), ['delta']);
+    assert.deepEqual(getColumnTabs(state, 'missing'), []);
+});
+
+test('a group lists only its own tabs, in order', () => {
+    const state = boardState();
+
+    assert.deepEqual(getGroupTabs(state, 'group-1').map(tab => tab.id), ['beta', 'gamma']);
+    assert.deepEqual(getGroupTabs(state, 'missing'), []);
+});
+
+test('tab references with no stored tab are skipped rather than reported as gaps', () => {
+    const state = canonicalStateFromLegacy([
+        { id: 'alpha', title: 'Alpha', url: 'https://example.com/alpha' }
+    ], [
+        {
+            id: 'column-1',
+            title: 'Research',
+            tabIds: ['tab-alpha', 'tab-missing', ['group-1', 'tab-gone', 'Reading', false]]
+        }
+    ]);
+
+    assert.deepEqual(getColumnTabs(state, 'column-1').map(tab => tab.id), ['alpha']);
+    assert.deepEqual(getGroupTabs(state, 'group-1'), []);
 });
