@@ -82,8 +82,10 @@ test('only one menu of a kind is open, and reopening the same one closes it', ()
         width: 20
     });
     const controller = createMenuController();
-    const open = id => controller.toggle('options', id, () =>
-        createMenuDropdown(document, [{ text: id, action: () => {} }], button));
+    const open = id =>
+        controller.toggle('options', id, () =>
+            createMenuDropdown(document, [{ text: id, action: () => {} }], button)
+        );
 
     const first = open('one');
     assert.equal(document.querySelectorAll('.options-menu').length, 1);
@@ -106,9 +108,8 @@ test('opening any menu closes the one already showing, and closeAll clears it', 
         width: 20
     });
     const controller = createMenuController();
-    const build = label => () => createMenuDropdown(document, [
-        { text: label, action: () => {} }
-    ], button);
+    const build = label => () =>
+        createMenuDropdown(document, [{ text: label, action: () => {} }], button);
 
     const tabMenu = controller.open('options', 'one', build('one'));
     // A column menu replaces the tab menu; the page never shows two at once.

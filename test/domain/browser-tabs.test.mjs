@@ -26,7 +26,10 @@ test('lists only tabs the extension may show', () => {
         { id: 4, url: 'moz-extension://abc/newtab.html' },
         { id: 5, url: 'http://localhost:3000' }
     ];
-    assert.deepEqual(filterListableTabs(tabs).map(tab => tab.id), [1, 5]);
+    assert.deepEqual(
+        filterListableTabs(tabs).map(tab => tab.id),
+        [1, 5]
+    );
     assert.deepEqual(filterListableTabs(undefined), []);
 });
 
@@ -39,7 +42,11 @@ test('falls back to the favicon service and tolerates unparsable urls', () => {
 });
 
 test('builds the stored tab shape and only adds a note when one is captured', () => {
-    const tab = { title: 'Example', url: 'https://example.com', favIconUrl: 'https://example.com/i.png' };
+    const tab = {
+        title: 'Example',
+        url: 'https://example.com',
+        favIconUrl: 'https://example.com/i.png'
+    };
 
     assert.deepEqual(savedTabFromBrowserTab(tab, { id: 'abc' }), {
         title: 'Example',
@@ -49,17 +56,23 @@ test('builds the stored tab shape and only adds a note when one is captured', ()
         color: '#FFFFFF'
     });
 
-    assert.deepEqual(savedTabFromBrowserTab({ title: 'Example', url: 'https://example.com' }, {
-        id: 'abc',
-        note: ''
-    }), {
-        title: 'Example',
-        url: 'https://example.com',
-        favIconUrl: 'https://www.google.com/s2/favicons?domain=example.com&sz=32',
-        id: 'abc',
-        color: '#FFFFFF',
-        note: null
-    });
+    assert.deepEqual(
+        savedTabFromBrowserTab(
+            { title: 'Example', url: 'https://example.com' },
+            {
+                id: 'abc',
+                note: ''
+            }
+        ),
+        {
+            title: 'Example',
+            url: 'https://example.com',
+            favIconUrl: 'https://www.google.com/s2/favicons?domain=example.com&sz=32',
+            id: 'abc',
+            color: '#FFFFFF',
+            note: null
+        }
+    );
 
     assert.equal(
         savedTabFromBrowserTab(tab, { id: 'abc', note: 'selected text' }).note,

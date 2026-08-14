@@ -54,25 +54,38 @@ test('tab operations add, update, and remove records without mutating prior stat
 
 test('column operations preserve metadata while adding, updating, moving, and deleting', () => {
     const initial = stateFixture();
-    const added = addColumn(initial, {
-        id: 'middle',
-        title: 'Middle',
-        emoji: '🍏',
-        customColumn: 'preserve',
-        items: []
-    }, 1);
+    const added = addColumn(
+        initial,
+        {
+            id: 'middle',
+            title: 'Middle',
+            emoji: '🍏',
+            customColumn: 'preserve',
+            items: []
+        },
+        1
+    );
     const updated = updateColumn(added, 'middle', { title: 'Updated', minimized: true });
     const moved = moveColumn(updated, 'middle', 0);
     const removed = removeColumn(moved, 'first', { deleteTabs: true });
 
-    assert.deepEqual(initial.columns.map(column => column.id), ['first', 'second']);
-    assert.deepEqual(moved.columns.map(column => column.id), ['middle', 'first', 'second']);
+    assert.deepEqual(
+        initial.columns.map(column => column.id),
+        ['first', 'second']
+    );
+    assert.deepEqual(
+        moved.columns.map(column => column.id),
+        ['middle', 'first', 'second']
+    );
     assert.equal(moved.columns[0].customColumn, 'preserve');
     assert.equal(moved.columns[0].title, 'Updated');
     assert.equal(moved.columns[0].minimized, true);
     assert.equal(removed.tabs.has('one'), false);
     assert.equal(removed.tabs.has('two'), false);
-    assert.deepEqual(removed.columns.map(column => column.id), ['middle', 'second']);
+    assert.deepEqual(
+        removed.columns.map(column => column.id),
+        ['middle', 'second']
+    );
 });
 
 test('group operations create, update, ungroup, and remove groups as pure transformations', () => {
@@ -88,14 +101,16 @@ test('group operations create, update, ungroup, and remove groups as pure transf
     const ungrouped = ungroup(updated, 'group-b');
     const removed = removeGroup(updated, 'group-b', { deleteTabs: true });
 
-    assert.deepEqual(created.columns[1].items, [{
-        type: 'group',
-        id: 'group-b',
-        tabIds: ['one', 'three'],
-        title: 'Group B',
-        expanded: false,
-        metadata: 'keep'
-    }]);
+    assert.deepEqual(created.columns[1].items, [
+        {
+            type: 'group',
+            id: 'group-b',
+            tabIds: ['one', 'three'],
+            title: 'Group B',
+            expanded: false,
+            metadata: 'keep'
+        }
+    ]);
     assert.equal(updated.columns[1].items[0].metadata, 'keep');
     assert.deepEqual(ungrouped.columns[1].items, [
         { type: 'tab', tabId: 'one' },
@@ -105,4 +120,3 @@ test('group operations create, update, ungroup, and remove groups as pure transf
     assert.equal(removed.tabs.has('three'), false);
     assert.equal(initial.columns[0].items[0].tabId, 'one');
 });
-

@@ -26,7 +26,10 @@ beforeEach(() => {
 
 function createView() {
     const calls = [];
-    const record = name => (...args) => calls.push([name, ...args]);
+    const record =
+        name =>
+        (...args) =>
+            calls.push([name, ...args]);
     const view = createOpenTabsView(document, {
         list,
         sidebar,
@@ -67,13 +70,22 @@ test('renders one row per open tab, in window order', () => {
     view.render(openTabs());
 
     const rows = Array.from(list.children);
-    assert.deepEqual(rows.map(row => row.id), ['opentab-7', 'opentab-9']);
-    assert.deepEqual(rows.map(row => row.querySelector('.tab-title').textContent), [
-        'Alpha',
-        'Beta'
-    ]);
-    assert.deepEqual(rows.map(row => row.getAttribute('data-tab-id')), ['7', '9']);
-    assert.deepEqual(rows.map(row => row.getAttribute('data-index')), ['0', '1']);
+    assert.deepEqual(
+        rows.map(row => row.id),
+        ['opentab-7', 'opentab-9']
+    );
+    assert.deepEqual(
+        rows.map(row => row.querySelector('.tab-title').textContent),
+        ['Alpha', 'Beta']
+    );
+    assert.deepEqual(
+        rows.map(row => row.getAttribute('data-tab-id')),
+        ['7', '9']
+    );
+    assert.deepEqual(
+        rows.map(row => row.getAttribute('data-index')),
+        ['0', '1']
+    );
     assert.equal(rows[0].draggable, true);
 });
 
@@ -95,7 +107,9 @@ test('a tab without an icon falls back to the favicon service', () => {
 test('an unsafe icon url is dropped rather than rendered', () => {
     const { view } = createView();
 
-    view.render([{ id: 1, title: 'Odd', url: 'https://a.test', favIconUrl: 'javascript:alert(1)' }]);
+    view.render([
+        { id: 1, title: 'Odd', url: 'https://a.test', favIconUrl: 'javascript:alert(1)' }
+    ]);
 
     assert.equal(list.children[0].querySelector('img').getAttribute('src'), null);
 });
@@ -117,7 +131,10 @@ test('rendering again replaces the previous rows', () => {
     view.render(openTabs());
     view.render([openTabs()[1]]);
 
-    assert.deepEqual(Array.from(list.children).map(row => row.id), ['opentab-9']);
+    assert.deepEqual(
+        Array.from(list.children).map(row => row.id),
+        ['opentab-9']
+    );
 });
 
 test('the close button, favicon, and title report what the user asked for', () => {
@@ -129,7 +146,10 @@ test('the close button, favicon, and title report what the user asked for', () =
     click(row.querySelector('.tab-info-left'));
     click(row.querySelector('.tab-title'));
 
-    assert.deepEqual(calls.map(call => call[0]), ['close', 'select', 'activate']);
+    assert.deepEqual(
+        calls.map(call => call[0]),
+        ['close', 'select', 'activate']
+    );
     assert.equal(calls[0][1].id, 7);
     assert.equal(calls[1][1], row);
     assert.equal(calls[2][1].id, 7);

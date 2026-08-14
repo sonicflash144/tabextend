@@ -69,25 +69,32 @@ test('rejects an export produced by a newer unsupported format', async () => {
 test('migrates numeric ids and every matching group reference without mutation', async () => {
     const candidate = await readFixture('legacy-raw-numeric.json');
     const original = structuredClone(candidate);
-    const generatedIds = new Map([[101, 'generated-a'], [102, 'generated-b']]);
+    const generatedIds = new Map([
+        [101, 'generated-a'],
+        [102, 'generated-b']
+    ]);
 
-    const result = migrateToUniqueIds(
-        candidate.savedTabs,
-        candidate.columnState,
-        oldId => generatedIds.get(oldId)
+    const result = migrateToUniqueIds(candidate.savedTabs, candidate.columnState, oldId =>
+        generatedIds.get(oldId)
     );
 
     assert.equal(result.migrated, true);
-    assert.deepEqual(result.savedTabs.map(tab => tab.id), ['generated-a', 'generated-b']);
+    assert.deepEqual(
+        result.savedTabs.map(tab => tab.id),
+        ['generated-a', 'generated-b']
+    );
     assert.deepEqual(result.columnState[0].tabIds, [
         'tab-generated-a',
         ['group-1700000000000', 'tab-generated-b', 'Legacy group', true]
     ]);
     assert.deepEqual(candidate, original);
-    assert.equal(validateLegacyData({
-        savedTabs: result.savedTabs,
-        columnState: result.columnState
-    }).valid, true);
+    assert.equal(
+        validateLegacyData({
+            savedTabs: result.savedTabs,
+            columnState: result.columnState
+        }).valid,
+        true
+    );
 });
 
 test('numeric-id migration is idempotent', async () => {
@@ -109,11 +116,13 @@ test('numeric-id migration is idempotent', async () => {
 test('reports broken references and malformed subgroup tuples', () => {
     const result = validateLegacyData({
         savedTabs: [{ id: 'known', title: 'Known', url: 'https://example.com' }],
-        columnState: [{
-            id: 'column-1',
-            title: 'Column',
-            tabIds: ['tab-missing', ['group-1', 'tab-known', 'Missing expanded flag']]
-        }]
+        columnState: [
+            {
+                id: 'column-1',
+                title: 'Column',
+                tabIds: ['tab-missing', ['group-1', 'tab-known', 'Missing expanded flag']]
+            }
+        ]
     });
 
     assert.equal(result.valid, false);
@@ -179,31 +188,35 @@ test('orphan recovery is idempotent and reuses its recovery column', () => {
 
 test('prepares the oldest envelope for safe import and preserves pending background tabs', async () => {
     const candidate = await readFixture('legacy-wrapped-data-key.json');
-    candidate.data.bgTabs = [{
-        id: 7002,
-        title: 'Pending background tab',
-        url: 'https://example.com/pending',
-        favIconUrl: '',
-        color: '#FFFFFF'
-    }];
+    candidate.data.bgTabs = [
+        {
+            id: 7002,
+            title: 'Pending background tab',
+            url: 'https://example.com/pending',
+            favIconUrl: '',
+            color: '#FFFFFF'
+        }
+    ];
 
     const result = prepareImportData(candidate, {
-        idFactory: oldId => oldId === 7001 ? 'migrated-1' : oldId === 7002 ? 'migrated-2' : 'recovery',
+        idFactory: oldId =>
+            oldId === 7001 ? 'migrated-1' : oldId === 7002 ? 'migrated-2' : 'recovery',
         now: () => 123456789
     });
 
     assert.equal(result.valid, true, result.errors.join('\n'));
     assert.equal(result.migrated, true);
     assert.equal(result.recovered, 1);
-    assert.deepEqual(result.data.savedTabs.map(tab => tab.id ?? tab.temp), [
-        'migrated-1',
-        'migrated-2',
-        123456789
-    ]);
+    assert.deepEqual(
+        result.data.savedTabs.map(tab => tab.id ?? tab.temp),
+        ['migrated-1', 'migrated-2', 123456789]
+    );
     assert.deepEqual(result.data.bgTabs, []);
-    assert.ok(result.data.columnState.some(column =>
-        column.recovered && column.tabIds.includes('tab-migrated-2')
-    ));
+    assert.ok(
+        result.data.columnState.some(
+            column => column.recovered && column.tabIds.includes('tab-migrated-2')
+        )
+    );
 });
 
 test('rejects malformed import before preparation', () => {

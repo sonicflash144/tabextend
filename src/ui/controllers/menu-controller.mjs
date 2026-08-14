@@ -37,4 +37,3 @@ export function createMenuController() {
 
     return { close, closeAll, get, isOpen, open, toggle };
 }
-

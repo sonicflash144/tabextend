@@ -7,10 +7,7 @@ import { createStateStore } from '../../src/domain/state.mjs';
 import { createBoardView } from '../../src/ui/board-view.mjs';
 import { createTabPresenter } from '../../src/ui/tab-presentation.mjs';
 import { createDragController } from '../../src/ui/controllers/drag-controller.mjs';
-import {
-    createDeletionArea,
-    createNewColumnIndicator
-} from '../../src/ui/rendering.mjs';
+import { createDeletionArea, createNewColumnIndicator } from '../../src/ui/rendering.mjs';
 import { createPageDom, dragEvent, setRect, stackRects } from '../helpers/dom.mjs';
 
 let page;
@@ -25,7 +22,8 @@ after(() => page.cleanup());
 
 beforeEach(() => {
     document.getElementById('columns-container').replaceChildren();
-    document.querySelectorAll('#deletion-area, .drop-indicator-container')
+    document
+        .querySelectorAll('#deletion-area, .drop-indicator-container')
         .forEach(node => node.remove());
 });
 
@@ -44,7 +42,9 @@ function createStorage(initial = {}) {
                 requested.filter(key => key in values).map(key => [key, clone(values[key])])
             );
         },
-        async set(updates) { Object.assign(values, clone(updates)); }
+        async set(updates) {
+            Object.assign(values, clone(updates));
+        }
     };
 }
 
@@ -110,15 +110,14 @@ test('stored data is rendered into columns and tabs on startup', async () => {
     const result = await service.initialize();
     renderState(result.state);
 
-    assert.deepEqual(renderedColumns(), [{
-        id: 'column-1',
-        title: 'Research',
-        items: ['tab-alpha', 'tab-beta']
-    }]);
-    assert.equal(
-        document.querySelector('#tab-alpha .tab-title').textContent,
-        'Alpha'
-    );
+    assert.deepEqual(renderedColumns(), [
+        {
+            id: 'column-1',
+            title: 'Research',
+            items: ['tab-alpha', 'tab-beta']
+        }
+    ]);
+    assert.equal(document.querySelector('#tab-alpha .tab-title').textContent, 'Alpha');
     assert.equal(document.getElementById('column-1').dataset.emoji, '📚');
 });
 
@@ -181,10 +180,7 @@ test('a tab queued by the background worker appears and the queue is cleared', a
     assert.deepEqual(renderedColumns()[0].items, ['tab-alpha', 'tab-beta', 'tab-gamma']);
     assert.equal(document.querySelector('#tab-gamma .tab-title').textContent, 'Gamma');
     assert.deepEqual(storage.values.bgTabs, []);
-    assert.equal(
-        storage.values.savedTabs.find(tab => tab.id === 'gamma').note,
-        'selected text'
-    );
+    assert.equal(storage.values.savedTabs.find(tab => tab.id === 'gamma').note, 'selected text');
 });
 
 test('an unchanged background queue does not disturb the page', async () => {
@@ -207,7 +203,12 @@ test('dragging a tab onto another writes a subgroup that renders back', async ()
     const columnsContainer = document.getElementById('columns-container');
     columnsContainer.appendChild(newColumnIndicator);
     setRect(document.getElementById('sidebar'), { top: 12, height: 800, left: 0, width: 200 });
-    setRect(document.getElementById('space-container'), { top: 64, height: 700, left: 220, width: 780 });
+    setRect(document.getElementById('space-container'), {
+        top: 64,
+        height: 700,
+        left: 220,
+        width: 780
+    });
     setRect(columnsContainer, { top: 64, height: 700, left: 220, width: 780 });
     setRect(deletionArea, { top: 900, height: 60, left: 0, width: 1000 });
     setRect(newColumnIndicator, { top: 64, height: 700, left: 1000, width: 60 });

@@ -47,11 +47,13 @@ export function createTabsRepository(browserApi) {
         const targets = (Array.isArray(urls) ? urls : []).filter(Boolean);
         if (targets.length === 0) return [];
 
-        const created = await Promise.all(targets.map((url, offset) => {
-            const createProperties = { url, active: false };
-            if (index !== null) createProperties.index = index + offset;
-            return create(createProperties);
-        }));
+        const created = await Promise.all(
+            targets.map((url, offset) => {
+                const createProperties = { url, active: false };
+                if (index !== null) createProperties.index = index + offset;
+                return create(createProperties);
+            })
+        );
 
         if (!capabilities.tabGroups) return created;
 

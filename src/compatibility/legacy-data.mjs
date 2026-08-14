@@ -34,20 +34,31 @@ export function unwrapExport(candidate) {
     if (!isObject(candidate)) {
         return {
             data: null,
-            metadata: { formatVersion: 0, exportedAt: null, extensionVersion: null, wrapped: false },
+            metadata: {
+                formatVersion: 0,
+                exportedAt: null,
+                extensionVersion: null,
+                wrapped: false
+            },
             errors: ['Export must be a JSON object.']
         };
     }
 
     const usesCurrentEnvelope = hasOwn(candidate, 'exportedData');
-    const usesHistoricalEnvelope = !usesCurrentEnvelope &&
+    const usesHistoricalEnvelope =
+        !usesCurrentEnvelope &&
         hasOwn(candidate, 'data') &&
         (hasOwn(candidate, 'exportedAt') || hasOwn(candidate, 'extensionVersion'));
 
     if (!usesCurrentEnvelope && !usesHistoricalEnvelope) {
         return {
             data: candidate,
-            metadata: { formatVersion: 0, exportedAt: null, extensionVersion: null, wrapped: false },
+            metadata: {
+                formatVersion: 0,
+                exportedAt: null,
+                extensionVersion: null,
+                wrapped: false
+            },
             errors: []
         };
     }
@@ -58,8 +69,10 @@ export function unwrapExport(candidate) {
     if (!isObject(payload)) {
         errors.push(`${payloadKey} must be an object.`);
     }
-    if (candidate.formatVersion !== undefined &&
-        (!Number.isInteger(candidate.formatVersion) || candidate.formatVersion < 0)) {
+    if (
+        candidate.formatVersion !== undefined &&
+        (!Number.isInteger(candidate.formatVersion) || candidate.formatVersion < 0)
+    ) {
         errors.push('formatVersion must be a non-negative integer.');
     }
     if (candidate.formatVersion > CURRENT_EXPORT_FORMAT_VERSION) {
@@ -67,8 +80,10 @@ export function unwrapExport(candidate) {
             `Export format version ${candidate.formatVersion} is newer than supported version ${CURRENT_EXPORT_FORMAT_VERSION}.`
         );
     }
-    if (candidate.exportedAt !== undefined &&
-        (typeof candidate.exportedAt !== 'string' || Number.isNaN(Date.parse(candidate.exportedAt)))) {
+    if (
+        candidate.exportedAt !== undefined &&
+        (typeof candidate.exportedAt !== 'string' || Number.isNaN(Date.parse(candidate.exportedAt)))
+    ) {
         errors.push('exportedAt must be a valid date string when present.');
     }
 
@@ -115,8 +130,11 @@ function validateSavedTab(tab, index, errors) {
     if (tab.note !== undefined && tab.note !== null && typeof tab.note !== 'string') {
         errors.push(`${path}.note must be a string or null when present.`);
     }
-    if (tab.parsedDate !== undefined && tab.parsedDate !== null &&
-        (typeof tab.parsedDate !== 'number' || !Number.isFinite(tab.parsedDate))) {
+    if (
+        tab.parsedDate !== undefined &&
+        tab.parsedDate !== null &&
+        (typeof tab.parsedDate !== 'number' || !Number.isFinite(tab.parsedDate))
+    ) {
         errors.push(`${path}.parsedDate must be a timestamp or null when present.`);
     }
     return String(tab.id);
@@ -124,7 +142,9 @@ function validateSavedTab(tab, index, errors) {
 
 function validateSubgroup(group, path, savedTabIds, referencedTabIds, errors) {
     if (group.length < 4) {
-        errors.push(`${path} must contain a group id, at least one tab, a title, and an expanded flag.`);
+        errors.push(
+            `${path} must contain a group id, at least one tab, a title, and an expanded flag.`
+        );
         return;
     }
     if (typeof group[0] !== 'string' || group[0].length === 0) {
@@ -227,7 +247,9 @@ export function validateLegacyData(data) {
                 const groupId = item[0];
                 if (typeof groupId === 'string') {
                     if (groupIds.has(groupId)) {
-                        errors.push(`columnState contains duplicate group id ${JSON.stringify(groupId)}.`);
+                        errors.push(
+                            `columnState contains duplicate group id ${JSON.stringify(groupId)}.`
+                        );
                     }
                     groupIds.add(groupId);
                 }
@@ -346,11 +368,12 @@ export function recoverOrphanedTabs(savedTabs, columnState, idFactory = defaultI
         };
     });
     const referencedIds = collectReferencedTabIds(columns);
-    const orphanedTabs = tabs.filter(tab =>
-        isObject(tab) &&
-        !isTempMarker(tab) &&
-        (typeof tab.id === 'string' || typeof tab.id === 'number') &&
-        !referencedIds.has(String(tab.id))
+    const orphanedTabs = tabs.filter(
+        tab =>
+            isObject(tab) &&
+            !isTempMarker(tab) &&
+            (typeof tab.id === 'string' || typeof tab.id === 'number') &&
+            !referencedIds.has(String(tab.id))
     );
 
     if (orphanedTabs.length === 0) {
@@ -432,11 +455,7 @@ export function prepareImportData(candidate, options = {}) {
     }
 
     const migration = migrateToUniqueIds(combinedTabs, source.columnState, idFactory);
-    const recovery = recoverOrphanedTabs(
-        migration.savedTabs,
-        migration.columnState,
-        idFactory
-    );
+    const recovery = recoverOrphanedTabs(migration.savedTabs, migration.columnState, idFactory);
     const preparedData = {
         ...source,
         savedTabs: [...recovery.savedTabs, { temp: now() }],

@@ -24,9 +24,8 @@ export function mergeManifest(base, override) {
             delete merged[key];
             return;
         }
-        merged[key] = isObject(value) && isObject(base[key])
-            ? mergeManifest(base[key], value)
-            : value;
+        merged[key] =
+            isObject(value) && isObject(base[key]) ? mergeManifest(base[key], value) : value;
     });
     return merged;
 }
@@ -71,14 +70,14 @@ async function writeTarget(browser) {
     await rm(archivePath, { force: true });
     await mkdir(outputDirectory, { recursive: true });
 
-    await Promise.all(sharedFiles.map(file =>
-        cp(path.join(repositoryRoot, file), path.join(outputDirectory, file))
-    ));
-    await cp(
-        path.join(repositoryRoot, 'dist'),
-        path.join(outputDirectory, 'dist'),
-        { recursive: true }
+    await Promise.all(
+        sharedFiles.map(file =>
+            cp(path.join(repositoryRoot, file), path.join(outputDirectory, file))
+        )
     );
+    await cp(path.join(repositoryRoot, 'dist'), path.join(outputDirectory, 'dist'), {
+        recursive: true
+    });
 
     const manifest = await createTargetManifest(browser);
     await writeFile(

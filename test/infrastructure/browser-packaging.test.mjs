@@ -5,10 +5,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { inflateRawSync } from 'node:zlib';
 
-import {
-    createTargetManifest,
-    SUPPORTED_BROWSERS
-} from '../../scripts/build-browsers.mjs';
+import { createTargetManifest, SUPPORTED_BROWSERS } from '../../scripts/build-browsers.mjs';
 import { createZipFromDirectory } from '../../scripts/zip-directory.mjs';
 
 function unzipEntries(archive) {
@@ -33,9 +30,10 @@ function unzipEntries(archive) {
         const localNameLength = archive.readUInt16LE(localOffset + 26);
         const localExtraLength = archive.readUInt16LE(localOffset + 28);
         const dataOffset = localOffset + 30 + localNameLength + localExtraLength;
-        entries.set(name, inflateRawSync(
-            archive.subarray(dataOffset, dataOffset + compressedSize)
-        ));
+        entries.set(
+            name,
+            inflateRawSync(archive.subarray(dataOffset, dataOffset + compressedSize))
+        );
         centralOffset += 46 + nameLength + extraLength + commentLength;
     }
     return entries;

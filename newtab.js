@@ -37,17 +37,11 @@ import {
 } from './src/ui/rendering.mjs';
 import { createBoardView } from './src/ui/board-view.mjs';
 import { createOpenTabsView } from './src/ui/open-tabs-view.mjs';
-import {
-    createTabPresenter,
-    TAB_COLOR_CLASSES
-} from './src/ui/tab-presentation.mjs';
+import { createTabPresenter, TAB_COLOR_CLASSES } from './src/ui/tab-presentation.mjs';
 import { createDragController } from './src/ui/controllers/drag-controller.mjs';
 import { createMenuController } from './src/ui/controllers/menu-controller.mjs';
 import { createSelectionController } from './src/ui/controllers/selection-controller.mjs';
-import {
-    safePageUrl,
-    textToLegacyStoredNote
-} from './src/security/content.mjs';
+import { safePageUrl, textToLegacyStoredNote } from './src/security/content.mjs';
 const browserApi = createBrowserApiFromGlobal(globalThis);
 const tabsRepository = createTabsRepository(browserApi);
 const openTabs = createOpenTabsService({
@@ -64,24 +58,27 @@ const releaseNotes = createReleaseService({
     runtime: browserApi.runtime
 });
 let theme = 'light';
-settings.load().then(stored => {
-    const sidebar = document.getElementById('sidebar');
-    sidebar.classList.add('no-transition');
-    if (stored.sidebarCollapsed) {
-        sidebar.classList.add('collapsed');
-    }
-    if (stored.storedTheme) {
-        theme = stored.storedTheme;
-        document.body.className = theme;
-    }
+settings
+    .load()
+    .then(stored => {
+        const sidebar = document.getElementById('sidebar');
+        sidebar.classList.add('no-transition');
+        if (stored.sidebarCollapsed) {
+            sidebar.classList.add('collapsed');
+        }
+        if (stored.storedTheme) {
+            theme = stored.storedTheme;
+            document.body.className = theme;
+        }
 
-    setTimeout(() => {
-        sidebar.classList.remove('no-transition');
-    }, 100);
-}).catch(error => {
-    console.error('Error updating sidebar:', error);
-});
-function toggleTheme(){
+        setTimeout(() => {
+            sidebar.classList.remove('no-transition');
+        }, 100);
+    })
+    .catch(error => {
+        console.error('Error updating sidebar:', error);
+    });
+function toggleTheme() {
     theme = nextTheme(theme);
     document.body.className = theme;
     const emojiPickers = document.querySelectorAll('.emoji-picker-on-top');
@@ -127,11 +124,11 @@ function generateUniqueId() {
 
 const tabPresenter = createTabPresenter({ chrono: new Chrono() });
 const getRandomEmoji = () => {
-    const range = [0x1F34F, 0x1F37F]; // Food and Drink        
+    const range = [0x1f34f, 0x1f37f]; // Food and Drink
     const codePoint = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
     return String.fromCodePoint(codePoint);
 };
-document.getElementById("add-column").addEventListener("click", () => {
+document.getElementById('add-column').addEventListener('click', () => {
     const nextState = addColumn(appState.getState(), {
         id: `column-${Date.now()}`,
         title: 'New Column',
@@ -163,16 +160,13 @@ function closeAllMenus() {
 }
 function getBrowser() {
     let userAgent = navigator.userAgent.toLowerCase();
-    if(userAgent.indexOf(CHROME_STRING) > -1){
+    if (userAgent.indexOf(CHROME_STRING) > -1) {
         userAgent = CHROME_STRING;
-    }
-    else if (userAgent.indexOf('firefox') > -1) {
+    } else if (userAgent.indexOf('firefox') > -1) {
         userAgent = 'firefox';
-    }
-    else if (userAgent.indexOf('safari') > -1) {
+    } else if (userAgent.indexOf('safari') > -1) {
         userAgent = 'safari';
-    }
-    else {
+    } else {
         userAgent = CHROME_STRING;
     }
     return userAgent;
@@ -202,10 +196,7 @@ function saveTabNote(id, note) {
         note: textToLegacyStoredNote(remainingNote)
     };
     if (parsedDate) changes.parsedDate = parsedDate.getTime();
-    persistCanonicalState(
-        updateTab(appState.getState(), id, changes),
-        { includeColumns: false }
-    );
+    persistCanonicalState(updateTab(appState.getState(), id, changes), { includeColumns: false });
 }
 function removeDate(tabIds, dateDisplay) {
     if (!Array.isArray(tabIds)) tabIds = [tabIds];
@@ -219,25 +210,27 @@ function removeDate(tabIds, dateDisplay) {
 }
 function openColorMenu(tabIds, moreOptionsButton) {
     if (!Array.isArray(tabIds)) tabIds = [tabIds];
-    menuController.toggle('color', 'color', () => renderColorMenu(document, {
-        colors: colorOptions,
-        button: moreOptionsButton,
-        onSelect: color => {
-            const nextState = tabIds.reduce(
-                (state, tabId) => updateTab(state, tabId, { color }),
-                appState.getState()
-            );
-            persistCanonicalState(nextState, { includeColumns: false });
-            closeAllMenus();
-        }
-    }));
+    menuController.toggle('color', 'color', () =>
+        renderColorMenu(document, {
+            colors: colorOptions,
+            button: moreOptionsButton,
+            onSelect: color => {
+                const nextState = tabIds.reduce(
+                    (state, tabId) => updateTab(state, tabId, { color }),
+                    appState.getState()
+                );
+                persistCanonicalState(nextState, { includeColumns: false });
+                closeAllMenus();
+            }
+        })
+    );
 }
 /* Column Menu Actions */
 function deleteColumn(event) {
     closeAllMenus();
     let column = event;
-    if(event instanceof Event){
-        column = event.target.closest(".column");
+    if (event instanceof Event) {
+        column = event.target.closest('.column');
     }
     persistCanonicalState(removeColumn(appState.getState(), column.id, { deleteTabs: true }));
 }
@@ -291,22 +284,30 @@ function descriptorForSavedElement(element) {
 
 async function persistItemsDrop(elements, target, initialState = appState.getState()) {
     const openElements = elements.filter(element => element.id.startsWith('opentab-'));
-    const capturedTabs = (await openTabs.capture(
-        openElements.map(element => Number(element.id.slice('opentab-'.length)))
-    )).map((capture, index) => ({ ...capture, element: openElements[index] }));
+    const capturedTabs = (
+        await openTabs.capture(
+            openElements.map(element => Number(element.id.slice('opentab-'.length)))
+        )
+    ).map((capture, index) => ({ ...capture, element: openElements[index] }));
 
-    let nextState = capturedTabs.length > 0
-        ? addTabs(initialState, capturedTabs.map(captured => captured.savedTab))
-        : initialState;
+    let nextState =
+        capturedTabs.length > 0
+            ? addTabs(
+                  initialState,
+                  capturedTabs.map(captured => captured.savedTab)
+              )
+            : initialState;
     const capturedByElement = new Map(
         capturedTabs.map(captured => [captured.element, captured.savedTab.id])
     );
-    const dragged = elements.map(element => {
-        if (capturedByElement.has(element)) {
-            return { type: 'tab', tabId: capturedByElement.get(element) };
-        }
-        return descriptorForSavedElement(element);
-    }).filter(Boolean);
+    const dragged = elements
+        .map(element => {
+            if (capturedByElement.has(element)) {
+                return { type: 'tab', tabId: capturedByElement.get(element) };
+            }
+            return descriptorForSavedElement(element);
+        })
+        .filter(Boolean);
 
     nextState = applyDrop(nextState, {
         dragged,
@@ -386,11 +387,15 @@ async function applyDropDescriptor(descriptor) {
                 emoji: getRandomEmoji(),
                 items: []
             });
-            await persistItemsDrop(descriptor.items, {
-                type: 'column',
-                columnId,
-                index: 0
-            }, nextState);
+            await persistItemsDrop(
+                descriptor.items,
+                {
+                    type: 'column',
+                    columnId,
+                    index: 0
+                },
+                nextState
+            );
             return;
         }
         case 'open-tabs':
@@ -444,37 +449,37 @@ const boardView = createBoardView(document, {
         onColumnMenu: openColumnMenu,
         onGroupMenu: openGroupMenu,
         onNoteSave: (tab, note) => saveTabNote(tab.id, note),
-        onTitleSave: (tab, title) => persistCanonicalState(
-            updateTab(appState.getState(), tab.id, { title }),
-            { includeColumns: false }
-        ),
-        onColumnRename: (column, value) => persistCanonicalState(
-            updateColumn(appState.getState(), column.id, {
-                title: value || 'New Column'
+        onTitleSave: (tab, title) =>
+            persistCanonicalState(updateTab(appState.getState(), tab.id, { title }), {
+                includeColumns: false
             }),
-            { includeTabs: false }
-        ),
-        onColumnMinimizedChange: (column, minimized) => persistCanonicalState(
-            updateColumn(appState.getState(), column.id, { minimized }),
-            {
+        onColumnRename: (column, value) =>
+            persistCanonicalState(
+                updateColumn(appState.getState(), column.id, {
+                    title: value || 'New Column'
+                }),
+                { includeTabs: false }
+            ),
+        onColumnMinimizedChange: (column, minimized) =>
+            persistCanonicalState(updateColumn(appState.getState(), column.id, { minimized }), {
                 includeTabs: false,
                 extra: { animation: { columnId: column.id, minimized } }
-            }
-        ),
-        onColumnEmojiChange: (column, emoji) => persistCanonicalState(
-            updateColumn(appState.getState(), column.id, { emoji }),
-            { includeTabs: false }
-        ),
-        onGroupRename: (group, value) => persistCanonicalState(
-            updateGroup(appState.getState(), group.id, {
-                title: value || 'New Group'
             }),
-            { includeTabs: false }
-        ),
-        onGroupExpandedChange: (group, expanded) => persistCanonicalState(
-            updateGroup(appState.getState(), group.id, { expanded }),
-            { includeTabs: false }
-        )
+        onColumnEmojiChange: (column, emoji) =>
+            persistCanonicalState(updateColumn(appState.getState(), column.id, { emoji }), {
+                includeTabs: false
+            }),
+        onGroupRename: (group, value) =>
+            persistCanonicalState(
+                updateGroup(appState.getState(), group.id, {
+                    title: value || 'New Group'
+                }),
+                { includeTabs: false }
+            ),
+        onGroupExpandedChange: (group, expanded) =>
+            persistCanonicalState(updateGroup(appState.getState(), group.id, { expanded }), {
+                includeTabs: false
+            })
     }
 });
 
@@ -498,18 +503,44 @@ function openTabMenu(context) {
         });
 
         menuItems = [
-            { text: "Clear Date", action: () => { removeDate(selectedTabIds, dateDisplay); closeAllMenus() }, hidden: !hasDate },
-            { text: "Color", action: () => openColorMenu(selectedTabIds, moreOptionsButton) },
-            { text: "Delete", action: () => deleteTab(selectedTabIds) }
+            {
+                text: 'Clear Date',
+                action: () => {
+                    removeDate(selectedTabIds, dateDisplay);
+                    closeAllMenus();
+                },
+                hidden: !hasDate
+            },
+            { text: 'Color', action: () => openColorMenu(selectedTabIds, moreOptionsButton) },
+            { text: 'Delete', action: () => deleteTab(selectedTabIds) }
         ];
     } else {
         const noteButtonText = tab.note && tab.note.trim() !== '' ? 'Edit Note' : 'Add Note';
         menuItems = [
-            { text: "Rename", action: () => { boardView.beginTitleEdit(item); closeAllMenus() } },
-            { text: noteButtonText, action: () => { boardView.beginNoteEdit(item); closeAllMenus() } },
-            { text: "Clear Date", action: () => { removeDate(tab.id, dateDisplay); closeAllMenus() }, hidden: !formattedDate },
-            { text: "Color", action: () => openColorMenu(tab.id, moreOptionsButton) },
-            { text: "Delete", action: () => deleteTab(tab.id) }
+            {
+                text: 'Rename',
+                action: () => {
+                    boardView.beginTitleEdit(item);
+                    closeAllMenus();
+                }
+            },
+            {
+                text: noteButtonText,
+                action: () => {
+                    boardView.beginNoteEdit(item);
+                    closeAllMenus();
+                }
+            },
+            {
+                text: 'Clear Date',
+                action: () => {
+                    removeDate(tab.id, dateDisplay);
+                    closeAllMenus();
+                },
+                hidden: !formattedDate
+            },
+            { text: 'Color', action: () => openColorMenu(tab.id, moreOptionsButton) },
+            { text: 'Delete', action: () => deleteTab(tab.id) }
         ];
     }
     menuController.toggle('options', tab.id, () =>
@@ -521,21 +552,37 @@ function openColumnMenu({ column, menuButton }) {
     selectionController.clear();
 
     const menuItems = [
-        { text: "Open All", action: () => openAllInColumn(column.id) },
-        { text: "Delete Column", action: () => deleteColumn(column) }
+        { text: 'Open All', action: () => openAllInColumn(column.id) },
+        { text: 'Delete Column', action: () => deleteColumn(column) }
     ];
-    menuController.toggle('column', column.id, () =>
-        createMenuDropdown(menuItems, menuButton)
-    );
+    menuController.toggle('column', column.id, () => createMenuDropdown(menuItems, menuButton));
 }
 
 function openGroupMenu({ group, moreOptionsButton }) {
     selectionController.clear();
 
     const menuItems = [
-        { text: "Open All", action: () => { openAllInGroup(group.id); closeAllMenus(); } },
-        { text: "Ungroup", action: () => { ungroupSubgroup(group.id); closeAllMenus(); } },
-        { text: "Delete", action: () => { deleteSubgroup(group.id); closeAllMenus(); } }
+        {
+            text: 'Open All',
+            action: () => {
+                openAllInGroup(group.id);
+                closeAllMenus();
+            }
+        },
+        {
+            text: 'Ungroup',
+            action: () => {
+                ungroupSubgroup(group.id);
+                closeAllMenus();
+            }
+        },
+        {
+            text: 'Delete',
+            action: () => {
+                deleteSubgroup(group.id);
+                closeAllMenus();
+            }
+        }
     ];
     menuController.toggle('options', group.id, () =>
         createMenuDropdown(menuItems, moreOptionsButton)
@@ -568,7 +615,8 @@ const openTabsView = createOpenTabsView(document, {
 });
 
 function fetchOpenTabs() {
-    openTabs.list()
+    openTabs
+        .list()
         .then(tabs => openTabsView.render(tabs))
         .catch(error => {
             console.error('Could not read the open tabs:', error);
@@ -583,13 +631,12 @@ browserApi.storage.onChanged.addListener(async changes => {
     try {
         const synchronized = await stateStorage.synchronize(changes);
         if (synchronized?.type === 'state') {
-            console.log("Changes detected", changes);
-            if(changes.columnState && changes.animation){
+            console.log('Changes detected', changes);
+            if (changes.columnState && changes.animation) {
                 const column = document.getElementById(changes.animation.newValue.columnId);
-                if(changes.animation.newValue.minimized === true){
+                if (changes.animation.newValue.minimized === true) {
                     minimizeColumn(column);
-                }
-                else{
+                } else {
                     maximizeColumn(column);
                 }
                 return;
@@ -605,7 +652,8 @@ browserApi.storage.onChanged.addListener(async changes => {
 
     const sidebarChange = settings.readSidebarChange(changes);
     if (sidebarChange) {
-        document.getElementById('sidebar')
+        document
+            .getElementById('sidebar')
             .classList.toggle('collapsed', sidebarChange.sidebarCollapsed);
     }
 });
@@ -615,7 +663,7 @@ async function initializeStoredState() {
     try {
         const result = await stateStorage.initialize();
         if (result.migrated) {
-            console.log("Migrated tab IDs to unique format");
+            console.log('Migrated tab IDs to unique format');
         }
         if (result.recovered > 0) {
             console.log(`Recovered ${result.recovered} orphaned tab(s)`);
@@ -629,13 +677,16 @@ async function initializeStoredState() {
 initializeStoredState();
 
 function setSidebarCollapsed(collapsed) {
-    settings.saveSidebarCollapsed(collapsed).then(() => {
-        document.querySelectorAll('#open-tabs-list .tab-item').forEach(tab => {
-            tab.classList.toggle('collapsed', collapsed);
+    settings
+        .saveSidebarCollapsed(collapsed)
+        .then(() => {
+            document.querySelectorAll('#open-tabs-list .tab-item').forEach(tab => {
+                tab.classList.toggle('collapsed', collapsed);
+            });
+        })
+        .catch(error => {
+            console.error('Could not save the sidebar state:', error);
         });
-    }).catch(error => {
-        console.error('Could not save the sidebar state:', error);
-    });
 }
 document.querySelector('.minimize-sidebar').addEventListener('click', () => {
     setSidebarCollapsed(true);
@@ -644,14 +695,16 @@ document.querySelector('.maximize-sidebar').addEventListener('click', () => {
     setSidebarCollapsed(false);
 });
 
-document.addEventListener('dragover', function(event) {
+document.addEventListener('dragover', function (event) {
     event.preventDefault();
 });
-const handleClickOutside = (e) => {
+const handleClickOutside = e => {
     const clickedButton = e.target.closest('.more-options, .menu-option, .settings-button');
     const isMoreOptionsButton = clickedButton !== null;
 
-    const allItems = Array.from(document.querySelectorAll('li')).filter(item => !item.classList.contains('subgroup-item'));
+    const allItems = Array.from(document.querySelectorAll('li')).filter(
+        item => !item.classList.contains('subgroup-item')
+    );
     const isClickInside = allItems.some(item => item.contains(e.target));
 
     if (!isMoreOptionsButton) {
@@ -663,74 +716,110 @@ const handleClickOutside = (e) => {
 
     const emojiPickers = document.querySelectorAll('.emoji-picker-on-top');
     const emojiButtons = document.querySelectorAll('.emoji-button');
-    const isEmojiClick = Array.from(emojiButtons).some(btn => btn.contains(e.target)) || 
-                        Array.from(emojiPickers).some(picker => picker.contains(e.target));
+    const isEmojiClick =
+        Array.from(emojiButtons).some(btn => btn.contains(e.target)) ||
+        Array.from(emojiPickers).some(picker => picker.contains(e.target));
     if (!isEmojiClick) {
-        emojiPickers.forEach(picker => picker.style.display = 'none');
+        emojiPickers.forEach(picker => (picker.style.display = 'none'));
     }
 };
 document.addEventListener('click', handleClickOutside);
 document.addEventListener('drop', handleDrop);
 document.addEventListener('dragover', event => dragController.handleDragOver(event));
 
-releaseNotes.load().then((releaseState) => {
-    let whatsNewClicked = releaseState.whatsNewClicked;
+releaseNotes
+    .load()
+    .then(releaseState => {
+        let whatsNewClicked = releaseState.whatsNewClicked;
 
-    if (releaseState.isNewRelease) {
-        settingsButton.appendChild(createNotificationDot(document));
-    }
-
-    settingsButton.addEventListener('click', () => {
-        if (menuController.isOpen('settings', 'settings')) {
-            closeAllMenus();
-            return;
+        if (releaseState.isNewRelease) {
+            settingsButton.appendChild(createNotificationDot(document));
         }
 
-        const settingsNotification = document.querySelector('.notification-circle:not(.inline-notification)');
-        if (settingsNotification) {
-            settingsNotification.remove();
-            releaseNotes.acknowledgeRelease().catch(error => {
-                console.error('Could not save the installed release:', error);
-            });
-        }
-
-        let releaseNotesNotification = document.querySelector('.inline-notification');
-
-        const menuItems = [
-            { text: theme === 'dark' ? "Toggle Light Theme" : "Toggle Dark Theme", action: () => { toggleTheme(); closeAllMenus() } },
-            { text: "Export Data", action: () => { exportAllData(); closeAllMenus(); } },
-            { text: "Import Data", action: () => { importAllData(); closeAllMenus(); } },
-            { text: "What's New", action: () => {
-                if (releaseNotesNotification) {
-                    releaseNotesNotification.remove();
-                }
-                openSettingsPage('https://tabsmagic.com/releasenotes');
+        settingsButton.addEventListener('click', () => {
+            if (menuController.isOpen('settings', 'settings')) {
                 closeAllMenus();
-                whatsNewClicked = true;
-                releaseNotes.markWhatsNewClicked().catch(error => {
-                    console.error('Could not save the release notes state:', error);
-                });
-            }},
-            { text: "Feedback", action: () => { openSettingsPage('https://tabsmagic.com/contact'); closeAllMenus() } }
-        ];
-        const settingsMenu = menuController.open('settings', 'settings', () =>
-            createMenuDropdown(menuItems, settingsButton)
-        );
-
-        if (!whatsNewClicked) {
-            const whatsNewButton = Array
-                .from(settingsMenu.querySelectorAll('button.menu-option'))
-                .find(btn => btn.textContent.trim().startsWith("What's New"));
-
-            if (whatsNewButton) {
-                releaseNotesNotification = createNotificationDot(document, { inline: true });
-                whatsNewButton.insertBefore(releaseNotesNotification, whatsNewButton.firstChild);
+                return;
             }
-        }
+
+            const settingsNotification = document.querySelector(
+                '.notification-circle:not(.inline-notification)'
+            );
+            if (settingsNotification) {
+                settingsNotification.remove();
+                releaseNotes.acknowledgeRelease().catch(error => {
+                    console.error('Could not save the installed release:', error);
+                });
+            }
+
+            let releaseNotesNotification = document.querySelector('.inline-notification');
+
+            const menuItems = [
+                {
+                    text: theme === 'dark' ? 'Toggle Light Theme' : 'Toggle Dark Theme',
+                    action: () => {
+                        toggleTheme();
+                        closeAllMenus();
+                    }
+                },
+                {
+                    text: 'Export Data',
+                    action: () => {
+                        exportAllData();
+                        closeAllMenus();
+                    }
+                },
+                {
+                    text: 'Import Data',
+                    action: () => {
+                        importAllData();
+                        closeAllMenus();
+                    }
+                },
+                {
+                    text: "What's New",
+                    action: () => {
+                        if (releaseNotesNotification) {
+                            releaseNotesNotification.remove();
+                        }
+                        openSettingsPage('https://tabsmagic.com/releasenotes');
+                        closeAllMenus();
+                        whatsNewClicked = true;
+                        releaseNotes.markWhatsNewClicked().catch(error => {
+                            console.error('Could not save the release notes state:', error);
+                        });
+                    }
+                },
+                {
+                    text: 'Feedback',
+                    action: () => {
+                        openSettingsPage('https://tabsmagic.com/contact');
+                        closeAllMenus();
+                    }
+                }
+            ];
+            const settingsMenu = menuController.open('settings', 'settings', () =>
+                createMenuDropdown(menuItems, settingsButton)
+            );
+
+            if (!whatsNewClicked) {
+                const whatsNewButton = Array.from(
+                    settingsMenu.querySelectorAll('button.menu-option')
+                ).find(btn => btn.textContent.trim().startsWith("What's New"));
+
+                if (whatsNewButton) {
+                    releaseNotesNotification = createNotificationDot(document, { inline: true });
+                    whatsNewButton.insertBefore(
+                        releaseNotesNotification,
+                        whatsNewButton.firstChild
+                    );
+                }
+            }
+        });
+    })
+    .catch(error => {
+        console.error('Could not read the installed release:', error);
     });
-}).catch(error => {
-    console.error('Could not read the installed release:', error);
-});
 
 function openSettingsPage(url) {
     openTabs.openPage(url).catch(error => {
@@ -753,7 +842,8 @@ function downloadExport(exported) {
 }
 
 function exportAllData() {
-    dataTransfer.createExport()
+    dataTransfer
+        .createExport()
         .then(downloadExport)
         .catch(error => {
             console.error('Export failed:', error);
@@ -764,7 +854,9 @@ function reportImportFailure(error) {
     console.error('Import failed:', error);
     if (error.rollbackError) {
         console.error('Import rollback failed:', error.rollbackError);
-        alert(`Import failed and automatic rollback also failed. Your pre-import backup may still be available in extension storage.\n\n${error.message}`);
+        alert(
+            `Import failed and automatic rollback also failed. Your pre-import backup may still be available in extension storage.\n\n${error.message}`
+        );
         return;
     }
     const stateMessage = error.rolledBack
@@ -785,7 +877,7 @@ function importAllData() {
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = async (e) => {
+        reader.onload = async e => {
             try {
                 const result = await dataTransfer.importFromText(e.target.result);
 
@@ -798,7 +890,6 @@ function importAllData() {
                     console.log(`Recovered ${result.recovered} unreferenced imported tab(s)`);
                 }
                 location.reload();
-
             } catch (err) {
                 reportImportFailure(err);
             }

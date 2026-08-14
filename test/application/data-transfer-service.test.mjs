@@ -18,12 +18,12 @@ function createStorage(initial = {}) {
             if (keys === null || keys === undefined) return clone(values);
             const requested = Array.isArray(keys) ? keys : [keys];
             return Object.fromEntries(
-                requested
-                    .filter(key => key in values)
-                    .map(key => [key, clone(values[key])])
+                requested.filter(key => key in values).map(key => [key, clone(values[key])])
             );
         },
-        async set(updates) { Object.assign(values, clone(updates)); },
+        async set(updates) {
+            Object.assign(values, clone(updates));
+        },
         async remove(keys) {
             (Array.isArray(keys) ? keys : [keys]).forEach(key => delete values[key]);
         }
@@ -92,10 +92,12 @@ test('an exported document imports back into an empty store', async () => {
 test('a rejected import reports its reasons and writes nothing', async () => {
     const { service, storage } = createService({ savedTabs: [{ id: 'kept' }] });
 
-    const result = await service.importFromText(JSON.stringify({
-        formatVersion: 1,
-        exportedData: { savedTabs: 'not an array', columnState: [] }
-    }));
+    const result = await service.importFromText(
+        JSON.stringify({
+            formatVersion: 1,
+            exportedData: { savedTabs: 'not an array', columnState: [] }
+        })
+    );
 
     assert.equal(result.imported, false);
     assert.ok(result.errors.length > 0);
@@ -121,9 +123,12 @@ test('a failed write is rolled back and reported', async () => {
     };
 
     const exported = await createService(storedData()).service.createExport();
-    await assert.rejects(() => service.importFromText(exported.json), error => {
-        assert.equal(error.rolledBack, true);
-        return true;
-    });
+    await assert.rejects(
+        () => service.importFromText(exported.json),
+        error => {
+            assert.equal(error.rolledBack, true);
+            return true;
+        }
+    );
     assert.deepEqual(storage.values.savedTabs, [{ id: 'kept' }]);
 });

@@ -7,8 +7,11 @@ function isObject(value) {
 }
 
 function isTempMarker(tab) {
-    return isObject(tab) && Object.prototype.hasOwnProperty.call(tab, 'temp') &&
-        !Object.prototype.hasOwnProperty.call(tab, 'id');
+    return (
+        isObject(tab) &&
+        Object.prototype.hasOwnProperty.call(tab, 'temp') &&
+        !Object.prototype.hasOwnProperty.call(tab, 'id')
+    );
 }
 
 function tabIdFromReference(reference) {
@@ -25,7 +28,10 @@ function canonicalItemFromLegacy(item) {
     return {
         type: 'group',
         id: String(item[0]),
-        tabIds: item.slice(1, -2).map(tabIdFromReference).filter(id => id !== null),
+        tabIds: item
+            .slice(1, -2)
+            .map(tabIdFromReference)
+            .filter(id => id !== null),
         title: typeof item[item.length - 2] === 'string' ? item[item.length - 2] : 'New Group',
         expanded: item[item.length - 1] === true
     };
@@ -36,8 +42,12 @@ export function canonicalStateFromLegacy(savedTabs = [], columnState = []) {
     const tabs = new Map();
     const tabOrder = [];
     for (const tab of savedTabs) {
-        if (!isObject(tab) || isTempMarker(tab) ||
-            (typeof tab.id !== 'string' && typeof tab.id !== 'number')) continue;
+        if (
+            !isObject(tab) ||
+            isTempMarker(tab) ||
+            (typeof tab.id !== 'string' && typeof tab.id !== 'number')
+        )
+            continue;
         const id = String(tab.id);
         tabs.set(id, { ...tab, id });
         if (!tabOrder.includes(id)) tabOrder.push(id);
@@ -133,10 +143,13 @@ export function getGroupTabs(state, groupId) {
 export function getColumnTabs(state, columnId) {
     const column = getColumn(state, columnId);
     if (!column) return [];
-    return column.items.flatMap(item => item.type === 'group'
-        ? item.tabIds.map(tabId => getTab(state, tabId))
-        : [getTab(state, item.tabId)]
-    ).filter(Boolean);
+    return column.items
+        .flatMap(item =>
+            item.type === 'group'
+                ? item.tabIds.map(tabId => getTab(state, tabId))
+                : [getTab(state, item.tabId)]
+        )
+        .filter(Boolean);
 }
 
 export function replaceColumnsFromLegacy(state, columnState) {
@@ -157,9 +170,11 @@ export function validateCanonicalState(state) {
 
     const orderedIds = new Set();
     state.tabOrder.forEach((id, index) => {
-        if (orderedIds.has(id)) errors.push(`tabOrder contains duplicate id ${JSON.stringify(id)}.`);
+        if (orderedIds.has(id))
+            errors.push(`tabOrder contains duplicate id ${JSON.stringify(id)}.`);
         orderedIds.add(id);
-        if (!state.tabs.has(id)) errors.push(`tabOrder[${index}] refers to missing tab ${JSON.stringify(id)}.`);
+        if (!state.tabs.has(id))
+            errors.push(`tabOrder[${index}] refers to missing tab ${JSON.stringify(id)}.`);
     });
     for (const id of state.tabs.keys()) {
         if (!orderedIds.has(id)) errors.push(`Tab ${JSON.stringify(id)} is missing from tabOrder.`);
@@ -194,7 +209,8 @@ export function validateCanonicalState(state) {
             errors.push(`columns[${columnIndex}] must be an object.`);
             return;
         }
-        if (columnIds.has(column.id)) errors.push(`Duplicate column id ${JSON.stringify(column.id)}.`);
+        if (columnIds.has(column.id))
+            errors.push(`Duplicate column id ${JSON.stringify(column.id)}.`);
         columnIds.add(column.id);
         if (!Array.isArray(column.items)) {
             errors.push(`columns[${columnIndex}].items must be an array.`);
@@ -214,7 +230,8 @@ export function validateCanonicalState(state) {
                 errors.push(`${path} has unknown type ${JSON.stringify(item.type)}.`);
                 return;
             }
-            if (groupIds.has(item.id)) errors.push(`Duplicate group id ${JSON.stringify(item.id)}.`);
+            if (groupIds.has(item.id))
+                errors.push(`Duplicate group id ${JSON.stringify(item.id)}.`);
             groupIds.add(item.id);
             if (!Array.isArray(item.tabIds)) {
                 errors.push(`${path}.tabIds must be an array.`);

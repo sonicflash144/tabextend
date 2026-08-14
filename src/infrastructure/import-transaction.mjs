@@ -13,8 +13,11 @@ function jsonValuesMatch(expected, actual) {
     if (typeof expected !== typeof actual) return false;
 
     if (Array.isArray(expected) || Array.isArray(actual)) {
-        if (!Array.isArray(expected) || !Array.isArray(actual) ||
-            expected.length !== actual.length) {
+        if (
+            !Array.isArray(expected) ||
+            !Array.isArray(actual) ||
+            expected.length !== actual.length
+        ) {
             return false;
         }
         return expected.every((value, index) => jsonValuesMatch(value, actual[index]));
@@ -23,24 +26,27 @@ function jsonValuesMatch(expected, actual) {
     if (typeof expected !== 'object') return false;
     const expectedKeys = Object.keys(expected).sort();
     const actualKeys = Object.keys(actual).sort();
-    if (expectedKeys.length !== actualKeys.length ||
-        expectedKeys.some((key, index) => key !== actualKeys[index])) {
+    if (
+        expectedKeys.length !== actualKeys.length ||
+        expectedKeys.some((key, index) => key !== actualKeys[index])
+    ) {
         return false;
     }
     return expectedKeys.every(key => jsonValuesMatch(expected[key], actual[key]));
 }
 
 function mismatchedStorageKeys(expected, actual) {
-    return Object.keys(expected).filter(key =>
-        !Object.prototype.hasOwnProperty.call(actual, key) ||
-        !jsonValuesMatch(expected[key], actual[key])
+    return Object.keys(expected).filter(
+        key =>
+            !Object.prototype.hasOwnProperty.call(actual, key) ||
+            !jsonValuesMatch(expected[key], actual[key])
     );
 }
 
 async function restorePreviousStorage(storage, previousStorage, importedKeys, backupKey) {
     await storage.set(previousStorage);
-    const newlyAddedKeys = importedKeys.filter(key =>
-        !Object.prototype.hasOwnProperty.call(previousStorage, key)
+    const newlyAddedKeys = importedKeys.filter(
+        key => !Object.prototype.hasOwnProperty.call(previousStorage, key)
     );
     if (!Object.prototype.hasOwnProperty.call(previousStorage, backupKey)) {
         newlyAddedKeys.push(backupKey);
@@ -54,12 +60,7 @@ async function restorePreviousStorage(storage, previousStorage, importedKeys, ba
  * get, set, and remove methods and can be replaced with a fake in tests.
  */
 export async function importStorageSafely(options) {
-    const {
-        storage,
-        data,
-        backupKey,
-        now = () => new Date().toISOString()
-    } = options;
+    const { storage, data, backupKey, now = () => new Date().toISOString() } = options;
 
     const previousStorage = await storage.get(null);
     const backupData = { ...previousStorage };

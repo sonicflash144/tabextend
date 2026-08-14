@@ -39,39 +39,39 @@ test('round trips groups, ordering, metadata, and hyphenated ids', () => {
             { id: 'id-with-hyphens', title: 'One', url: 'https://example.com/1' },
             { id: 'second', title: 'Two', url: 'https://example.com/2' }
         ],
-        columnState: [{
-            id: 'column-1',
-            title: 'Column',
-            emoji: '📚',
-            minimized: true,
-            recovered: true,
-            tabIds: [[
-                'group-1',
-                'tab-id-with-hyphens',
-                'tab-second',
-                'Group title',
-                true
-            ]]
-        }]
+        columnState: [
+            {
+                id: 'column-1',
+                title: 'Column',
+                emoji: '📚',
+                minimized: true,
+                recovered: true,
+                tabIds: [['group-1', 'tab-id-with-hyphens', 'tab-second', 'Group title', true]]
+            }
+        ]
     };
 
-    const roundTrip = canonicalStateToLegacy(canonicalStateFromLegacy(
-        legacy.savedTabs,
-        legacy.columnState
-    ));
+    const roundTrip = canonicalStateToLegacy(
+        canonicalStateFromLegacy(legacy.savedTabs, legacy.columnState)
+    );
 
     assert.deepEqual(roundTrip, legacy);
 });
 
 test('excludes temp markers from memory and adds one only when requested', () => {
-    const state = canonicalStateFromLegacy([
-        { id: 'one', title: 'One', url: 'https://example.com' },
-        { temp: 100 }
-    ], []);
+    const state = canonicalStateFromLegacy(
+        [{ id: 'one', title: 'One', url: 'https://example.com' }, { temp: 100 }],
+        []
+    );
 
     assert.equal(state.tabs.size, 1);
-    assert.deepEqual(canonicalStateToLegacy(state).savedTabs.map(tab => tab.id), ['one']);
-    assert.deepEqual(canonicalStateToLegacy(state, { tempMarker: 200 }).savedTabs[1], { temp: 200 });
+    assert.deepEqual(
+        canonicalStateToLegacy(state).savedTabs.map(tab => tab.id),
+        ['one']
+    );
+    assert.deepEqual(canonicalStateToLegacy(state, { tempMarker: 200 }).savedTabs[1], {
+        temp: 200
+    });
 });
 
 test('replaces columns while retaining canonical tab records', () => {
@@ -88,9 +88,10 @@ test('replaces columns while retaining canonical tab records', () => {
 });
 
 test('canonical validation catches missing references', () => {
-    const state = canonicalStateFromLegacy([], [
-        { id: 'column', title: 'Column', tabIds: ['tab-missing'] }
-    ]);
+    const state = canonicalStateFromLegacy(
+        [],
+        [{ id: 'column', title: 'Column', tabIds: ['tab-missing'] }]
+    );
     const result = validateCanonicalState(state);
 
     assert.equal(result.valid, false);
@@ -98,10 +99,13 @@ test('canonical validation catches missing references', () => {
 });
 
 test('canonical validation enforces complete and unique tab ordering', () => {
-    const state = canonicalStateFromLegacy([
-        { id: 'one', title: 'One', url: 'https://example.com/one' },
-        { id: 'two', title: 'Two', url: 'https://example.com/two' }
-    ], []);
+    const state = canonicalStateFromLegacy(
+        [
+            { id: 'one', title: 'One', url: 'https://example.com/one' },
+            { id: 'two', title: 'Two', url: 'https://example.com/two' }
+        ],
+        []
+    );
     state.tabOrder = ['one', 'one', 'missing'];
 
     const result = validateCanonicalState(state);
@@ -147,14 +151,13 @@ test('canonical validation rejects duplicate placements within and outside group
             { id: 'one', title: 'One', url: 'https://example.com/one' },
             { id: 'two', title: 'Two', url: 'https://example.com/two' }
         ],
-        [{
-            id: 'column-1',
-            title: 'Column',
-            tabIds: [
-                'tab-one',
-                ['group-1', 'tab-one', 'tab-two', 'tab-two', 'Group', false]
-            ]
-        }]
+        [
+            {
+                id: 'column-1',
+                title: 'Column',
+                tabIds: ['tab-one', ['group-1', 'tab-one', 'tab-two', 'tab-two', 'Group', false]]
+            }
+        ]
     );
 
     const result = validateCanonicalState(state);
@@ -196,22 +199,22 @@ test('state store replaces legacy state and notifies subscribers', () => {
 });
 
 function boardState() {
-    return canonicalStateFromLegacy([
-        { id: 'alpha', title: 'Alpha', url: 'https://example.com/alpha' },
-        { id: 'beta', title: 'Beta', url: 'https://example.com/beta' },
-        { id: 'gamma', title: 'Gamma', url: 'https://example.com/gamma' },
-        { id: 'delta', title: 'Delta', url: 'https://example.com/delta' }
-    ], [
-        {
-            id: 'column-1',
-            title: 'Research',
-            tabIds: [
-                'tab-alpha',
-                ['group-1', 'tab-beta', 'tab-gamma', 'Reading', false]
-            ]
-        },
-        { id: 'column-2', title: 'Later', tabIds: ['tab-delta'] }
-    ]);
+    return canonicalStateFromLegacy(
+        [
+            { id: 'alpha', title: 'Alpha', url: 'https://example.com/alpha' },
+            { id: 'beta', title: 'Beta', url: 'https://example.com/beta' },
+            { id: 'gamma', title: 'Gamma', url: 'https://example.com/gamma' },
+            { id: 'delta', title: 'Delta', url: 'https://example.com/delta' }
+        ],
+        [
+            {
+                id: 'column-1',
+                title: 'Research',
+                tabIds: ['tab-alpha', ['group-1', 'tab-beta', 'tab-gamma', 'Reading', false]]
+            },
+            { id: 'column-2', title: 'Later', tabIds: ['tab-delta'] }
+        ]
+    );
 }
 
 test('columns and groups are found by their identity', () => {
@@ -229,33 +232,42 @@ test('columns and groups are found by their identity', () => {
 test('a column lists its tabs in order with its groups flattened in place', () => {
     const state = boardState();
 
-    assert.deepEqual(getColumnTabs(state, 'column-1').map(tab => tab.id), [
-        'alpha',
-        'beta',
-        'gamma'
-    ]);
-    assert.deepEqual(getColumnTabs(state, 'column-2').map(tab => tab.id), ['delta']);
+    assert.deepEqual(
+        getColumnTabs(state, 'column-1').map(tab => tab.id),
+        ['alpha', 'beta', 'gamma']
+    );
+    assert.deepEqual(
+        getColumnTabs(state, 'column-2').map(tab => tab.id),
+        ['delta']
+    );
     assert.deepEqual(getColumnTabs(state, 'missing'), []);
 });
 
 test('a group lists only its own tabs, in order', () => {
     const state = boardState();
 
-    assert.deepEqual(getGroupTabs(state, 'group-1').map(tab => tab.id), ['beta', 'gamma']);
+    assert.deepEqual(
+        getGroupTabs(state, 'group-1').map(tab => tab.id),
+        ['beta', 'gamma']
+    );
     assert.deepEqual(getGroupTabs(state, 'missing'), []);
 });
 
 test('tab references with no stored tab are skipped rather than reported as gaps', () => {
-    const state = canonicalStateFromLegacy([
-        { id: 'alpha', title: 'Alpha', url: 'https://example.com/alpha' }
-    ], [
-        {
-            id: 'column-1',
-            title: 'Research',
-            tabIds: ['tab-alpha', 'tab-missing', ['group-1', 'tab-gone', 'Reading', false]]
-        }
-    ]);
+    const state = canonicalStateFromLegacy(
+        [{ id: 'alpha', title: 'Alpha', url: 'https://example.com/alpha' }],
+        [
+            {
+                id: 'column-1',
+                title: 'Research',
+                tabIds: ['tab-alpha', 'tab-missing', ['group-1', 'tab-gone', 'Reading', false]]
+            }
+        ]
+    );
 
-    assert.deepEqual(getColumnTabs(state, 'column-1').map(tab => tab.id), ['alpha']);
+    assert.deepEqual(
+        getColumnTabs(state, 'column-1').map(tab => tab.id),
+        ['alpha']
+    );
     assert.deepEqual(getGroupTabs(state, 'group-1'), []);
 });

@@ -29,12 +29,7 @@ export function createOpenTabsView(document, options) {
     }
 
     function renderTab(tab, index, classes = rowClasses()) {
-        const {
-            item,
-            infoLeft,
-            title,
-            closeButton
-        } = createOpenTabView(document, {
+        const { item, infoLeft, title, closeButton } = createOpenTabView(document, {
             tab,
             classes,
             ...presenter.presentOpen(tab),

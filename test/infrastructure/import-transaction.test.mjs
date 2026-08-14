@@ -14,7 +14,9 @@ function reverseObjectKeys(value) {
     if (Array.isArray(value)) return value.map(reverseObjectKeys);
     if (value === null || typeof value !== 'object') return value;
     return Object.fromEntries(
-        Object.keys(value).reverse().map(key => [key, reverseObjectKeys(value[key])])
+        Object.keys(value)
+            .reverse()
+            .map(key => [key, reverseObjectKeys(value[key])])
     );
 }
 
@@ -92,17 +94,21 @@ test('verification accepts equivalent objects returned with reordered properties
     };
     const storage = createFakeStorage(initial, { reorderReadBack: true });
     const imported = {
-        savedTabs: [{
-            id: 'new',
-            title: 'New',
-            metadata: { source: 'legacy', flags: { reviewed: true, pinned: false } }
-        }],
-        columnState: [{
-            id: 'new-column',
-            title: 'Column',
-            minimized: false,
-            tabIds: ['tab-new']
-        }]
+        savedTabs: [
+            {
+                id: 'new',
+                title: 'New',
+                metadata: { source: 'legacy', flags: { reviewed: true, pinned: false } }
+            }
+        ],
+        columnState: [
+            {
+                id: 'new-column',
+                title: 'Column',
+                minimized: false,
+                tabIds: ['tab-new']
+            }
+        ]
     };
 
     await importStorageSafely({ storage, data: imported, backupKey });

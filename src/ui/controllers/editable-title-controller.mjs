@@ -61,4 +61,3 @@ export function createEditableTitleController(document, options = {}) {
     titleGroup.append(titleInput, titleSpan);
     return { titleGroup, titleInput, titleSpan };
 }
-

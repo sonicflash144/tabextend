@@ -1,0 +1,17 @@
+node_modules/
+package-lock.json
+
+# Generated bundles and packaged archives.
+dist/
+build/
+
+# Generated from manifest.json plus browser/safari/manifest.override.json.
+browser/safari/manifest.json
+
+# Historical exports are kept byte-faithful to the files users actually have.
+test/fixtures/
+
+# Descendant rules are indented under their parent selector to show the page's
+# structure. Prettier cannot express that convention, so the stylesheet is
+# formatted by hand.
+newtab.css

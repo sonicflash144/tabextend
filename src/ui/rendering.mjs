@@ -1,18 +1,17 @@
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 const ICON_DEFINITIONS = {
-    'chevron-down': [
-        ['path', { d: 'm6 9 6 6 6-6' }]
-    ],
-    'chevron-up': [
-        ['path', { d: 'm18 15-6-6-6 6' }]
-    ],
+    'chevron-down': [['path', { d: 'm6 9 6 6 6-6' }]],
+    'chevron-up': [['path', { d: 'm18 15-6-6-6 6' }]],
     close: [
         ['line', { x1: '18', x2: '6', y1: '6', y2: '18' }],
         ['line', { x1: '6', x2: '18', y1: '6', y2: '18' }]
     ],
     delete: [
         ['polyline', { points: '3 6 5 6 21 6' }],
-        ['path', { d: 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' }],
+        [
+            'path',
+            { d: 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' }
+        ],
         ['line', { x1: '10', x2: '10', y1: '11', y2: '17' }],
         ['line', { x1: '14', x2: '14', y1: '11', y2: '17' }]
     ],
@@ -33,7 +32,10 @@ const ICON_DEFINITIONS = {
         ['circle', { cx: '12', cy: '19', r: '1' }]
     ],
     'new-column': [
-        ['path', { d: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z' }],
+        [
+            'path',
+            { d: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z' }
+        ],
         ['line', { x1: '12', x2: '12', y1: '11', y2: '17' }],
         ['line', { x1: '9', x2: '15', y1: '14', y2: '14' }]
     ]
@@ -42,12 +44,7 @@ const ICON_DEFINITIONS = {
 function createIcon(document, name, options = {}) {
     const definition = ICON_DEFINITIONS[name];
     if (!definition) throw new Error(`Unknown icon ${JSON.stringify(name)}.`);
-    const {
-        width = 24,
-        height = width,
-        filled = false,
-        classes = []
-    } = options;
+    const { width = 24, height = width, filled = false, classes = [] } = options;
     const svg = document.createElementNS(SVG_NAMESPACE, 'svg');
     const attributes = {
         xmlns: SVG_NAMESPACE,
@@ -182,13 +179,7 @@ export function createNotificationDot(document, options = {}) {
 }
 
 export function createDraggableListItem(document, options = {}) {
-    const {
-        id,
-        isSubgroup = false,
-        classes = [],
-        onDragStart,
-        onDragEnd
-    } = options;
+    const { id, isSubgroup = false, classes = [], onDragStart, onDragEnd } = options;
     const item = document.createElement('li');
     item.classList.add('tab-item', ...classes);
     if (isSubgroup) item.classList.add('subgroup-item');
@@ -321,10 +312,12 @@ export function createSavedTabView(document, options) {
     const moreOptionsButton = document.createElement('button');
     moreOptionsButton.classList.add('more-options');
     moreOptionsButton.dataset.index = String(tab.id);
-    moreOptionsButton.appendChild(createIcon(document, 'more', {
-        width: 20,
-        filled: true
-    }));
+    moreOptionsButton.appendChild(
+        createIcon(document, 'more', {
+            width: 20,
+            filled: true
+        })
+    );
     actions.appendChild(moreOptionsButton);
     infoContainer.append(infoLeft, infoRight, actions);
     item.appendChild(infoContainer);
@@ -342,16 +335,8 @@ export function createSavedTabView(document, options) {
 }
 
 export function createColumnView(document, options) {
-    const {
-        id,
-        minimized,
-        emoji,
-        theme,
-        titleGroup,
-        fallbackEmoji,
-        onDragStart,
-        onDragEnd
-    } = options;
+    const { id, minimized, emoji, theme, titleGroup, fallbackEmoji, onDragStart, onDragEnd } =
+        options;
     const column = document.createElement('div');
     column.classList.add('column');
     if (minimized) column.classList.add('minimized');

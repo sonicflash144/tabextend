@@ -1,22 +1,14 @@
-import {
-    CURRENT_EXPORT_FORMAT_VERSION,
-    prepareImportData
-} from '../compatibility/legacy-data.mjs';
+import { CURRENT_EXPORT_FORMAT_VERSION, prepareImportData } from '../compatibility/legacy-data.mjs';
 import { importStorageSafely } from '../infrastructure/import-transaction.mjs';
 
-export const TRANSIENT_EXPORT_KEYS = new Set([
-    'animation',
-    'tabsMagicImportBackup'
-]);
+export const TRANSIENT_EXPORT_KEYS = new Set(['animation', 'tabsMagicImportBackup']);
 
 export const IMPORT_BACKUP_KEY = 'tabsMagicImportBackup';
 
 /** Create the portable export envelope shared by every browser package. */
 export function createExportPayload(storageData, options = {}) {
-    const {
-        exportedAt = new Date().toISOString(),
-        formatVersion = CURRENT_EXPORT_FORMAT_VERSION
-    } = options;
+    const { exportedAt = new Date().toISOString(), formatVersion = CURRENT_EXPORT_FORMAT_VERSION } =
+        options;
     const exportedData = { ...storageData };
     TRANSIENT_EXPORT_KEYS.forEach(key => delete exportedData[key]);
 

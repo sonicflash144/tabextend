@@ -4,11 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { JSDOM } from 'jsdom';
 
-const repositoryRoot = path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    '..',
-    '..'
-);
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 // The real page markup, so tests see the ids and structure the extension ships.
 const pageHtml = readFileSync(path.join(repositoryRoot, 'newtab.html'), 'utf8');
@@ -119,20 +115,24 @@ export function markVisible(...elements) {
 }
 
 export function click(element, init = {}) {
-    element.dispatchEvent(new element.ownerDocument.defaultView.MouseEvent('click', {
-        bubbles: true,
-        cancelable: true,
-        ...init
-    }));
+    element.dispatchEvent(
+        new element.ownerDocument.defaultView.MouseEvent('click', {
+            bubbles: true,
+            cancelable: true,
+            ...init
+        })
+    );
 }
 
 export function keyDown(element, key, init = {}) {
-    element.dispatchEvent(new element.ownerDocument.defaultView.KeyboardEvent('keydown', {
-        bubbles: true,
-        cancelable: true,
-        key,
-        ...init
-    }));
+    element.dispatchEvent(
+        new element.ownerDocument.defaultView.KeyboardEvent('keydown', {
+            bubbles: true,
+            cancelable: true,
+            key,
+            ...init
+        })
+    );
 }
 
 /**
@@ -147,9 +147,15 @@ export function dragEvent(type, target, options = {}) {
         dropEffect: 'none',
         data,
         dragImage: null,
-        setData(type, value) { transfer.data = value; },
-        getData() { return transfer.data; },
-        setDragImage(node) { transfer.dragImage = node; }
+        setData(type, value) {
+            transfer.data = value;
+        },
+        getData() {
+            return transfer.data;
+        },
+        setDragImage(node) {
+            transfer.dragImage = node;
+        }
     };
     Object.defineProperties(event, {
         // Handlers are called directly rather than dispatched, so the target

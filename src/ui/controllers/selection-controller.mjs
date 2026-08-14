@@ -2,8 +2,9 @@ export function createSelectionController(document) {
     let lastSelectedIndex = null;
 
     function visibleItems() {
-        return Array.from(document.querySelectorAll('li:not(.subgroup-item)'))
-            .filter(item => item.offsetParent !== null);
+        return Array.from(document.querySelectorAll('li:not(.subgroup-item)')).filter(
+            item => item.offsetParent !== null
+        );
     }
 
     function selectedItems() {
@@ -44,4 +45,3 @@ export function createSelectionController(document) {
 
     return { clear, handleItemClick, resetAnchor, selectedItems, visibleItems };
 }
-

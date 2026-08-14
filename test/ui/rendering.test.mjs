@@ -55,8 +55,9 @@ function columnTitleGroup(text = 'Research') {
 }
 
 test('the page markup the extension ships provides the containers the app needs', () => {
-    ['sidebar', 'open-tabs-list', 'main-content', 'space-container', 'columns-container']
-        .forEach(id => assert.ok(document.getElementById(id), `missing #${id}`));
+    ['sidebar', 'open-tabs-list', 'main-content', 'space-container', 'columns-container'].forEach(
+        id => assert.ok(document.getElementById(id), `missing #${id}`)
+    );
     assert.ok(document.querySelector('.settings-button'));
     assert.ok(document.querySelector('.minimize-sidebar'));
     assert.ok(document.querySelector('.maximize-sidebar'));
@@ -221,12 +222,14 @@ test('a subgroup starts collapsed and toggles between previews and tabs', () => 
         group: { id: 'group-1', title: 'Reading' },
         titleGroup
     });
-    view.faviconsContainer.appendChild(createSubgroupPreview(document, {
-        tab: { id: 'alpha', title: 'Alpha' },
-        navigableUrl: 'https://example.com/alpha',
-        faviconUrl: 'https://example.com/icon.png',
-        colorClass: 'tab-blue'
-    }));
+    view.faviconsContainer.appendChild(
+        createSubgroupPreview(document, {
+            tab: { id: 'alpha', title: 'Alpha' },
+            navigableUrl: 'https://example.com/alpha',
+            faviconUrl: 'https://example.com/icon.png',
+            colorClass: 'tab-blue'
+        })
+    );
     view.expandedContainer.appendChild(savedTabView().item);
 
     assert.equal(view.item.id, 'group-1');
@@ -279,11 +282,15 @@ test('a menu renders one button per visible entry and closes after acting', () =
         width: 40
     });
     const actions = [];
-    const menu = createMenuDropdown(document, [
-        { text: 'Export Data', action: () => actions.push('export') },
-        { text: 'Import Data', action: () => actions.push('import') },
-        { text: 'Hidden', action: () => actions.push('hidden'), hidden: true }
-    ], button);
+    const menu = createMenuDropdown(
+        document,
+        [
+            { text: 'Export Data', action: () => actions.push('export') },
+            { text: 'Import Data', action: () => actions.push('import') },
+            { text: 'Hidden', action: () => actions.push('hidden'), hidden: true }
+        ],
+        button
+    );
 
     const options = menu.querySelectorAll('button.menu-option');
     assert.deepEqual(

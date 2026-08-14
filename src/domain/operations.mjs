@@ -30,8 +30,8 @@ function clampedIndex(index, length) {
 export function findGroupLocation(state, groupId) {
     const normalizedId = normalizeId(groupId);
     for (let columnIndex = 0; columnIndex < state.columns.length; columnIndex += 1) {
-        const itemIndex = state.columns[columnIndex].items.findIndex(item =>
-            item.type === 'group' && item.id === normalizedId
+        const itemIndex = state.columns[columnIndex].items.findIndex(
+            item => item.type === 'group' && item.id === normalizedId
         );
         if (itemIndex !== -1) {
             return {
@@ -56,9 +56,7 @@ export function removeTabPlacements(state, tabIds) {
                 return removedIds.has(item.tabId) ? [] : [item];
             }
             const remainingTabIds = item.tabIds.filter(tabId => !removedIds.has(tabId));
-            return remainingTabIds.length === 0
-                ? []
-                : [{ ...item, tabIds: remainingTabIds }];
+            return remainingTabIds.length === 0 ? [] : [{ ...item, tabIds: remainingTabIds }];
         })
     }));
     return nextState;
@@ -90,9 +88,8 @@ export function updateTab(state, tabId, changes) {
     if (!currentTab) return state;
 
     const nextState = cloneCanonicalState(state);
-    const resolvedChanges = typeof changes === 'function'
-        ? changes({ ...nextState.tabs.get(id) })
-        : changes;
+    const resolvedChanges =
+        typeof changes === 'function' ? changes({ ...nextState.tabs.get(id) }) : changes;
     nextState.tabs.set(id, {
         ...nextState.tabs.get(id),
         ...resolvedChanges,
@@ -102,9 +99,7 @@ export function updateTab(state, tabId, changes) {
 }
 
 export function removeTabs(state, tabIds) {
-    const removedIds = new Set(
-        (Array.isArray(tabIds) ? tabIds : [tabIds]).map(normalizeId)
-    );
+    const removedIds = new Set((Array.isArray(tabIds) ? tabIds : [tabIds]).map(normalizeId));
     if (![...removedIds].some(id => state.tabs.has(id))) return state;
 
     const nextState = cloneCanonicalState(state);
@@ -138,9 +133,10 @@ export function updateColumn(state, columnId, changes) {
 
     const nextState = cloneCanonicalState(state);
     const currentColumn = nextState.columns[columnIndex];
-    const resolvedChanges = typeof changes === 'function'
-        ? changes({ ...currentColumn, items: currentColumn.items.map(cloneItem) })
-        : changes;
+    const resolvedChanges =
+        typeof changes === 'function'
+            ? changes({ ...currentColumn, items: currentColumn.items.map(cloneItem) })
+            : changes;
     nextState.columns[columnIndex] = {
         ...currentColumn,
         ...resolvedChanges,
@@ -163,7 +159,7 @@ export function moveColumn(state, columnId, index) {
 }
 
 function tabIdsInColumn(column) {
-    return column.items.flatMap(item => item.type === 'group' ? item.tabIds : [item.tabId]);
+    return column.items.flatMap(item => (item.type === 'group' ? item.tabIds : [item.tabId]));
 }
 
 export function removeColumn(state, columnId, options = {}) {
@@ -173,9 +169,7 @@ export function removeColumn(state, columnId, options = {}) {
 
     const nextState = cloneCanonicalState(state);
     nextState.columns = nextState.columns.filter(candidate => candidate.id !== id);
-    return options.deleteTabs
-        ? removeTabs(nextState, tabIdsInColumn(column))
-        : nextState;
+    return options.deleteTabs ? removeTabs(nextState, tabIdsInColumn(column)) : nextState;
 }
 
 export function createGroup(state, columnId, index, group) {
@@ -211,9 +205,10 @@ export function updateGroup(state, groupId, changes) {
     const nextState = cloneCanonicalState(state);
     const nextLocation = findGroupLocation(nextState, groupId);
     const currentGroup = nextLocation.group;
-    const resolvedChanges = typeof changes === 'function'
-        ? changes({ ...currentGroup, tabIds: [...currentGroup.tabIds] })
-        : changes;
+    const resolvedChanges =
+        typeof changes === 'function'
+            ? changes({ ...currentGroup, tabIds: [...currentGroup.tabIds] })
+            : changes;
     nextLocation.column.items[nextLocation.itemIndex] = {
         ...currentGroup,
         ...resolvedChanges,

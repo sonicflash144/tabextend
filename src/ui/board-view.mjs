@@ -153,8 +153,8 @@ export function createBoardView(document, options) {
             } else if (event.key === 'Enter' && event.shiftKey) {
                 const start = noteInput.selectionStart;
                 const end = noteInput.selectionEnd;
-                noteInput.value = `${noteInput.value.substring(0, start)}\n` +
-                    noteInput.value.substring(end);
+                noteInput.value =
+                    `${noteInput.value.substring(0, start)}\n` + noteInput.value.substring(end);
                 noteInput.selectionStart = start + 1;
                 noteInput.selectionEnd = start + 1;
                 event.preventDefault();
@@ -220,23 +220,17 @@ export function createBoardView(document, options) {
                 onColumnRename(column, value);
             }
         });
-        const {
-            column,
-            minimizeButton,
-            maximizeButton,
-            menuButton,
-            emojiButton,
-            emojiPicker
-        } = createColumnView(document, {
-            id: columnData.id,
-            minimized: columnData.minimized,
-            emoji: columnData.emoji,
-            theme: getTheme(),
-            titleGroup,
-            fallbackEmoji: nextFallbackEmoji(),
-            onDragStart: onColumnDragStart,
-            onDragEnd
-        });
+        const { column, minimizeButton, maximizeButton, menuButton, emojiButton, emojiPicker } =
+            createColumnView(document, {
+                id: columnData.id,
+                minimized: columnData.minimized,
+                emoji: columnData.emoji,
+                theme: getTheme(),
+                titleGroup,
+                fallbackEmoji: nextFallbackEmoji(),
+                onDragStart: onColumnDragStart,
+                onDragEnd
+            });
 
         minimizeButton.addEventListener('click', () => {
             setColumnMinimized(column, true);
@@ -292,29 +286,26 @@ export function createBoardView(document, options) {
             defaultText: 'New Group',
             onSave: value => onGroupRename(group, value)
         });
-        const {
-            item,
-            faviconsContainer,
-            expandedContainer,
-            expandButton,
-            moreOptionsButton
-        } = createSubgroupView(document, {
-            group,
-            titleGroup,
-            onDragStart: onTabDragStart,
-            onDragEnd
-        });
+        const { item, faviconsContainer, expandedContainer, expandButton, moreOptionsButton } =
+            createSubgroupView(document, {
+                group,
+                titleGroup,
+                onDragStart: onTabDragStart,
+                onDragEnd
+            });
 
         group.tabIds.forEach(tabId => {
             const tab = getTab(state, tabId);
             if (!tab) return;
             const { navigableUrl, faviconUrl, colorClass } = presenter.present(tab);
-            faviconsContainer.appendChild(createSubgroupPreview(document, {
-                tab,
-                navigableUrl,
-                faviconUrl,
-                colorClass
-            }));
+            faviconsContainer.appendChild(
+                createSubgroupPreview(document, {
+                    tab,
+                    navigableUrl,
+                    faviconUrl,
+                    colorClass
+                })
+            );
             expandedContainer.appendChild(renderTab(tab));
         });
 

@@ -11,12 +11,12 @@ function createStorage(initial = {}) {
             if (keys === null || keys === undefined) return { ...values };
             const requested = Array.isArray(keys) ? keys : [keys];
             return Object.fromEntries(
-                requested
-                    .filter(key => key in values)
-                    .map(key => [key, values[key]])
+                requested.filter(key => key in values).map(key => [key, values[key]])
             );
         },
-        async set(updates) { Object.assign(values, updates); }
+        async set(updates) {
+            Object.assign(values, updates);
+        }
     };
 }
 
@@ -69,14 +69,12 @@ test('reports sidebar changes made by another page', () => {
 
     assert.equal(settings.readSidebarChange({}), null);
     assert.equal(settings.readSidebarChange({ theme: { newValue: 'dark' } }), null);
-    assert.deepEqual(
-        settings.readSidebarChange({ sidebarCollapsed: { newValue: true } }),
-        { sidebarCollapsed: true }
-    );
-    assert.deepEqual(
-        settings.readSidebarChange({ sidebarCollapsed: { newValue: false } }),
-        { sidebarCollapsed: false }
-    );
+    assert.deepEqual(settings.readSidebarChange({ sidebarCollapsed: { newValue: true } }), {
+        sidebarCollapsed: true
+    });
+    assert.deepEqual(settings.readSidebarChange({ sidebarCollapsed: { newValue: false } }), {
+        sidebarCollapsed: false
+    });
 });
 
 test('alternates between the supported themes', () => {

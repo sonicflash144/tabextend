@@ -119,15 +119,18 @@ test('a date the parser cannot locate in the raw note does not throw', () => {
 });
 
 test('a stored tab is presented with safe urls, colour, note, and date', () => {
-    const presented = presentTab({
-        id: 'alpha',
-        title: 'Alpha',
-        url: 'https://example.com/alpha',
-        favIconUrl: 'https://example.com/icon.png',
-        color: '#ebc4ff',
-        note: 'line one<br>line two',
-        parsedDate: at(13)
-    }, { now: NOON });
+    const presented = presentTab(
+        {
+            id: 'alpha',
+            title: 'Alpha',
+            url: 'https://example.com/alpha',
+            favIconUrl: 'https://example.com/icon.png',
+            color: '#ebc4ff',
+            note: 'line one<br>line two',
+            parsedDate: at(13)
+        },
+        { now: NOON }
+    );
 
     assert.deepEqual(presented, {
         navigableUrl: 'https://example.com/alpha',
@@ -141,12 +144,15 @@ test('a stored tab is presented with safe urls, colour, note, and date', () => {
 });
 
 test('unsafe stored urls are dropped rather than rendered', () => {
-    const presented = presentTab({
-        id: 'alpha',
-        url: 'javascript:alert(1)',
-        favIconUrl: 'javascript:alert(1)',
-        color: '#FFFFFF'
-    }, { now: NOON });
+    const presented = presentTab(
+        {
+            id: 'alpha',
+            url: 'javascript:alert(1)',
+            favIconUrl: 'javascript:alert(1)',
+            color: '#FFFFFF'
+        },
+        { now: NOON }
+    );
 
     assert.equal(presented.navigableUrl, '');
     assert.equal(presented.faviconUrl, '');

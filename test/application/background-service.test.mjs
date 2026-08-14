@@ -13,8 +13,12 @@ import {
 function createEvent() {
     const listeners = new Set();
     return {
-        addListener(listener) { listeners.add(listener); },
-        removeListener(listener) { listeners.delete(listener); },
+        addListener(listener) {
+            listeners.add(listener);
+        },
+        removeListener(listener) {
+            listeners.delete(listener);
+        },
         async emit(...args) {
             for (const listener of listeners) await listener(...args);
         }
@@ -31,7 +35,9 @@ function createStorage(initial = {}) {
                 requested.filter(key => key in values).map(key => [key, values[key]])
             );
         },
-        async set(updates) { Object.assign(values, updates); }
+        async set(updates) {
+            Object.assign(values, updates);
+        }
     };
 }
 
@@ -43,8 +49,12 @@ function createBrowserApi(tabs = []) {
         action: { onClicked: createEvent() },
         contextMenus: {
             onClicked: createEvent(),
-            async create(properties) { calls.push(['menuCreate', properties]); },
-            async update(menuId, changes) { calls.push(['menuUpdate', menuId, changes]); }
+            async create(properties) {
+                calls.push(['menuCreate', properties]);
+            },
+            async update(menuId, changes) {
+                calls.push(['menuUpdate', menuId, changes]);
+            }
         },
         tabs: {
             onUpdated: createEvent(),
@@ -53,8 +63,12 @@ function createBrowserApi(tabs = []) {
                 calls.push(['get', tabId]);
                 return tabs.find(tab => tab.id === tabId);
             },
-            async create(properties) { calls.push(['create', properties]); },
-            async remove(tabId) { calls.push(['remove', tabId]); }
+            async create(properties) {
+                calls.push(['create', properties]);
+            },
+            async remove(tabId) {
+                calls.push(['remove', tabId]);
+            }
         }
     };
 }
@@ -93,12 +107,17 @@ test('creates the save menu hidden on install', async () => {
 
     await browserApi.runtime.onInstalled.emit();
 
-    assert.deepEqual(browserApi.calls, [['menuCreate', {
-        id: SAVE_TAB_MENU_ID,
-        title: 'Save to Tabs Magic',
-        contexts: ['page', 'selection'],
-        visible: false
-    }]]);
+    assert.deepEqual(browserApi.calls, [
+        [
+            'menuCreate',
+            {
+                id: SAVE_TAB_MENU_ID,
+                title: 'Save to Tabs Magic',
+                contexts: ['page', 'selection'],
+                visible: false
+            }
+        ]
+    ]);
 });
 
 test('shows the save menu only on savable pages', async () => {
@@ -119,7 +138,14 @@ test('shows the save menu only on savable pages', async () => {
 
 test('queues the clicked tab with its selection before closing it', async () => {
     const { browserApi, storage } = createService({
-        tabs: [{ id: 7, title: 'Example', url: 'https://example.com', favIconUrl: 'https://example.com/i.png' }],
+        tabs: [
+            {
+                id: 7,
+                title: 'Example',
+                url: 'https://example.com',
+                favIconUrl: 'https://example.com/i.png'
+            }
+        ],
         stored: { [BACKGROUND_TABS_KEY]: [{ id: 'existing' }] }
     });
 
@@ -154,7 +180,9 @@ test('stores a null note when no text is selected and no queue exists yet', asyn
 });
 
 test('ignores clicks on other context menu entries', async () => {
-    const { browserApi, storage } = createService({ tabs: [{ id: 7, url: 'https://example.com' }] });
+    const { browserApi, storage } = createService({
+        tabs: [{ id: 7, url: 'https://example.com' }]
+    });
 
     await browserApi.contextMenus.onClicked.emit({ menuItemId: 'other' }, { id: 7 });
 
@@ -164,12 +192,17 @@ test('ignores clicks on other context menu entries', async () => {
 
 test('reports failures instead of leaving rejections unhandled', async () => {
     const { browserApi, errors } = createService();
-    browserApi.tabs.get = async () => { throw new Error('tab is gone'); };
+    browserApi.tabs.get = async () => {
+        throw new Error('tab is gone');
+    };
 
     await browserApi.contextMenus.onClicked.emit({ menuItemId: SAVE_TAB_MENU_ID }, { id: 7 });
     await browserApi.tabs.onActivated.emit({ tabId: 7 });
 
-    assert.deepEqual(errors.map(error => error.message), ['tab is gone', 'tab is gone']);
+    assert.deepEqual(
+        errors.map(error => error.message),
+        ['tab is gone', 'tab is gone']
+    );
 });
 
 test('opens the new tab page from the toolbar action', async () => {

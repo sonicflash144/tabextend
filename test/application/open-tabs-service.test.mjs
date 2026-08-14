@@ -7,9 +7,15 @@ function createEvent() {
     const listeners = new Set();
     return {
         listeners,
-        addListener(listener) { listeners.add(listener); },
-        removeListener(listener) { listeners.delete(listener); },
-        emit(...args) { listeners.forEach(listener => listener(...args)); }
+        addListener(listener) {
+            listeners.add(listener);
+        },
+        removeListener(listener) {
+            listeners.delete(listener);
+        },
+        emit(...args) {
+            listeners.forEach(listener => listener(...args));
+        }
     };
 }
 
@@ -33,11 +39,21 @@ function createTabsRepositoryStub(options = {}) {
             calls.push(['queryActiveTab']);
             return options.activeTab === undefined ? { id: 99 } : options.activeTab;
         },
-        async remove(tabIds) { calls.push(['remove', tabIds]); },
-        async activate(tabId) { calls.push(['activate', tabId]); },
-        async move(tabId, moveProperties) { calls.push(['move', tabId, moveProperties]); },
-        async create(createProperties) { calls.push(['create', createProperties]); },
-        async openUrls(urls, openOptions) { calls.push(['openUrls', urls, openOptions]); }
+        async remove(tabIds) {
+            calls.push(['remove', tabIds]);
+        },
+        async activate(tabId) {
+            calls.push(['activate', tabId]);
+        },
+        async move(tabId, moveProperties) {
+            calls.push(['move', tabId, moveProperties]);
+        },
+        async create(createProperties) {
+            calls.push(['create', createProperties]);
+        },
+        async openUrls(urls, openOptions) {
+            calls.push(['openUrls', urls, openOptions]);
+        }
     };
 }
 
@@ -63,7 +79,10 @@ test('lists only listable tabs of the current window', async () => {
         ]
     });
 
-    assert.deepEqual((await service.list()).map(tab => tab.id), [1]);
+    assert.deepEqual(
+        (await service.list()).map(tab => tab.id),
+        [1]
+    );
     assert.deepEqual(tabs.calls[0], ['query', { currentWindow: true }]);
 });
 
@@ -99,7 +118,10 @@ test('captures open tabs as stored tabs without closing them', async () => {
             }
         }
     ]);
-    assert.equal(tabs.calls.some(call => call[0] === 'remove'), false);
+    assert.equal(
+        tabs.calls.some(call => call[0] === 'remove'),
+        false
+    );
 });
 
 test('closes tabs in one call and skips empty requests', async () => {
@@ -109,7 +131,10 @@ test('closes tabs in one call and skips empty requests', async () => {
     await service.close(3);
     await service.close([]);
 
-    assert.deepEqual(tabs.calls, [['remove', [1, 2]], ['remove', [3]]]);
+    assert.deepEqual(tabs.calls, [
+        ['remove', [1, 2]],
+        ['remove', [3]]
+    ]);
 });
 
 test('restores focus to the active tab after closing another tab', async () => {
@@ -145,10 +170,15 @@ test('refreshes on tab changes and delays only removals when asked', () => {
     const scheduled = [];
     let refreshes = 0;
 
-    const stop = service.onChanged(() => { refreshes += 1; }, {
-        removalDelay: 150,
-        schedule: (callback, delay) => scheduled.push([callback, delay])
-    });
+    const stop = service.onChanged(
+        () => {
+            refreshes += 1;
+        },
+        {
+            removalDelay: 150,
+            schedule: (callback, delay) => scheduled.push([callback, delay])
+        }
+    );
 
     tabs.onUpdated.emit();
     tabs.onMoved.emit();
@@ -171,7 +201,9 @@ test('refreshes removals immediately when no delay is configured', () => {
     const { service, tabs } = createService();
     let refreshes = 0;
 
-    service.onChanged(() => { refreshes += 1; });
+    service.onChanged(() => {
+        refreshes += 1;
+    });
     tabs.onRemoved.emit();
 
     assert.equal(refreshes, 1);

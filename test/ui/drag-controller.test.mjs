@@ -2,10 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, beforeEach, test } from 'node:test';
 
 import { createDragController } from '../../src/ui/controllers/drag-controller.mjs';
-import {
-    createDeletionArea,
-    createNewColumnIndicator
-} from '../../src/ui/rendering.mjs';
+import { createDeletionArea, createNewColumnIndicator } from '../../src/ui/rendering.mjs';
 import { createPageDom, dragEvent, setRect, stackRects } from '../helpers/dom.mjs';
 
 let page;
@@ -24,7 +21,8 @@ before(() => {
 after(() => page.cleanup());
 
 beforeEach(() => {
-    document.querySelectorAll('.drop-indicator-container, #deletion-area, .new-column-indicator')
+    document
+        .querySelectorAll('.drop-indicator-container, #deletion-area, .new-column-indicator')
         .forEach(node => node.remove());
     columnsContainer = document.getElementById('columns-container');
     columnsContainer.replaceChildren();
@@ -36,7 +34,12 @@ beforeEach(() => {
 
     // The page's boxes: a sidebar down the left, columns to its right.
     setRect(document.getElementById('sidebar'), { top: 12, height: 800, left: 0, width: 200 });
-    setRect(document.getElementById('space-container'), { top: 64, height: 700, left: 220, width: 780 });
+    setRect(document.getElementById('space-container'), {
+        top: 64,
+        height: 700,
+        left: 220,
+        width: 780
+    });
     setRect(columnsContainer, { top: 64, height: 700, left: 220, width: 780 });
     setRect(deletionArea, { top: 900, height: 60, left: 0, width: 1000 });
     setRect(newColumnIndicator, { top: 64, height: 700, left: 1000, width: 60 });
@@ -106,7 +109,10 @@ test('dragging a selected row drags the whole selection', () => {
 
     assert.equal(event.dataTransfer.getData('text/plain'), 'tab-1');
     assert.equal(event.dataTransfer.dragImage, rows[0]);
-    assert.deepEqual(rows.map(row => row.classList.contains('dragging')), [true, true, false]);
+    assert.deepEqual(
+        rows.map(row => row.classList.contains('dragging')),
+        [true, true, false]
+    );
 });
 
 test('dragging an unselected row clears the selection and drags it alone', () => {
@@ -372,18 +378,20 @@ test('drops onto the deletion area, a new column, and the sidebar', () => {
     stackRects([row], { top: 100, height: 40, left: 240, width: 300 });
     controller.handleTabDragStart(dragEvent('dragstart', row));
 
-    assert.deepEqual(
-        controller.resolveDrop(dragEvent('drop', deletionArea, { data: 'tab-1' })),
-        { type: 'delete-items', items: [row] }
-    );
+    assert.deepEqual(controller.resolveDrop(dragEvent('drop', deletionArea, { data: 'tab-1' })), {
+        type: 'delete-items',
+        items: [row]
+    });
     assert.deepEqual(
         controller.resolveDrop(dragEvent('drop', newColumnIndicator, { data: 'tab-1' })),
         { type: 'new-column', items: [row] }
     );
     assert.deepEqual(
-        controller.resolveDrop(dragEvent('drop', document.getElementById('open-tabs-list'), {
-            data: 'tab-1'
-        })),
+        controller.resolveDrop(
+            dragEvent('drop', document.getElementById('open-tabs-list'), {
+                data: 'tab-1'
+            })
+        ),
         { type: 'open-tabs', items: [row], index: 0 }
     );
 });

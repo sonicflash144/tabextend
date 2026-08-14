@@ -84,10 +84,8 @@ export function parseNoteDate(note, options) {
     const { chrono, now = () => new Date() } = options;
     const searchable = note.replace(/\\\w+/g, '');
     const parsedDate = chrono.parseDate(searchable, now(), { forwardDate: true });
-    const detectedDateText = parsedDate ? chrono.parse(note)[0]?.text ?? '' : '';
-    const remainingNote = parsedDate
-        ? note.replace(detectedDateText, '').trim()
-        : note;
+    const detectedDateText = parsedDate ? (chrono.parse(note)[0]?.text ?? '') : '';
+    const remainingNote = parsedDate ? note.replace(detectedDateText, '').trim() : note;
     return { parsedDate, remainingNote, detectedDateText };
 }
 
@@ -124,9 +122,10 @@ export function createTabPresenter(options = {}) {
         presentOpen: presentOpenTab,
         formatDate: parsedDate => formatTabDate(parsedDate, { now: now() }),
         noteDisplayText: legacyNoteToDisplayText,
-        parseNote: note => parseNoteDate(note, {
-            chrono,
-            now: () => new Date(now())
-        })
+        parseNote: note =>
+            parseNoteDate(note, {
+                chrono,
+                now: () => new Date(now())
+            })
     };
 }

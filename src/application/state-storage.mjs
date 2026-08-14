@@ -1,13 +1,7 @@
-import {
-    migrateToUniqueIds,
-    recoverOrphanedTabs
-} from '../compatibility/legacy-data.mjs';
+import { migrateToUniqueIds, recoverOrphanedTabs } from '../compatibility/legacy-data.mjs';
 import { applyDrop } from '../domain/drop-operations.mjs';
 import { addColumn, addTabs } from '../domain/operations.mjs';
-import {
-    canonicalStateFromLegacy,
-    canonicalStateToLegacy
-} from '../domain/state.mjs';
+import { canonicalStateFromLegacy, canonicalStateToLegacy } from '../domain/state.mjs';
 
 const STATE_STORAGE_KEYS = ['columnState', 'bgTabs', 'savedTabs'];
 
@@ -16,9 +10,11 @@ function isObject(value) {
 }
 
 function isTempMarker(tab) {
-    return isObject(tab) &&
+    return (
+        isObject(tab) &&
         Object.prototype.hasOwnProperty.call(tab, 'temp') &&
-        !Object.prototype.hasOwnProperty.call(tab, 'id');
+        !Object.prototype.hasOwnProperty.call(tab, 'id')
+    );
 }
 
 function defaultColumn() {
@@ -48,8 +44,11 @@ export function createStateStorageService(options) {
     if (!storage || typeof storage.get !== 'function' || typeof storage.set !== 'function') {
         throw new Error('A storage adapter with get and set methods is required.');
     }
-    if (!stateStore || typeof stateStore.getState !== 'function' ||
-        typeof stateStore.replace !== 'function') {
+    if (
+        !stateStore ||
+        typeof stateStore.getState !== 'function' ||
+        typeof stateStore.replace !== 'function'
+    ) {
         throw new Error('A canonical state store is required.');
     }
     if (typeof idFactory !== 'function') {
@@ -61,9 +60,8 @@ export function createStateStorageService(options) {
             return state;
         }
 
-        const tabs = backgroundTabs.map(tab => typeof tab.id === 'number'
-            ? { ...tab, id: String(idFactory(tab.id)) }
-            : tab
+        const tabs = backgroundTabs.map(tab =>
+            typeof tab.id === 'number' ? { ...tab, id: String(idFactory(tab.id)) } : tab
         );
         let nextState = state;
         if (nextState.columns.length === 0) {
@@ -81,11 +79,7 @@ export function createStateStorageService(options) {
     }
 
     function persistenceUpdates(nextState, options = {}) {
-        const {
-            includeTabs = true,
-            includeColumns = true,
-            extra = {}
-        } = options;
+        const { includeTabs = true, includeColumns = true, extra = {} } = options;
         const legacyState = canonicalStateToLegacy(
             nextState,
             includeTabs ? { tempMarker: now() } : {}
@@ -136,20 +130,14 @@ export function createStateStorageService(options) {
 
     async function reload() {
         const data = await storage.get(['savedTabs', 'columnState']);
-        const state = canonicalStateFromLegacy(
-            data.savedTabs || [],
-            data.columnState || []
-        );
+        const state = canonicalStateFromLegacy(data.savedTabs || [], data.columnState || []);
         stateStore.replace(state);
         return state;
     }
 
     async function consumeBackgroundTabs() {
         const data = await storage.get(STATE_STORAGE_KEYS);
-        const state = canonicalStateFromLegacy(
-            data.savedTabs || [],
-            data.columnState || []
-        );
+        const state = canonicalStateFromLegacy(data.savedTabs || [], data.columnState || []);
         const backgroundTabs = Array.isArray(data.bgTabs) ? data.bgTabs : [];
         const nextState = appendBackgroundTabs(state, backgroundTabs);
         await persist(nextState, { extra: { bgTabs: [] } });

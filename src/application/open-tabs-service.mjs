@@ -1,7 +1,4 @@
-import {
-    filterListableTabs,
-    savedTabFromBrowserTab
-} from '../domain/browser-tabs.mjs';
+import { filterListableTabs, savedTabFromBrowserTab } from '../domain/browser-tabs.mjs';
 
 /**
  * Open-tab workflows for the new tab page: listing the current window,
@@ -24,13 +21,15 @@ export function createOpenTabsService(options) {
 
     /** Read open tabs and convert them into stored tabs without closing them. */
     async function capture(browserTabIds) {
-        return Promise.all(browserTabIds.map(async browserTabId => {
-            const tab = await tabs.get(browserTabId);
-            return {
-                browserTabId,
-                savedTab: savedTabFromBrowserTab(tab, { id: idFactory() })
-            };
-        }));
+        return Promise.all(
+            browserTabIds.map(async browserTabId => {
+                const tab = await tabs.get(browserTabId);
+                return {
+                    browserTabId,
+                    savedTab: savedTabFromBrowserTab(tab, { id: idFactory() })
+                };
+            })
+        );
     }
 
     function close(browserTabIds) {
@@ -76,9 +75,7 @@ export function createOpenTabsService(options) {
      */
     function onChanged(handler, changeOptions = {}) {
         const { removalDelay = 0, schedule = setTimeout } = changeOptions;
-        const handleRemoved = removalDelay > 0
-            ? () => schedule(handler, removalDelay)
-            : handler;
+        const handleRemoved = removalDelay > 0 ? () => schedule(handler, removalDelay) : handler;
 
         tabs.onUpdated.addListener(handler);
         tabs.onRemoved.addListener(handleRemoved);

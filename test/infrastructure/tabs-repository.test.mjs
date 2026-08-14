@@ -19,15 +19,21 @@ function createBrowserApi(options = {}) {
                 calls.push(['group', groupOptions]);
                 return 42;
             },
-            async remove(tabIds) { calls.push(['remove', tabIds]); },
-            async update(tabId, changes) { calls.push(['update', tabId, changes]); },
+            async remove(tabIds) {
+                calls.push(['remove', tabIds]);
+            },
+            async update(tabId, changes) {
+                calls.push(['update', tabId, changes]);
+            },
             async query(queryInfo) {
                 calls.push(['query', queryInfo]);
                 return queryInfo.active ? [{ id: 9 }] : [];
             }
         },
         tabGroups: {
-            async update(groupId, changes) { calls.push(['groupUpdate', groupId, changes]); }
+            async update(groupId, changes) {
+                calls.push(['groupUpdate', groupId, changes]);
+            }
         }
     };
     return { api, calls };
@@ -46,7 +52,10 @@ test('opens urls at an index and groups them with a title', async () => {
         groupTitle: 'Reading'
     });
 
-    assert.deepEqual(created.map(tab => tab.index), [3, 4]);
+    assert.deepEqual(
+        created.map(tab => tab.index),
+        [3, 4]
+    );
     assert.deepEqual(calls[0], ['create', { url: 'https://a.test', active: false, index: 3 }]);
     assert.deepEqual(calls[2], ['group', { tabIds: [1, 2] }]);
     assert.deepEqual(calls[3], ['groupUpdate', 42, { title: 'Reading' }]);

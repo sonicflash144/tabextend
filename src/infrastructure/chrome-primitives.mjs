@@ -3,13 +3,7 @@ function copyRuntimeError(runtime) {
     return lastError ? new Error(lastError.message || String(lastError)) : null;
 }
 
-export function createExtensionMethod(
-    target,
-    methodName,
-    runtime,
-    errorResult,
-    options = {}
-) {
+export function createExtensionMethod(target, methodName, runtime, errorResult, options = {}) {
     const { apiStyle = 'callback' } = options;
     if (!target || typeof target[methodName] !== 'function') {
         return (...args) => {
@@ -80,7 +74,9 @@ export function createExtensionEventAdapter(event) {
         return {
             addListener() {},
             removeListener() {},
-            hasListener() { return false; }
+            hasListener() {
+                return false;
+            }
         };
     }
     return {

@@ -1,18 +1,24 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import {
-    createChromeApiAdapters
-} from '../../src/infrastructure/chrome-api.mjs';
+import { createChromeApiAdapters } from '../../src/infrastructure/chrome-api.mjs';
 import { createStorageRepository } from '../../src/infrastructure/storage-repository.mjs';
 
 function createEvent() {
     const listeners = new Set();
     return {
-        addListener(listener) { listeners.add(listener); },
-        removeListener(listener) { listeners.delete(listener); },
-        hasListener(listener) { return listeners.has(listener); },
-        emit(...args) { listeners.forEach(listener => listener(...args)); }
+        addListener(listener) {
+            listeners.add(listener);
+        },
+        removeListener(listener) {
+            listeners.delete(listener);
+        },
+        hasListener(listener) {
+            return listeners.has(listener);
+        },
+        emit(...args) {
+            listeners.forEach(listener => listener(...args));
+        }
     };
 }
 
@@ -26,7 +32,8 @@ function createFakeChrome() {
     const local = {
         get(keys, callback) {
             const selected = {};
-            const requested = keys === null ? Object.keys(values) : Array.isArray(keys) ? keys : [keys];
+            const requested =
+                keys === null ? Object.keys(values) : Array.isArray(keys) ? keys : [keys];
             requested.forEach(key => {
                 if (Object.prototype.hasOwnProperty.call(values, key)) selected[key] = values[key];
             });
@@ -46,13 +53,27 @@ function createFakeChrome() {
         }
     };
     const tabs = {
-        get(id, callback) { callback({ id, title: `Tab ${id}` }); },
-        query(queryInfo, callback) { callback([{ id: 10, queryInfo }]); },
-        create(properties, callback) { callback({ id: 11, ...properties }); },
-        remove(ids, callback) { callback(); },
-        update(id, properties, callback) { callback({ id, ...properties }); },
-        move(id, properties, callback) { callback({ id, ...properties }); },
-        group(properties, callback) { callback(42); },
+        get(id, callback) {
+            callback({ id, title: `Tab ${id}` });
+        },
+        query(queryInfo, callback) {
+            callback([{ id: 10, queryInfo }]);
+        },
+        create(properties, callback) {
+            callback({ id: 11, ...properties });
+        },
+        remove(ids, callback) {
+            callback();
+        },
+        update(id, properties, callback) {
+            callback({ id, ...properties });
+        },
+        move(id, properties, callback) {
+            callback({ id, ...properties });
+        },
+        group(properties, callback) {
+            callback(42);
+        },
         onUpdated: createEvent(),
         onRemoved: createEvent(),
         onMoved: createEvent(),
@@ -62,10 +83,18 @@ function createFakeChrome() {
         runtime,
         storage: { local, onChanged: createEvent() },
         tabs,
-        tabGroups: { update(id, properties, callback) { callback({ id, ...properties }); } },
+        tabGroups: {
+            update(id, properties, callback) {
+                callback({ id, ...properties });
+            }
+        },
         contextMenus: {
-            create(properties, callback) { callback(properties.id); },
-            update(id, properties, callback) { callback({ id, ...properties }); },
+            create(properties, callback) {
+                callback(properties.id);
+            },
+            update(id, properties, callback) {
+                callback({ id, ...properties });
+            },
             onClicked: createEvent()
         },
         action: { onClicked: createEvent() },
@@ -143,7 +172,9 @@ test('event adapters subscribe and unsubscribe listeners', () => {
     const chromeApi = createFakeChrome();
     const api = createChromeApiAdapters(chromeApi);
     let calls = 0;
-    const listener = () => { calls += 1; };
+    const listener = () => {
+        calls += 1;
+    };
 
     api.tabs.onUpdated.addListener(listener);
     chromeApi.tabs.onUpdated.emit(1, {}, {});

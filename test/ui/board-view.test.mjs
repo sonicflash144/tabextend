@@ -37,7 +37,10 @@ function createChrono(matches = []) {
 
 function createBoard(options = {}) {
     const calls = [];
-    const record = name => (...args) => calls.push([name, ...args]);
+    const record =
+        name =>
+        (...args) =>
+            calls.push([name, ...args]);
     const board = createBoardView(document, {
         container: document.getElementById('columns-container'),
         presenter: createTabPresenter({
@@ -68,26 +71,24 @@ function createBoard(options = {}) {
 
 function stateWith(options = {}) {
     const { tabIds = ['tab-alpha', 'tab-beta'], minimized = false, tabs } = options;
-    return canonicalStateFromLegacy(tabs || [
-        {
-            id: 'alpha',
-            title: 'Alpha',
-            url: 'https://example.com/alpha',
-            favIconUrl: 'https://example.com/icon.png',
-            color: '#ebc4ff'
-        },
-        { id: 'beta', title: 'Beta', url: 'https://example.com/beta' }
-    ], [
-        { id: 'column-1', title: 'Research', minimized, emoji: '📚', tabIds }
-    ]);
+    return canonicalStateFromLegacy(
+        tabs || [
+            {
+                id: 'alpha',
+                title: 'Alpha',
+                url: 'https://example.com/alpha',
+                favIconUrl: 'https://example.com/icon.png',
+                color: '#ebc4ff'
+            },
+            { id: 'beta', title: 'Beta', url: 'https://example.com/beta' }
+        ],
+        [{ id: 'column-1', title: 'Research', minimized, emoji: '📚', tabIds }]
+    );
 }
 
 test('requires a container and a presenter', () => {
     assert.throws(() => createBoardView(document, { presenter: {} }), /container element/);
-    assert.throws(
-        () => createBoardView(document, { container: document.body }),
-        /tab presenter/
-    );
+    assert.throws(() => createBoardView(document, { container: document.body }), /tab presenter/);
 });
 
 test('rendering builds the columns, tabs, and the new column indicator', () => {
@@ -132,9 +133,11 @@ test('a minimized column is collapsed after its tabs are rendered', () => {
 test('a subgroup renders previews, nested tabs, and honours its expanded flag', () => {
     const { board } = createBoard();
 
-    board.render(stateWith({
-        tabIds: [['group-1', 'tab-alpha', 'tab-beta', 'Reading', true]]
-    }));
+    board.render(
+        stateWith({
+            tabIds: [['group-1', 'tab-alpha', 'tab-beta', 'Reading', true]]
+        })
+    );
 
     const subgroup = document.getElementById('group-1');
     assert.equal(subgroup.querySelector('.subgroup-title-text').textContent, 'Reading');
@@ -167,9 +170,10 @@ test('renaming a column reports the new title and records it on the element', ()
     column.querySelector('.column-title-input').value = 'Reading list';
     keyDown(column.querySelector('.column-title-input'), 'Enter');
 
-    assert.deepEqual(calls.filter(call => call[0] === 'columnRename'), [
-        ['columnRename', column, 'Reading list']
-    ]);
+    assert.deepEqual(
+        calls.filter(call => call[0] === 'columnRename'),
+        [['columnRename', column, 'Reading list']]
+    );
     assert.equal(column.dataset.title, 'Reading list');
     assert.equal(titleSpan.textContent, 'Reading list');
 });
@@ -184,10 +188,13 @@ test('minimizing and maximizing a column reports each change once', () => {
     click(column.querySelector('.maximize-column'));
     assert.equal(column.classList.contains('minimized'), false);
 
-    assert.deepEqual(calls.filter(call => call[0] === 'columnMinimized'), [
-        ['columnMinimized', column, true],
-        ['columnMinimized', column, false]
-    ]);
+    assert.deepEqual(
+        calls.filter(call => call[0] === 'columnMinimized'),
+        [
+            ['columnMinimized', column, true],
+            ['columnMinimized', column, false]
+        ]
+    );
 });
 
 test('picking an emoji updates the header and reports the change', () => {
@@ -196,24 +203,32 @@ test('picking an emoji updates the header and reports the change', () => {
     const column = document.getElementById('column-1');
     const picker = column.querySelector('.emoji-picker-on-top');
 
-    picker.dispatchEvent(new page.window.CustomEvent('emoji-click', {
-        detail: { unicode: '🌵' }
-    }));
+    picker.dispatchEvent(
+        new page.window.CustomEvent('emoji-click', {
+            detail: { unicode: '🌵' }
+        })
+    );
 
     assert.equal(column.querySelector('.emoji-button').textContent, '🌵');
     assert.equal(column.dataset.emoji, '🌵');
     assert.equal(picker.style.display, 'none');
-    assert.deepEqual(calls.filter(call => call[0] === 'columnEmoji'), [
-        ['columnEmoji', column, '🌵']
-    ]);
+    assert.deepEqual(
+        calls.filter(call => call[0] === 'columnEmoji'),
+        [['columnEmoji', column, '🌵']]
+    );
 });
 
 test('the emoji picker opens under its button and closes the others', () => {
     const { board } = createBoard();
-    board.render(canonicalStateFromLegacy([], [
-        { id: 'column-1', title: 'One', tabIds: [] },
-        { id: 'column-2', title: 'Two', tabIds: [] }
-    ]));
+    board.render(
+        canonicalStateFromLegacy(
+            [],
+            [
+                { id: 'column-1', title: 'One', tabIds: [] },
+                { id: 'column-2', title: 'Two', tabIds: [] }
+            ]
+        )
+    );
     const [first, second] = Array.from(document.querySelectorAll('.column'));
     setRect(first.querySelector('.emoji-button'), { top: 20, height: 24, left: 40, width: 24 });
 
@@ -233,9 +248,7 @@ test('the emoji picker opens under its button and closes the others', () => {
 
 test('a picker near the right of the window opens leftwards from its button', () => {
     const { board } = createBoard();
-    board.render(canonicalStateFromLegacy([], [
-        { id: 'column-1', title: 'One', tabIds: [] }
-    ]));
+    board.render(canonicalStateFromLegacy([], [{ id: 'column-1', title: 'One', tabIds: [] }]));
     const column = document.getElementById('column-1');
     const button = column.querySelector('.emoji-button');
     const picker = column.querySelector('.emoji-picker-on-top');
@@ -253,9 +266,11 @@ test('a picker near the right of the window opens leftwards from its button', ()
 
 test('the menu buttons hand their context to the page', () => {
     const { board, calls } = createBoard();
-    board.render(stateWith({
-        tabIds: ['tab-alpha', ['group-1', 'tab-beta', 'Reading', false]]
-    }));
+    board.render(
+        stateWith({
+            tabIds: ['tab-alpha', ['group-1', 'tab-beta', 'Reading', false]]
+        })
+    );
     const column = document.getElementById('column-1');
 
     click(column.querySelector('.more-options'));
@@ -297,10 +312,10 @@ test('expanding a subgroup reports the new state', () => {
     click(subgroup.querySelector('.expand-button'));
     assert.equal(subgroup.querySelector('.expanded-tabs').style.display, 'none');
 
-    assert.deepEqual(calls.filter(call => call[0] === 'groupExpanded').map(call => call[2]), [
-        true,
-        false
-    ]);
+    assert.deepEqual(
+        calls.filter(call => call[0] === 'groupExpanded').map(call => call[2]),
+        [true, false]
+    );
 });
 
 test('renaming a subgroup reports the new title', () => {
@@ -333,10 +348,12 @@ test('clicking a note opens its editor and locks the row against dragging', () =
 
 test('a note opened from the menu starts from the stored text', () => {
     const { board } = createBoard();
-    board.render(stateWith({
-        tabs: [{ id: 'alpha', title: 'Alpha', url: 'https://a.test', note: 'first<br>second' }],
-        tabIds: ['tab-alpha']
-    }));
+    board.render(
+        stateWith({
+            tabs: [{ id: 'alpha', title: 'Alpha', url: 'https://a.test', note: 'first<br>second' }],
+            tabIds: ['tab-alpha']
+        })
+    );
     const item = document.getElementById('tab-alpha');
 
     board.beginNoteEdit(item);
@@ -372,9 +389,10 @@ test('committing a rename saves the title, shows it, and restores dragging', () 
     titleInput.value = 'Renamed';
     keyDown(titleInput, 'Enter');
 
-    assert.deepEqual(calls.filter(call => call[0] === 'titleSave').map(call => call[2]), [
-        'Renamed'
-    ]);
+    assert.deepEqual(
+        calls.filter(call => call[0] === 'titleSave').map(call => call[2]),
+        ['Renamed']
+    );
     assert.equal(item.querySelector('.tab-title').textContent, 'Renamed');
     assert.ok(titleInput.classList.contains('hidden'));
     assert.equal(item.querySelector('.tab-title').classList.contains('hidden'), false);
@@ -393,7 +411,10 @@ test('escaping a rename restores the title it started with', () => {
     keyDown(titleInput, 'Escape');
 
     assert.equal(item.querySelector('.tab-title').textContent, 'Alpha');
-    assert.deepEqual(calls.filter(call => call[0] === 'titleSave').map(call => call[2]), ['Alpha']);
+    assert.deepEqual(
+        calls.filter(call => call[0] === 'titleSave').map(call => call[2]),
+        ['Alpha']
+    );
 });
 
 test('renaming twice does not save twice for one edit', () => {
@@ -408,10 +429,10 @@ test('renaming twice does not save twice for one edit', () => {
     titleInput.value = 'Renamed';
     titleInput.blur();
 
-    assert.deepEqual(calls.filter(call => call[0] === 'titleSave').map(call => call[2]), [
-        'Alpha',
-        'Renamed'
-    ]);
+    assert.deepEqual(
+        calls.filter(call => call[0] === 'titleSave').map(call => call[2]),
+        ['Alpha', 'Renamed']
+    );
 });
 
 test('leaving the note saves it, restores the row, and shows the stored text', () => {
@@ -424,9 +445,10 @@ test('leaving the note saves it, restores the row, and shows the stored text', (
     noteInput.value = 'line one\nline two';
     noteInput.dispatchEvent(new page.window.Event('blur'));
 
-    assert.deepEqual(calls.filter(call => call[0] === 'noteSave'), [
-        ['noteSave', calls.find(call => call[0] === 'noteSave')[1], 'line one\nline two']
-    ]);
+    assert.deepEqual(
+        calls.filter(call => call[0] === 'noteSave'),
+        [['noteSave', calls.find(call => call[0] === 'noteSave')[1], 'line one\nline two']]
+    );
     assert.equal(item.querySelector('.note-display').textContent, 'line one\nline two');
     assert.ok(noteInput.classList.contains('hidden'));
     assert.equal(item.querySelector('.note-display').classList.contains('hidden'), false);
@@ -438,7 +460,9 @@ test('enter commits a note and escape restores the text it started with', () => 
     board.render(stateWith());
     const noteInput = document.querySelector('#tab-alpha .tab-note');
     let blurs = 0;
-    noteInput.blur = () => { blurs += 1; };
+    noteInput.blur = () => {
+        blurs += 1;
+    };
 
     noteInput.value = 'edited';
     keyDown(noteInput, 'Enter');
@@ -454,7 +478,9 @@ test('shift+enter inserts a line break instead of committing', () => {
     board.render(stateWith());
     const noteInput = document.querySelector('#tab-alpha .tab-note');
     let blurs = 0;
-    noteInput.blur = () => { blurs += 1; };
+    noteInput.blur = () => {
+        blurs += 1;
+    };
 
     noteInput.value = 'ab';
     noteInput.selectionStart = 1;
@@ -487,15 +513,19 @@ test('typing a date into a note previews the due date it will be saved with', ()
 
 test('a tab that already has a due date keeps it while the note is edited', () => {
     const { board } = createBoard();
-    board.render(stateWith({
-        tabs: [{
-            id: 'alpha',
-            title: 'Alpha',
-            url: 'https://example.com/alpha',
-            parsedDate: new Date(2026, 7, 13, 9).getTime()
-        }],
-        tabIds: ['tab-alpha']
-    }));
+    board.render(
+        stateWith({
+            tabs: [
+                {
+                    id: 'alpha',
+                    title: 'Alpha',
+                    url: 'https://example.com/alpha',
+                    parsedDate: new Date(2026, 7, 13, 9).getTime()
+                }
+            ],
+            tabIds: ['tab-alpha']
+        })
+    );
     const dateDisplay = document.querySelector('#tab-alpha .date-display');
     const noteInput = document.querySelector('#tab-alpha .tab-note');
     assert.equal(dateDisplay.textContent, 'Today');

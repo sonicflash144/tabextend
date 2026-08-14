@@ -4,21 +4,11 @@ import globals from 'globals';
 
 export default [
     {
-        ignores: [
-            'dist/**',
-            'build/**',
-            'node_modules/**',
-            'coverage/**'
-        ]
+        ignores: ['dist/**', 'build/**', 'node_modules/**', 'coverage/**']
     },
     js.configs.recommended,
     {
-        files: [
-            'newtab.js',
-            'background.js',
-            'src/**/*.js',
-            'src/**/*.mjs'
-        ],
+        files: ['newtab.js', 'background.js', 'src/**/*.js', 'src/**/*.mjs'],
         languageOptions: {
             ecmaVersion: 'latest',
             sourceType: 'module',

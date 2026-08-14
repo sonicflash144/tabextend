@@ -1,17 +1,11 @@
-import {
-    cloneCanonicalState,
-    findGroupLocation,
-    removeTabPlacements
-} from './operations.mjs';
+import { cloneCanonicalState, findGroupLocation, removeTabPlacements } from './operations.mjs';
 
 function normalizeId(id) {
     return String(id);
 }
 
 function cloneItem(item) {
-    return item.type === 'group'
-        ? { ...item, tabIds: [...item.tabIds] }
-        : { ...item };
+    return item.type === 'group' ? { ...item, tabIds: [...item.tabIds] } : { ...item };
 }
 
 function clampedIndex(index, length) {
@@ -22,8 +16,8 @@ function clampedIndex(index, length) {
 function findTopLevelTabLocation(state, tabId) {
     const normalizedId = normalizeId(tabId);
     for (let columnIndex = 0; columnIndex < state.columns.length; columnIndex += 1) {
-        const itemIndex = state.columns[columnIndex].items.findIndex(item =>
-            item.type === 'tab' && item.tabId === normalizedId
+        const itemIndex = state.columns[columnIndex].items.findIndex(
+            item => item.type === 'tab' && item.tabId === normalizedId
         );
         if (itemIndex !== -1) {
             return {
@@ -39,9 +33,7 @@ function findTopLevelTabLocation(state, tabId) {
 
 function normalizeDragged(state, dragged) {
     const draggedGroupIds = new Set(
-        dragged
-            .filter(item => item.type === 'group')
-            .map(item => normalizeId(item.groupId))
+        dragged.filter(item => item.type === 'group').map(item => normalizeId(item.groupId))
     );
     const tabsInsideDraggedGroups = new Set();
     draggedGroupIds.forEach(groupId => {
@@ -85,9 +77,7 @@ function removeDraggedItems(state, draggedGroupIds, draggedTabIds) {
     const nextState = cloneCanonicalState(state);
     nextState.columns = nextState.columns.map(column => ({
         ...column,
-        items: column.items.filter(item =>
-            item.type !== 'group' || !draggedGroupIds.has(item.id)
-        )
+        items: column.items.filter(item => item.type !== 'group' || !draggedGroupIds.has(item.id))
     }));
     return removeTabPlacements(nextState, draggedTabIds);
 }
@@ -121,20 +111,14 @@ function adjustedGroupIndex(state, target, draggedTabIds) {
     const originalIndex = clampedIndex(target.index, location.group.tabIds.length);
     const removedBeforeTarget = location.group.tabIds
         .slice(0, originalIndex)
-        .filter(tabId => draggedTabIds.has(tabId))
-        .length;
+        .filter(tabId => draggedTabIds.has(tabId)).length;
     return originalIndex - removedBeforeTarget;
 }
 
 function dropInColumn(state, originalState, payload, target, draggedGroupIds, draggedTabIds) {
     const column = state.columns.find(candidate => candidate.id === normalizeId(target.columnId));
     if (!column) throw new Error(`Drop column ${JSON.stringify(target.columnId)} does not exist.`);
-    const index = adjustedColumnIndex(
-        originalState,
-        target,
-        draggedGroupIds,
-        draggedTabIds
-    );
+    const index = adjustedColumnIndex(originalState, target, draggedGroupIds, draggedTabIds);
     column.items.splice(index, 0, ...payload.map(cloneItem));
     return state;
 }
@@ -171,9 +155,7 @@ function dropOnItem(state, payload, target, draggedGroupIds, groupIdFactory) {
     const location = findTopLevelTabLocation(state, tabId);
     if (!location) throw new Error(`Target tab ${JSON.stringify(tabId)} does not exist.`);
     const sourceGroup = payload.find(item => item.type === 'group');
-    const groupMetadata = sourceGroup
-        ? { ...sourceGroup }
-        : { title: 'New Group', expanded: true };
+    const groupMetadata = sourceGroup ? { ...sourceGroup } : { title: 'New Group', expanded: true };
     delete groupMetadata.type;
     delete groupMetadata.id;
     delete groupMetadata.tabIds;
@@ -196,40 +178,18 @@ function dropOnItem(state, payload, target, draggedGroupIds, groupIdFactory) {
  * are removed, matching the indexes calculated by the UI's drag geometry.
  */
 export function applyDrop(state, options) {
-    const {
-        dragged = [],
-        target,
-        groupIdFactory = () => `group-${Date.now()}`
-    } = options;
+    const { dragged = [], target, groupIdFactory = () => `group-${Date.now()}` } = options;
     if (!target || dragged.length === 0) return state;
 
-    const {
-        payload,
-        draggedGroupIds,
-        draggedTabIds
-    } = normalizeDragged(state, dragged);
+    const { payload, draggedGroupIds, draggedTabIds } = normalizeDragged(state, dragged);
     if (payload.length === 0) return state;
 
     const nextState = removeDraggedItems(state, draggedGroupIds, draggedTabIds);
     if (target.type === 'column') {
-        return dropInColumn(
-            nextState,
-            state,
-            payload,
-            target,
-            draggedGroupIds,
-            draggedTabIds
-        );
+        return dropInColumn(nextState, state, payload, target, draggedGroupIds, draggedTabIds);
     }
     if (target.type === 'group') {
-        return dropInGroup(
-            nextState,
-            state,
-            payload,
-            target,
-            draggedGroupIds,
-            draggedTabIds
-        );
+        return dropInGroup(nextState, state, payload, target, draggedGroupIds, draggedTabIds);
     }
     if (target.type === 'item') {
         return dropOnItem(nextState, payload, target, draggedGroupIds, groupIdFactory);

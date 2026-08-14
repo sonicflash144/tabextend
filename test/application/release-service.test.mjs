@@ -13,12 +13,12 @@ function createStorage(initial = {}) {
         async get(keys) {
             const requested = Array.isArray(keys) ? keys : [keys];
             return Object.fromEntries(
-                requested
-                    .filter(key => key in values)
-                    .map(key => [key, values[key]])
+                requested.filter(key => key in values).map(key => [key, values[key]])
             );
         },
-        async set(updates) { Object.assign(values, updates); }
+        async set(updates) {
+            Object.assign(values, updates);
+        }
     };
 }
 
@@ -68,6 +68,9 @@ test('release service records acknowledgement and release-notes clicks', async (
 });
 
 test('release service requires storage and runtime adapters', () => {
-    assert.throws(() => createReleaseService({ runtime: { getManifest: () => ({}) } }), /storage adapter/);
+    assert.throws(
+        () => createReleaseService({ runtime: { getManifest: () => ({}) } }),
+        /storage adapter/
+    );
     assert.throws(() => createReleaseService({ storage: createStorage() }), /runtime adapter/);
 });

@@ -10,9 +10,15 @@ import {
 function createEvent() {
     const listeners = new Set();
     return {
-        addListener(listener) { listeners.add(listener); },
-        removeListener(listener) { listeners.delete(listener); },
-        hasListener(listener) { return listeners.has(listener); }
+        addListener(listener) {
+            listeners.add(listener);
+        },
+        removeListener(listener) {
+            listeners.delete(listener);
+        },
+        hasListener(listener) {
+            return listeners.has(listener);
+        }
     };
 }
 
@@ -25,18 +31,28 @@ function createPromiseApi() {
         },
         storage: {
             local: {
-                async get() { return { ...values }; },
-                async set(updates) { Object.assign(values, updates); },
+                async get() {
+                    return { ...values };
+                },
+                async set(updates) {
+                    Object.assign(values, updates);
+                },
                 async remove(keys) {
                     (Array.isArray(keys) ? keys : [keys]).forEach(key => delete values[key]);
                 },
-                async clear() { Object.keys(values).forEach(key => delete values[key]); }
+                async clear() {
+                    Object.keys(values).forEach(key => delete values[key]);
+                }
             },
             onChanged: createEvent()
         },
         tabs: {
-            async get(id) { return { id }; },
-            async query() { return []; },
+            async get(id) {
+                return { id };
+            },
+            async query() {
+                return [];
+            },
             onUpdated: createEvent(),
             onRemoved: createEvent(),
             onMoved: createEvent(),

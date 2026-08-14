@@ -118,9 +118,11 @@ export function createDragController(document, options = {}) {
      */
     function targetItemAtPointer(event, items, dragged) {
         return items.find(item => {
-            if (item.closest(`#${OPEN_TABS_LIST_ID}`) ||
+            if (
+                item.closest(`#${OPEN_TABS_LIST_ID}`) ||
                 item.classList.contains('dragging') ||
-                item.closest('.expanded-tabs')) {
+                item.closest('.expanded-tabs')
+            ) {
                 return false;
             }
             const targetSubgroup = item.closest('.subgroup-item');
@@ -138,9 +140,7 @@ export function createDragController(document, options = {}) {
     function sharedSubgroup(items) {
         if (items.length === 0) return null;
         const first = items[0].closest('.subgroup-item');
-        return items.every(item => item.closest('.subgroup-item') === first)
-            ? first
-            : null;
+        return items.every(item => item.closest('.subgroup-item') === first) ? first : null;
     }
 
     function ensureDropIndicator() {
@@ -207,8 +207,9 @@ export function createDragController(document, options = {}) {
             return;
         }
 
-        toArray(document.querySelectorAll('.selected'))
-            .forEach(item => item.classList.remove('selected'));
+        toArray(document.querySelectorAll('.selected')).forEach(item =>
+            item.classList.remove('selected')
+        );
 
         event.dataTransfer.setData('text/plain', column.id);
         event.dataTransfer.setDragImage(column, 0, 0);
@@ -222,9 +223,7 @@ export function createDragController(document, options = {}) {
         newColumnIndicator.style.display = 'flex';
 
         const column = event.target.closest('.column');
-        const element = sidebar
-            ? document.getElementById(OPEN_TABS_LIST_ID)
-            : column;
+        const element = sidebar ? document.getElementById(OPEN_TABS_LIST_ID) : column;
         if (!element) {
             dropIndicator.style.display = 'none';
             return;
@@ -232,18 +231,15 @@ export function createDragController(document, options = {}) {
 
         const rect = element.getBoundingClientRect();
         // Only top-level tab items; items inside subgroups are not drop slots.
-        const listItems = toArray(element.children).filter(item =>
-            item.classList.contains('tab-item') && !item.closest('.expanded-tabs')
+        const listItems = toArray(element.children).filter(
+            item => item.classList.contains('tab-item') && !item.closest('.expanded-tabs')
         );
         const isMinimized = Boolean(column && column.classList.contains('minimized'));
         const dropPosition = dropIndexForItems(event, listItems, isMinimized);
 
         const span = sidebar
             ? { left: sidebarRect.left, width: sidebarRect.width }
-            : clampIndicatorSpan(
-                { left: rect.left, width: rect.width },
-                spaceContainerRect
-            );
+            : clampIndicatorSpan({ left: rect.left, width: rect.width }, spaceContainerRect);
         dropIndicator.style.width = `${span.width}px`;
         dropIndicator.style.height = `${INDICATOR_THICKNESS}px`;
         dropIndicator.style.left = `${span.left}px`;
@@ -254,12 +250,12 @@ export function createDragController(document, options = {}) {
         let indicatorTop;
         if (dropPosition === listItems.length) {
             const lastItem = listItems[listItems.length - 1];
-            indicatorTop = isMinimized || !lastItem
-                ? rect.top + containerScrollTop
-                : lastItem.getBoundingClientRect().bottom + containerScrollTop;
+            indicatorTop =
+                isMinimized || !lastItem
+                    ? rect.top + containerScrollTop
+                    : lastItem.getBoundingClientRect().bottom + containerScrollTop;
         } else {
-            indicatorTop = listItems[dropPosition].getBoundingClientRect().top +
-                containerScrollTop;
+            indicatorTop = listItems[dropPosition].getBoundingClientRect().top + containerScrollTop;
         }
         dropIndicator.style.top = `${clampIndicatorTop(indicatorTop, containerRect)}px`;
 
@@ -284,8 +280,9 @@ export function createDragController(document, options = {}) {
         const targetInSubgroup = event.target.closest('.subgroup-item');
         if (!draggedFromSubgroup || targetInSubgroup !== draggedFromSubgroup) return;
 
-        const subgroupItems = toArray(draggedFromSubgroup.querySelectorAll('.tab-item'))
-            .filter(item => item.closest('.expanded-tabs'));
+        const subgroupItems = toArray(draggedFromSubgroup.querySelectorAll('.tab-item')).filter(
+            item => item.closest('.expanded-tabs')
+        );
         const subgroupDropPosition = dropIndexForItems(event, subgroupItems, isMinimized);
         const subgroupRect = draggedFromSubgroup.getBoundingClientRect();
 
@@ -300,8 +297,9 @@ export function createDragController(document, options = {}) {
                 ? lastSubItem.getBoundingClientRect().bottom + containerScrollTop
                 : subgroupRect.top + containerScrollTop;
         } else {
-            subgroupIndicatorTop = subgroupItems[subgroupDropPosition]
-                .getBoundingClientRect().top + containerScrollTop;
+            subgroupIndicatorTop =
+                subgroupItems[subgroupDropPosition].getBoundingClientRect().top +
+                containerScrollTop;
         }
         dropIndicator.style.top = `${subgroupIndicatorTop}px`;
     }
@@ -358,9 +356,7 @@ export function createDragController(document, options = {}) {
             sidebar,
             sidebarRect: sidebarElement.getBoundingClientRect(),
             spaceContainerRect: spaceContainer.getBoundingClientRect(),
-            containerScrollTop: sidebar
-                ? sidebarElement.scrollTop
-                : columnsContainer.scrollTop
+            containerScrollTop: sidebar ? sidebarElement.scrollTop : columnsContainer.scrollTop
         };
 
         ensureDropIndicator();
@@ -385,14 +381,15 @@ export function createDragController(document, options = {}) {
             return deletionArea.contains(event.target)
                 ? { type: 'delete-column', column: droppedColumn }
                 : {
-                    type: 'move-column',
-                    column: droppedColumn,
-                    index: columnDropIndex(event)
-                };
+                      type: 'move-column',
+                      column: droppedColumn,
+                      index: columnDropIndex(event)
+                  };
         }
 
         const dragged = draggingItems();
-        const tabItem = dragged.find(item => item.id === droppedId) ||
+        const tabItem =
+            dragged.find(item => item.id === droppedId) ||
             toArray(document.querySelectorAll('.tab-item')).find(item => item.id === droppedId);
         if (!tabItem) return null;
         const items = dragged.length > 1 ? dragged : [tabItem];
@@ -406,13 +403,14 @@ export function createDragController(document, options = {}) {
 
         const columnElement = event.target.closest('.column');
         const sidebar = event.target.closest('#sidebar');
-        const destination = columnElement ||
-            (sidebar && document.getElementById(OPEN_TABS_LIST_ID));
+        const destination =
+            columnElement || (sidebar && document.getElementById(OPEN_TABS_LIST_ID));
         if (!destination) return null;
 
         const isMinimized = destination.classList.contains('minimized');
-        const listItems = toArray(destination.querySelectorAll('.tab-item'))
-            .filter(item => !item.closest('.expanded-tabs'));
+        const listItems = toArray(destination.querySelectorAll('.tab-item')).filter(
+            item => !item.closest('.expanded-tabs')
+        );
         const dropPosition = dropIndexForItems(event, listItems, isMinimized);
 
         if (destination.id === OPEN_TABS_LIST_ID) {
@@ -424,8 +422,7 @@ export function createDragController(document, options = {}) {
         const draggedFromSubgroup = items.some(item => item.classList.contains('subgroup-item'))
             ? null
             : sharedSubgroup(items);
-        if (draggedFromSubgroup &&
-            event.target.closest('.subgroup-item') === draggedFromSubgroup) {
+        if (draggedFromSubgroup && event.target.closest('.subgroup-item') === draggedFromSubgroup) {
             const subgroupItems = toArray(
                 draggedFromSubgroup.querySelectorAll('.expanded-tabs .tab-item')
             );

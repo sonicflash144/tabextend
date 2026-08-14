@@ -47,16 +47,13 @@ export function isPointerOnItem(clientY, rect) {
 
 function edgeSpeed(distance, threshold, maxSpeed) {
     if (distance <= 0 || distance >= threshold) return 0;
-    const progress = 1 - (distance / threshold);
+    const progress = 1 - distance / threshold;
     return maxSpeed * Math.pow(progress, 2);
 }
 
 /** Auto-scroll velocity as the pointer approaches the container edges. */
 export function autoScrollSpeeds(pointer, containerRect, options = {}) {
-    const {
-        threshold = AUTO_SCROLL_THRESHOLD,
-        maxSpeed = AUTO_SCROLL_MAX_SPEED
-    } = options;
+    const { threshold = AUTO_SCROLL_THRESHOLD, maxSpeed = AUTO_SCROLL_MAX_SPEED } = options;
 
     const left = edgeSpeed(pointer.clientX - containerRect.left, threshold, maxSpeed);
     const right = edgeSpeed(containerRect.right - pointer.clientX, threshold, maxSpeed);

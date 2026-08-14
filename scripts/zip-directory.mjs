@@ -12,7 +12,7 @@ const DOS_DATE = 33;
 const crcTable = Array.from({ length: 256 }, (_, index) => {
     let value = index;
     for (let bit = 0; bit < 8; bit += 1) {
-        value = (value & 1) ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+        value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
     }
     return value >>> 0;
 });
@@ -32,7 +32,7 @@ async function filesIn(directory, relativeDirectory = '') {
     for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
         const relativePath = path.join(relativeDirectory, entry.name);
         if (entry.isDirectory()) {
-            files.push(...await filesIn(directory, relativePath));
+            files.push(...(await filesIn(directory, relativePath)));
         } else if (entry.isFile()) {
             files.push(relativePath.split(path.sep).join('/'));
         }

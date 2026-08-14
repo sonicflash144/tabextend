@@ -8,7 +8,7 @@ Testable code belongs in `src/`: application workflows in `application/`, migrat
 
 ## Build, Test, and Development Commands
 
-- `npm install`: install locked dependencies.
+- `npm install`: install dependencies and update `package-lock.json` if `package.json` changed. Use `npm ci` for a clean install of exactly the locked versions.
 - `npm test`: run the `node:test` suite.
 - `npm run lint`: run ESLint across source, tests, and configuration files.
 - `npm run lint:fix`: apply ESLint's safe automatic fixes.
@@ -21,7 +21,7 @@ For manual testing, build, enable browser developer mode, and load this reposito
 
 ## Coding Style & Naming Conventions
 
-Use JavaScript modules under `src/` and four-space indentation in application code. Follow surrounding legacy/configuration style. Use `camelCase` for values and functions, `PascalCase` for constructors, and descriptive kebab-case fixtures. Prefer pure functions and injected browser adapters. ESLint uses the flat configuration in `eslint.config.mjs`, with separate browser/WebExtension, Node test, and CommonJS Webpack environments. Prettier is available, but postpone the initial repository-wide formatting pass until it can be reviewed as a standalone change. Always run `git diff --check`.
+Use JavaScript modules under `src/` and four-space indentation in application code. Follow surrounding legacy/configuration style. Use `camelCase` for values and functions, `PascalCase` for constructors, and descriptive kebab-case fixtures. Prefer pure functions and injected browser adapters. ESLint uses the flat configuration in `eslint.config.mjs`, with separate browser/WebExtension, Node test, and CommonJS Webpack environments. Prettier owns formatting through `.prettierrc.json`: four-space indentation, `printWidth` 100, single quotes, no trailing commas, no parentheses around single arrow parameters, and two-space overrides for JSON, YAML, HTML, Markdown, and `webpack.config.js`. `endOfLine` is `auto` so `format:check` passes on Windows checkouts that smudge to CRLF as well as on LF checkouts in CI. `.prettierignore` excludes generated output (`dist/`, `build/`, `browser/safari/manifest.json`), the historical export fixtures, and `newtab.css`, whose descendant rules are indented under their parent selector to show page structure — Prettier has no setting that preserves that, so the stylesheet stays hand-formatted. Always run `git diff --check`.
 
 ## Testing Guidelines
 
@@ -51,6 +51,7 @@ The ongoing refactor is moving the monolithic `newtab.js` toward tested applicat
 - DOM integration tests cover rendering (saved tabs, columns, subgroups, previews, open tabs, menus, minimize/expand, and text never reaching markup), the board view's editing and menu wiring, editing, selection, menus, drag targeting with indicator layout/clamping/auto-scroll, and storage-driven UI updates from startup, external changes, and the background queue. The storage-driven tests render through the real board view. One test drives the whole loop: a drag on rendered elements, through drop resolution and the domain operations, into storage, and back onto the page in the legacy nested-array shape.
 - The DOM environment exposed a defect in `createEditableTitleController`: its own empty class-name defaults made `classList.add('')` throw. Unnamed classes are now skipped. The page always passed class names, so shipped behavior is unchanged.
 - The automated suite currently has 236 passing tests covering compatibility, canonical state and operations, storage lifecycle/synchronization, export and transactional import, adapters and repositories, open-tab/settings/release/background workflows, drag geometry and drop resolution, tab presentation, safe content, DOM rendering, the board and open-tab views, controllers, storage-driven UI updates, ZIP browser packaging, and every Chrome/Firefox/Safari export-import pairing. Production bundles have been rebuilt from the current source.
+- Prettier settings that preserve the repository's four-space style are in place and the initial repository-wide formatting has been applied as a standalone change; webpack emitted byte-identical bundles across it. `.github/workflows/ci.yml` runs lint, `format:check`, tests, and `build:browsers` on pushes to `main` and on pull requests, cancelling any run still in flight for the same branch. There is no separate `build` step because `build:browsers` invokes webpack itself with the same production configuration and output path. `package-lock.json` is tracked, so CI installs with `npm ci` against pinned versions and caches the npm download directory. Keep the lockfile committed and in sync with `package.json`; `npm ci` fails outright when they disagree.
 
 `newtab.js` is now 810 lines, down from about 1700. It no longer calls the WebExtension namespace directly, builds no views of its own, and no longer reads application data out of rendered elements: it resolves the boundary once as `browserApi`, composes the services and views, and supplies the behavior they call back into — menu contents, persistence, and applying drop descriptors. Reopening saved tabs reads URLs and titles from canonical state through `getColumnTabs`, `getGroupTabs`, and `findGroup`, and every URL passes through `safePageUrl` on its way to the browser. The only elements it still creates are the download anchor and file input that export and import need, which are browser affordances rather than views.
 
@@ -58,7 +59,7 @@ The ongoing refactor is moving the monolithic `newtab.js` toward tested applicat
 
 ### Remaining Work, in Priority Order
 
-1. Establish Prettier settings that preserve the repository's four-space style, apply the initial full formatting in a standalone commit, and add lint/test/build/format checks to CI.
+None currently tracked.
 
 The column emoji picker is the `emoji-picker` custom element from `emoji-picker-element`, registered by the page importing the package and created in `createEmojiPicker`. It was once replaced by a hand-rolled grid of thirty-two emoji during an unrelated change, which silently dropped search and the full emoji set; do not substitute a static list for it.
 
@@ -83,5 +84,7 @@ Do not:
 If the Xcode project's extension target file references are ever re-pointed (e.g. during an Xcode project regeneration), keep them aimed at `browser/safari/manifest.json`, `dist/`, `icon.png`, and `icons/` under this repo — that coupling is by convention only, not enforced by any check.
 
 ## Commits & Pull Requests
+
+Never run `git commit` or `git push`, and never stage on the author's behalf with `git add`. The repository owner makes every commit and push. Leave finished work in the working tree, say what changed and why, and — when it helps — suggest how the change should be split into commits. This holds even when a task description asks for something "in a standalone commit": that describes how the change should be shaped, not permission to create it. Read-only Git commands (`status`, `diff`, `log`, `show`) are always fine.
 
 History uses brief, task-specific subjects such as `savedTabs delete fix`; keep commits concise and scoped. Pull requests should explain user-visible behavior, compatibility impact, tests performed, and any manifest or storage changes. Link related issues and include screenshots or a short recording for UI changes.

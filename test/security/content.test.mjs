@@ -17,7 +17,10 @@ test('decodes historical note line breaks without interpreting note HTML', () =>
 });
 
 test('preserves the existing visual behavior for escaped reminder text', () => {
-    assert.equal(legacyNoteToDisplayText('call \\tomorrow<br>bring notes'), 'call tomorrow\nbring notes');
+    assert.equal(
+        legacyNoteToDisplayText('call \\tomorrow<br>bring notes'),
+        'call tomorrow\nbring notes'
+    );
 });
 
 test('continues writing the historical br-based note format', () => {
@@ -44,7 +47,10 @@ test('rejects scriptable, internal, file, relative, and malformed page URLs', ()
 });
 
 test('only permits supported image protocols and image data URLs', () => {
-    assert.equal(safeImageUrl('https://example.com/favicon.png'), 'https://example.com/favicon.png');
+    assert.equal(
+        safeImageUrl('https://example.com/favicon.png'),
+        'https://example.com/favicon.png'
+    );
     assert.equal(safeImageUrl('data:image/png;base64,AAAA'), 'data:image/png;base64,AAAA');
     assert.equal(safeImageUrl('data:text/html,<script>alert(1)</script>'), '');
     assert.equal(safeImageUrl('javascript:alert(1)'), '');

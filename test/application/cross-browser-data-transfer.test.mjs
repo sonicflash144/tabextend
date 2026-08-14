@@ -30,28 +30,36 @@ function createRawStorageApi(browser, initial = {}) {
     const promiseStyle = browser !== 'chrome';
     const local = promiseStyle
         ? {
-            async get(keys) { return selectedValues(values, keys); },
-            async set(updates) { Object.assign(values, clone(updates)); },
-            async remove(keys) {
-                (Array.isArray(keys) ? keys : [keys]).forEach(key => delete values[key]);
-            },
-            async clear() { Object.keys(values).forEach(key => delete values[key]); }
-        }
+              async get(keys) {
+                  return selectedValues(values, keys);
+              },
+              async set(updates) {
+                  Object.assign(values, clone(updates));
+              },
+              async remove(keys) {
+                  (Array.isArray(keys) ? keys : [keys]).forEach(key => delete values[key]);
+              },
+              async clear() {
+                  Object.keys(values).forEach(key => delete values[key]);
+              }
+          }
         : {
-            get(keys, callback) { callback(selectedValues(values, keys)); },
-            set(updates, callback) {
-                Object.assign(values, clone(updates));
-                callback();
-            },
-            remove(keys, callback) {
-                (Array.isArray(keys) ? keys : [keys]).forEach(key => delete values[key]);
-                callback();
-            },
-            clear(callback) {
-                Object.keys(values).forEach(key => delete values[key]);
-                callback();
-            }
-        };
+              get(keys, callback) {
+                  callback(selectedValues(values, keys));
+              },
+              set(updates, callback) {
+                  Object.assign(values, clone(updates));
+                  callback();
+              },
+              remove(keys, callback) {
+                  (Array.isArray(keys) ? keys : [keys]).forEach(key => delete values[key]);
+                  callback();
+              },
+              clear(callback) {
+                  Object.keys(values).forEach(key => delete values[key]);
+                  callback();
+              }
+          };
     const rawApi = {
         runtime: {
             lastError: null,

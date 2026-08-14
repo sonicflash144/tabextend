@@ -1,7 +1,4 @@
-import {
-    createExtensionEventAdapter,
-    createExtensionMethod
-} from './chrome-primitives.mjs';
+import { createExtensionEventAdapter, createExtensionMethod } from './chrome-primitives.mjs';
 import { createStorageRepository } from './storage-repository.mjs';
 
 /** Resolve the native WebExtension namespace and its asynchronous API style. */
@@ -18,9 +15,7 @@ export function createBrowserApiAdapters(extensionApi, options = {}) {
     const methodOptions = { apiStyle };
     const runtime = extensionApi.runtime;
     const storageRepository = createStorageRepository(extensionApi, methodOptions);
-    const supportsTabGroups = Boolean(
-        extensionApi.tabs?.group && extensionApi.tabGroups?.update
-    );
+    const supportsTabGroups = Boolean(extensionApi.tabs?.group && extensionApi.tabGroups?.update);
 
     return {
         capabilities: {
@@ -33,11 +28,41 @@ export function createBrowserApiAdapters(extensionApi, options = {}) {
         tabs: {
             get: createExtensionMethod(extensionApi.tabs, 'get', runtime, undefined, methodOptions),
             query: createExtensionMethod(extensionApi.tabs, 'query', runtime, [], methodOptions),
-            create: createExtensionMethod(extensionApi.tabs, 'create', runtime, undefined, methodOptions),
-            remove: createExtensionMethod(extensionApi.tabs, 'remove', runtime, undefined, methodOptions),
-            update: createExtensionMethod(extensionApi.tabs, 'update', runtime, undefined, methodOptions),
-            move: createExtensionMethod(extensionApi.tabs, 'move', runtime, undefined, methodOptions),
-            group: createExtensionMethod(extensionApi.tabs, 'group', runtime, undefined, methodOptions),
+            create: createExtensionMethod(
+                extensionApi.tabs,
+                'create',
+                runtime,
+                undefined,
+                methodOptions
+            ),
+            remove: createExtensionMethod(
+                extensionApi.tabs,
+                'remove',
+                runtime,
+                undefined,
+                methodOptions
+            ),
+            update: createExtensionMethod(
+                extensionApi.tabs,
+                'update',
+                runtime,
+                undefined,
+                methodOptions
+            ),
+            move: createExtensionMethod(
+                extensionApi.tabs,
+                'move',
+                runtime,
+                undefined,
+                methodOptions
+            ),
+            group: createExtensionMethod(
+                extensionApi.tabs,
+                'group',
+                runtime,
+                undefined,
+                methodOptions
+            ),
             onUpdated: createExtensionEventAdapter(extensionApi.tabs?.onUpdated),
             onRemoved: createExtensionEventAdapter(extensionApi.tabs?.onRemoved),
             onMoved: createExtensionEventAdapter(extensionApi.tabs?.onMoved),
@@ -53,8 +78,20 @@ export function createBrowserApiAdapters(extensionApi, options = {}) {
             )
         },
         contextMenus: {
-            create: createExtensionMethod(extensionApi.contextMenus, 'create', runtime, undefined, methodOptions),
-            update: createExtensionMethod(extensionApi.contextMenus, 'update', runtime, undefined, methodOptions),
+            create: createExtensionMethod(
+                extensionApi.contextMenus,
+                'create',
+                runtime,
+                undefined,
+                methodOptions
+            ),
+            update: createExtensionMethod(
+                extensionApi.contextMenus,
+                'update',
+                runtime,
+                undefined,
+                methodOptions
+            ),
             onClicked: createExtensionEventAdapter(extensionApi.contextMenus?.onClicked)
         },
         action: {

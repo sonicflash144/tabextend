@@ -4,11 +4,11 @@ module.exports = {
   devtool: 'source-map',
   entry: {
     bundle: './newtab.js',
-    background: './background.js',
+    background: './background.js'
   },
   output: {
     filename: '[name].js',
-    path: path.resolve(__dirname, 'dist'), // Output directory
+    path: path.resolve(__dirname, 'dist') // Output directory
   },
   module: {
     rules: [
@@ -18,13 +18,13 @@ module.exports = {
         use: {
           loader: 'babel-loader',
           options: {
-            presets: ['@babel/preset-env'],
-          },
-        },
-      },
-    ],
+            presets: ['@babel/preset-env']
+          }
+        }
+      }
+    ]
   },
   resolve: {
-    extensions: ['.js'],
-  },
+    extensions: ['.js']
+  }
 };

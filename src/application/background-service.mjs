@@ -25,20 +25,24 @@ export function createBackgroundService(options) {
     }
 
     function createMenu() {
-        return Promise.resolve(contextMenus.create({
-            id: SAVE_TAB_MENU_ID,
-            title: SAVE_TAB_MENU_TITLE,
-            contexts: ['page', 'selection'],
-            visible: false // Start hidden
-        })).catch(report);
+        return Promise.resolve(
+            contextMenus.create({
+                id: SAVE_TAB_MENU_ID,
+                title: SAVE_TAB_MENU_TITLE,
+                contexts: ['page', 'selection'],
+                visible: false // Start hidden
+            })
+        ).catch(report);
     }
 
     /** The menu only applies to pages the extension is allowed to save. */
     function updateMenuVisibility(url) {
         if (!url) return Promise.resolve();
-        return Promise.resolve(contextMenus.update(SAVE_TAB_MENU_ID, {
-            visible: !isRestrictedUrl(url)
-        })).catch(report);
+        return Promise.resolve(
+            contextMenus.update(SAVE_TAB_MENU_ID, {
+                visible: !isRestrictedUrl(url)
+            })
+        ).catch(report);
     }
 
     /** Queue a tab for the new tab page, then close it. */
