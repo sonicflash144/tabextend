@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { canonicalStateFromLegacy } from '../../src/domain/state.mjs';
+import { canonicalStateFromLegacy, findGroup } from '../../src/domain/state.mjs';
 import {
     addColumn,
     addTabs,
@@ -9,6 +9,7 @@ import {
     moveColumn,
     removeColumn,
     removeGroup,
+    removeReopenedGroup,
     removeTabs,
     ungroup,
     updateColumn,
@@ -119,4 +120,34 @@ test('group operations create, update, ungroup, and remove groups as pure transf
     assert.equal(removed.tabs.has('one'), false);
     assert.equal(removed.tabs.has('three'), false);
     assert.equal(initial.columns[0].items[0].tabId, 'one');
+});
+
+test('a reopened group only loses the tabs the browser actually opened', () => {
+    const initial = createGroup(stateFixture(), 'second', 0, {
+        id: 'group-b',
+        tabIds: ['one', 'two', 'three'],
+        title: 'Group B'
+    });
+
+    // The browser refused 'two' — a local file, without file access — so the
+    // group stays behind holding it and the other two are gone.
+    const partial = removeReopenedGroup(initial, 'group-b', ['one', 'three']);
+    assert.deepEqual(findGroup(partial, 'group-b').group.tabIds, ['two']);
+    assert.equal(partial.tabs.has('one'), false);
+    assert.equal(partial.tabs.has('three'), false);
+    assert.equal(partial.tabs.get('two').title, 'Two');
+    assert.deepEqual(partial.tabOrder, ['two']);
+
+    // Every tab opened, so the group is retired with them.
+    const whole = removeReopenedGroup(initial, 'group-b', ['one', 'two', 'three']);
+    assert.equal(findGroup(whole, 'group-b').group, null);
+    assert.deepEqual(whole.tabOrder, []);
+
+    // Nothing opened, so nothing moves at all.
+    assert.equal(removeReopenedGroup(initial, 'group-b', []), initial);
+    assert.equal(removeReopenedGroup(initial, 'group-b', ['absent']), initial);
+    assert.equal(removeReopenedGroup(initial, 'missing-group', ['one']), initial);
+
+    // The source state is untouched by any of it.
+    assert.deepEqual(findGroup(initial, 'group-b').group.tabIds, ['one', 'two', 'three']);
 });

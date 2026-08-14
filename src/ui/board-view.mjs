@@ -45,9 +45,21 @@ export function createBoardView(document, options) {
         onNoteSave = NOOP,
         onTabDragStart = NOOP,
         onTabMenu = NOOP,
+        onTabOpen = NOOP,
         onTabSelect = NOOP,
         onTitleSave = NOOP
     } = handlers;
+
+    /**
+     * Saved tabs are links, so the browser opens them itself and keeps its own
+     * modifier-click handling. `onTabOpen` returns true for the URLs it opened
+     * another way, which are the ones an extension page may not navigate to.
+     */
+    function wireOpening(anchor, tab, navigableUrl) {
+        anchor.addEventListener('click', event => {
+            if (onTabOpen(tab, navigableUrl, event)) event.preventDefault();
+        });
+    }
 
     /**
      * A row cannot be dragged while one of its fields is being edited, or a
@@ -190,6 +202,7 @@ export function createBoardView(document, options) {
         });
         const item = view.item;
 
+        wireOpening(view.titleDisplay, tab, presentation.navigableUrl);
         view.infoLeft.addEventListener('click', event => onTabSelect(item, event));
         view.moreOptionsButton.addEventListener('click', event => {
             event.stopPropagation();
@@ -297,15 +310,17 @@ export function createBoardView(document, options) {
         group.tabIds.forEach(tabId => {
             const tab = getTab(state, tabId);
             if (!tab) return;
-            const { navigableUrl, faviconUrl, colorClass } = presenter.present(tab);
-            faviconsContainer.appendChild(
-                createSubgroupPreview(document, {
-                    tab,
-                    navigableUrl,
-                    faviconUrl,
-                    colorClass
-                })
-            );
+            const { navigableUrl, faviconUrl, faviconFallback, colorClass } =
+                presenter.present(tab);
+            const preview = createSubgroupPreview(document, {
+                tab,
+                navigableUrl,
+                faviconUrl,
+                faviconFallback,
+                colorClass
+            });
+            wireOpening(preview, tab, navigableUrl);
+            faviconsContainer.appendChild(preview);
             expandedContainer.appendChild(renderTab(tab));
         });
 

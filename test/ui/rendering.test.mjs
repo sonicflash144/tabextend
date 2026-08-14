@@ -112,6 +112,43 @@ test('an omitted favicon leaves the image source empty rather than broken', () =
     assert.equal(view.item.querySelector('img').getAttribute('src'), null);
 });
 
+test('a named fallback fills the icon slot with a themed icon, not an image', () => {
+    const view = savedTabView({ faviconUrl: '', faviconFallback: 'file' });
+
+    assert.equal(view.item.querySelector('img'), null);
+    const icon = view.infoLeft.querySelector('svg');
+    assert.equal(icon.getAttribute('width'), '24');
+    // Drawn with the text colour, which is what follows the theme.
+    assert.equal(icon.getAttribute('stroke'), 'currentColor');
+});
+
+test('the favicon slot is marked by class whichever element fills it', () => {
+    // The stylesheet sizes and aligns the slot, and cannot select on the
+    // element because a tab with no icon of its own gets an svg there instead.
+    const fallback = savedTabView({ faviconUrl: '', faviconFallback: 'file' });
+    assert.equal(fallback.infoLeft.querySelector('svg').classList.contains('tab-favicon'), true);
+
+    const withIcon = savedTabView({ faviconUrl: 'https://example.com/icon.png' });
+    assert.equal(withIcon.infoLeft.querySelector('img').classList.contains('tab-favicon'), true);
+
+    // A tab with neither still leaves a marked slot for the layout to hold.
+    const empty = savedTabView({ faviconUrl: '', faviconFallback: null });
+    assert.equal(empty.infoLeft.querySelector('img').classList.contains('tab-favicon'), true);
+});
+
+test('a fallback is ignored when the tab has an icon of its own', () => {
+    const view = savedTabView({
+        faviconUrl: 'https://example.com/icon.png',
+        faviconFallback: 'file'
+    });
+
+    assert.equal(view.infoLeft.querySelector('svg'), null);
+    assert.equal(
+        view.item.querySelector('img').getAttribute('src'),
+        'https://example.com/icon.png'
+    );
+});
+
 test('drag callbacks are wired to the rendered list item', () => {
     const started = [];
     const ended = [];
@@ -261,6 +298,47 @@ test('a subgroup preview carries the url the open-all action reads', () => {
     assert.ok(preview.classList.contains('tab-pink'));
 });
 
+test('a subgroup preview keeps its class and data on a fallback icon too', () => {
+    const preview = createSubgroupPreview(document, {
+        tab: { id: 'alpha', title: 'Notes' },
+        navigableUrl: 'file:///home/notes.html',
+        faviconUrl: '',
+        faviconFallback: 'file',
+        colorClass: 'tab-pink'
+    });
+    // The slot the open-all action reads is a class and a data attribute, so
+    // it has to survive the node being an icon rather than an image.
+    const favicon = preview.querySelector('.subgroup-favicon');
+
+    assert.equal(favicon.tagName, 'svg');
+    assert.equal(favicon.dataset.url, 'file:///home/notes.html');
+    assert.equal(favicon.dataset.tabId, 'alpha');
+});
+
+test('links inside a row never become the drag source', () => {
+    // A link with an href is a drag source by default and would be found
+    // before the row, handing the drag to the browser's own link handling.
+    // Firefox then refuses a `file://` target from an extension page, which
+    // left local files impossible to drag at all.
+    const local = savedTabView({ navigableUrl: 'file:///home/notes.html' });
+    assert.equal(local.item.draggable, true);
+    assert.equal(local.titleDisplay.draggable, false);
+
+    // Not conditional on the scheme: the row owns the drag either way.
+    const remote = savedTabView({ navigableUrl: 'https://example.com/page' });
+    assert.equal(remote.titleDisplay.draggable, false);
+
+    const preview = createSubgroupPreview(document, {
+        tab: { id: 'alpha', title: 'Notes' },
+        navigableUrl: 'file:///home/notes.html',
+        faviconUrl: '',
+        faviconFallback: 'file',
+        colorClass: 'tab-pink'
+    });
+    assert.equal(preview.draggable, false);
+    assert.equal(preview.querySelector('.subgroup-favicon').draggable, false);
+});
+
 test('an open tab renders collapsed when the sidebar is collapsed', () => {
     const view = createOpenTabView(document, {
         tab: { id: 42, title: 'Open tab' },
@@ -272,6 +350,22 @@ test('an open tab renders collapsed when the sidebar is collapsed', () => {
     assert.ok(view.item.classList.contains('collapsed'));
     assert.equal(view.title.textContent, 'Open tab');
     assert.ok(view.closeButton.classList.contains('close-button'));
+    assert.ok(view.infoLeft.querySelector('img').classList.contains('tab-favicon'));
+});
+
+test('an open local file marks its fallback slot like any other sidebar favicon', () => {
+    // The sidebar aligns the slot with `#open-tabs-list .tab-favicon`, so the
+    // svg has to carry the class or it would sit on the baseline while every
+    // image favicon around it is centred.
+    const view = createOpenTabView(document, {
+        tab: { id: 42, title: 'notes.html' },
+        classes: [],
+        faviconUrl: '',
+        faviconFallback: 'file'
+    });
+
+    assert.equal(view.infoLeft.querySelector('img'), null);
+    assert.ok(view.infoLeft.querySelector('svg').classList.contains('tab-favicon'));
 });
 
 test('a menu renders one button per visible entry and closes after acting', () => {

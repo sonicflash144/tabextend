@@ -15,6 +15,10 @@ const ICON_DEFINITIONS = {
         ['line', { x1: '10', x2: '10', y1: '11', y2: '17' }],
         ['line', { x1: '14', x2: '14', y1: '11', y2: '17' }]
     ],
+    file: [
+        ['path', { d: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z' }],
+        ['path', { d: 'M14 2v5h6' }]
+    ],
     maximize: [
         ['polyline', { points: '15 3 21 3 21 9' }],
         ['polyline', { points: '9 21 3 21 3 15' }],
@@ -248,11 +252,35 @@ export function getColorClass(color) {
     }
 }
 
+/**
+ * A tab's own icon, or the icon named as its fallback when it has none that
+ * can render. The fallback is drawn from the shared set, so it follows the
+ * theme through `currentColor`; an image would have to carry its own colour.
+ *
+ * Either way it carries `tab-favicon`, because the two are different elements
+ * and the stylesheet has to size and align the slot without knowing which one
+ * is in it.
+ */
+function createFavicon(document, options = {}) {
+    const { faviconUrl, faviconFallback } = options;
+    if (!faviconUrl && faviconFallback) {
+        return createIcon(document, faviconFallback, {
+            width: 24,
+            classes: ['tab-favicon']
+        });
+    }
+    const image = document.createElement('img');
+    image.classList.add('tab-favicon');
+    if (faviconUrl) image.src = faviconUrl;
+    return image;
+}
+
 export function createSavedTabView(document, options) {
     const {
         tab,
         navigableUrl,
         faviconUrl,
+        faviconFallback,
         colorClass,
         formattedDate,
         dateDisplayColor,
@@ -273,8 +301,7 @@ export function createSavedTabView(document, options) {
     infoContainer.classList.add('tab-info-container');
     const infoLeft = document.createElement('div');
     infoLeft.classList.add('tab-info-left');
-    const faviconImage = document.createElement('img');
-    if (faviconUrl) faviconImage.src = faviconUrl;
+    const faviconImage = createFavicon(document, { faviconUrl, faviconFallback });
     faviconImage.draggable = false;
     infoLeft.appendChild(faviconImage);
 
@@ -286,6 +313,12 @@ export function createSavedTabView(document, options) {
     titleDisplay.style.textDecoration = 'none';
     titleDisplay.textContent = typeof tab.title === 'string' ? tab.title : '';
     if (navigableUrl) titleDisplay.href = navigableUrl;
+    // The row is the drag source, never the link inside it. A link with an
+    // href is a drag source by default and would be found first, which puts
+    // the browser's own link drag in charge: Firefox then refuses to drag a
+    // `file://` target from an extension page and the row cannot be moved at
+    // all. Same reason the favicon opts out.
+    titleDisplay.draggable = false;
     const titleInput = document.createElement('input');
     titleInput.type = 'text';
     titleInput.classList.add('hidden');
@@ -409,13 +442,16 @@ export function createSubgroupView(document, options) {
 }
 
 export function createSubgroupPreview(document, options) {
-    const { tab, navigableUrl, faviconUrl, colorClass } = options;
+    const { tab, navigableUrl, faviconUrl, faviconFallback, colorClass } = options;
     const wrapper = document.createElement('a');
     if (navigableUrl) wrapper.href = navigableUrl;
     wrapper.classList.add('favicon-wrapper', colorClass);
     wrapper.style.textDecoration = 'none';
-    const favicon = document.createElement('img');
-    if (faviconUrl) favicon.src = faviconUrl;
+    // The subgroup row owns the drag, so its preview links opt out the way the
+    // saved-tab title does; a `file://` preview would otherwise stop the whole
+    // subgroup from being draggable in Firefox.
+    wrapper.draggable = false;
+    const favicon = createFavicon(document, { faviconUrl, faviconFallback });
     favicon.dataset.tabId = String(tab.id);
     favicon.classList.add('subgroup-favicon');
     favicon.dataset.url = navigableUrl;
@@ -429,7 +465,7 @@ export function createSubgroupPreview(document, options) {
 }
 
 export function createOpenTabView(document, options) {
-    const { tab, classes, faviconUrl, onDragStart, onDragEnd } = options;
+    const { tab, classes, faviconUrl, faviconFallback, onDragStart, onDragEnd } = options;
     const item = createDraggableListItem(document, {
         id: `opentab-${tab.id}`,
         classes,
@@ -440,8 +476,7 @@ export function createOpenTabView(document, options) {
     infoContainer.classList.add('tab-info-container');
     const infoLeft = document.createElement('div');
     infoLeft.classList.add('tab-info-left');
-    const faviconImage = document.createElement('img');
-    if (faviconUrl) faviconImage.src = faviconUrl;
+    const faviconImage = createFavicon(document, { faviconUrl, faviconFallback });
     faviconImage.draggable = false;
     infoLeft.appendChild(faviconImage);
     const infoRight = document.createElement('div');

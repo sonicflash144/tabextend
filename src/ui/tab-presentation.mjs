@@ -1,4 +1,4 @@
-import { resolveFaviconUrl } from '../domain/browser-tabs.mjs';
+import { isFileUrl, resolveFaviconUrl } from '../domain/browser-tabs.mjs';
 import {
     legacyNoteToDisplayText,
     legacyNoteToEditableText,
@@ -24,6 +24,14 @@ const WEEKDAY_NAMES = [
     'Friday',
     'Saturday'
 ];
+
+/**
+ * A local file reports no favicon and has no host to look one up by, so the
+ * view draws this icon in the slot instead. Only its name travels, so the
+ * icon stays part of the shared set and follows the theme, and nothing is
+ * written to storage: tabs saved before local files were supported get it too.
+ */
+export const LOCAL_FILE_ICON = 'file';
 
 const OVERDUE_COLOR = '#e63c30';
 const TODAY_COLOR = '#058527';
@@ -89,12 +97,26 @@ export function parseNoteDate(note, options) {
     return { parsedDate, remainingNote, detectedDateText };
 }
 
+/**
+ * The tab's own icon when it has one that can render, and otherwise the name
+ * of the icon to draw in its place. Naming an icon rather than building one
+ * keeps this module free of the DOM.
+ */
+function faviconFor(tab, candidate) {
+    const faviconUrl = safeImageUrl(candidate);
+    if (faviconUrl) return { faviconUrl, faviconFallback: null };
+    return {
+        faviconUrl: '',
+        faviconFallback: isFileUrl(tab?.url) ? LOCAL_FILE_ICON : null
+    };
+}
+
 /** Everything a stored tab contributes to its view, with nothing DOM-bound. */
 export function presentTab(tab, options = {}) {
     const { now = Date.now() } = options;
     return {
         navigableUrl: safePageUrl(tab.url),
-        faviconUrl: safeImageUrl(tab.favIconUrl),
+        ...faviconFor(tab, tab.favIconUrl),
         colorClass: resolveColorClass(tab.color),
         noteDisplayText: legacyNoteToDisplayText(tab.note),
         noteEditableText: legacyNoteToEditableText(tab.note),
@@ -107,7 +129,7 @@ export function presentTab(tab, options = {}) {
  * falls back to the favicon service when the browser reports no icon.
  */
 export function presentOpenTab(tab) {
-    return { faviconUrl: safeImageUrl(resolveFaviconUrl(tab)) };
+    return faviconFor(tab, resolveFaviconUrl(tab));
 }
 
 /**

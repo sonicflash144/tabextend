@@ -1,10 +1,14 @@
+/**
+ * `file:` is deliberately absent: local files are navigable pages rather than
+ * a scripting or privilege risk, and whether they may be listed or opened at
+ * all is a browser capability decided in `domain/browser-tabs.mjs`.
+ */
 const BLOCKED_PAGE_PROTOCOLS = new Set([
     'about:',
     'brave:',
     'chrome:',
     'data:',
     'edge:',
-    'file:',
     'javascript:',
     'moz-extension:',
     'opera:',

@@ -243,3 +243,22 @@ export function removeGroup(state, groupId, options = {}) {
     nextLocation.column.items.splice(nextLocation.itemIndex, 1);
     return options.deleteTabs ? removeTabs(nextState, groupTabIds) : nextState;
 }
+
+/**
+ * Retire a group whose tabs were reopened as browser tabs. Only the tabs the
+ * browser actually opened leave the board: if it opened all of them the group
+ * goes with them, and otherwise the group stays behind holding whatever it
+ * refused, so a local file Chrome would not open is never dropped on the floor.
+ */
+export function removeReopenedGroup(state, groupId, openedTabIds) {
+    const location = findGroupLocation(state, groupId);
+    if (!location) return state;
+
+    const opened = new Set((Array.isArray(openedTabIds) ? openedTabIds : []).map(normalizeId));
+    const removable = location.group.tabIds.filter(tabId => opened.has(normalizeId(tabId)));
+    if (removable.length === 0) return state;
+    if (removable.length === location.group.tabIds.length) {
+        return removeGroup(state, groupId, { deleteTabs: true });
+    }
+    return removeTabs(state, removable);
+}

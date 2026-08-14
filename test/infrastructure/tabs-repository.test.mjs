@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { createTabsRepository } from '../../src/infrastructure/tabs-repository.mjs';
 
 function createBrowserApi(options = {}) {
-    const { tabGroups: supportsGroups = true } = options;
+    const { tabGroups: supportsGroups = true, refuse = () => false } = options;
     const calls = [];
     let nextTabId = 1;
 
@@ -13,6 +13,9 @@ function createBrowserApi(options = {}) {
         tabs: {
             async create(createProperties) {
                 calls.push(['create', createProperties]);
+                if (refuse(createProperties.url)) {
+                    throw new Error('Cannot navigate to a file URL without local file access');
+                }
                 return { id: nextTabId++, ...createProperties };
             },
             async group(groupOptions) {
@@ -47,18 +50,58 @@ test('opens urls at an index and groups them with a title', async () => {
     const { api, calls } = createBrowserApi();
     const repository = createTabsRepository(api);
 
-    const created = await repository.openUrls(['https://a.test', 'https://b.test'], {
+    const { opened, refused } = await repository.openUrls(['https://a.test', 'https://b.test'], {
         index: 3,
         groupTitle: 'Reading'
     });
 
     assert.deepEqual(
-        created.map(tab => tab.index),
+        opened.map(result => result.tab.index),
         [3, 4]
     );
+    assert.deepEqual(refused, []);
     assert.deepEqual(calls[0], ['create', { url: 'https://a.test', active: false, index: 3 }]);
     assert.deepEqual(calls[2], ['group', { tabIds: [1, 2] }]);
     assert.deepEqual(calls[3], ['groupUpdate', 42, { title: 'Reading' }]);
+});
+
+test('reports a refused url without abandoning the ones that opened', async () => {
+    const { api, calls } = createBrowserApi({ refuse: url => url.startsWith('file://') });
+    const repository = createTabsRepository(api);
+
+    const { opened, refused } = await repository.openUrls(
+        ['https://a.test', 'file:///home/notes.html', 'https://b.test'],
+        { index: 3, groupTitle: 'Reading' }
+    );
+
+    // The refusal is reported per URL rather than rejecting the whole batch.
+    assert.deepEqual(
+        opened.map(result => result.url),
+        ['https://a.test', 'https://b.test']
+    );
+    assert.deepEqual(
+        refused.map(result => result.url),
+        ['file:///home/notes.html']
+    );
+    assert.match(refused[0].error.message, /without local file access/);
+
+    // What did open is still collected into the titled group.
+    assert.deepEqual(calls[3], ['group', { tabIds: [1, 2] }]);
+    assert.deepEqual(calls[4], ['groupUpdate', 42, { title: 'Reading' }]);
+});
+
+test('groups nothing when every url is refused', async () => {
+    const { api, calls } = createBrowserApi({ refuse: () => true });
+    const repository = createTabsRepository(api);
+
+    const { opened, refused } = await repository.openUrls(['file:///home/notes.html']);
+
+    assert.deepEqual(opened, []);
+    assert.equal(refused.length, 1);
+    assert.deepEqual(
+        calls.map(call => call[0]),
+        ['create']
+    );
 });
 
 test('omits the index when none is requested and never groups without support', async () => {
@@ -74,8 +117,8 @@ test('ignores empty url lists', async () => {
     const { api, calls } = createBrowserApi();
     const repository = createTabsRepository(api);
 
-    assert.deepEqual(await repository.openUrls([]), []);
-    assert.deepEqual(await repository.openUrls([null, undefined]), []);
+    assert.deepEqual(await repository.openUrls([]), { opened: [], refused: [] });
+    assert.deepEqual(await repository.openUrls([null, undefined]), { opened: [], refused: [] });
     assert.deepEqual(calls, []);
 });
 

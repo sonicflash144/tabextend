@@ -62,11 +62,27 @@ function createBoard(options = {}) {
             onNoteSave: record('noteSave'),
             onTabDragStart: record('tabDragStart'),
             onTabMenu: record('tabMenu'),
+            // Reports whether it opened the link itself, so it cannot use the
+            // recorder, whose return value is always truthy.
+            onTabOpen: (tab, url) => {
+                calls.push(['tabOpen', tab.id, url]);
+                return options.handleOpen === true;
+            },
             onTabSelect: record('tabSelect'),
             onTitleSave: record('titleSave')
         }
     });
     return { board, calls };
+}
+
+/** Click and hand back the event, so a test can see whether it was consumed. */
+function clickLink(element) {
+    const event = new document.defaultView.MouseEvent('click', {
+        bubbles: true,
+        cancelable: true
+    });
+    element.dispatchEvent(event);
+    return event;
 }
 
 function stateWith(options = {}) {
@@ -147,6 +163,53 @@ test('a subgroup renders previews, nested tabs, and honours its expanded flag', 
         ['tab-alpha', 'tab-beta']
     );
     assert.equal(subgroup.querySelector('.expanded-tabs').style.display, 'flex');
+});
+
+test('an ordinary link is offered to the page and then left to the browser', () => {
+    const { board, calls } = createBoard();
+    board.render(stateWith());
+
+    const link = document.querySelector('#tab-alpha .tab-title');
+    const event = clickLink(link);
+
+    assert.deepEqual(
+        calls.filter(call => call[0] === 'tabOpen'),
+        [['tabOpen', 'alpha', 'https://example.com/alpha']]
+    );
+    assert.equal(event.defaultPrevented, false);
+});
+
+test('a link the page opened itself is not followed by the browser as well', () => {
+    const { board, calls } = createBoard({ handleOpen: true });
+    board.render(
+        stateWith({
+            tabs: [{ id: 'alpha', title: 'Notes', url: 'file:///home/notes.html' }],
+            tabIds: ['tab-alpha']
+        })
+    );
+
+    const link = document.querySelector('#tab-alpha .tab-title');
+    assert.equal(link.href, 'file:///home/notes.html');
+    const event = clickLink(link);
+
+    assert.deepEqual(calls, [['tabOpen', 'alpha', 'file:///home/notes.html']]);
+    assert.equal(event.defaultPrevented, true);
+});
+
+test('a subgroup preview routes its click the same way as a tab title', () => {
+    const { board, calls } = createBoard({ handleOpen: true });
+    board.render(
+        stateWith({
+            tabs: [{ id: 'alpha', title: 'Notes', url: 'file:///home/notes.html' }],
+            tabIds: [['group-1', 'tab-alpha', 'Reading', false]]
+        })
+    );
+
+    const preview = document.querySelector('#group-1 .favicon-wrapper');
+    const event = clickLink(preview);
+
+    assert.ok(calls.some(call => call[0] === 'tabOpen' && call[2] === 'file:///home/notes.html'));
+    assert.equal(event.defaultPrevented, true);
 });
 
 test('a tab whose stored entry is missing is skipped', () => {
