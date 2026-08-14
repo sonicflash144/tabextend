@@ -1,11 +1,12 @@
 import { Chrono } from 'chrono-node';
-import {
-    prepareImportData
-} from './src/compatibility/legacy-data.mjs';
 import { createStateStorageService } from './src/application/state-storage.mjs';
-import { createExportPayload } from './src/application/data-transfer.mjs';
-import { importStorageSafely } from './src/infrastructure/import-transaction.mjs';
+import { createDataTransferService } from './src/application/data-transfer.mjs';
+import { createOpenTabsService } from './src/application/open-tabs-service.mjs';
+import { createReleaseService } from './src/application/release-service.mjs';
+import { createSettingsService, nextTheme } from './src/application/settings-service.mjs';
 import { createBrowserApiFromGlobal } from './src/infrastructure/browser-api.mjs';
+import { createTabsRepository } from './src/infrastructure/tabs-repository.mjs';
+import { faviconServiceUrl } from './src/domain/browser-tabs.mjs';
 import {
     createStateStore,
     getTab
@@ -36,6 +37,7 @@ import {
     setColumnMinimized,
     setSubgroupExpanded
 } from './src/ui/rendering.mjs';
+import { createDragController } from './src/ui/controllers/drag-controller.mjs';
 import { createEditableTitleController } from './src/ui/controllers/editable-title-controller.mjs';
 import { createMenuController } from './src/ui/controllers/menu-controller.mjs';
 import { createSelectionController } from './src/ui/controllers/selection-controller.mjs';
@@ -46,53 +48,59 @@ import {
     safePageUrl,
     textToLegacyStoredNote
 } from './src/security/content.mjs';
-const chrome = createBrowserApiFromGlobal(globalThis);
+const browserApi = createBrowserApiFromGlobal(globalThis);
+const tabsRepository = createTabsRepository(browserApi);
+const openTabs = createOpenTabsService({
+    tabs: tabsRepository,
+    idFactory: generateUniqueId
+});
+const settings = createSettingsService({ storage: browserApi.storage.local });
+const dataTransfer = createDataTransferService({
+    storage: browserApi.storage.local,
+    idFactory: generateUniqueId
+});
+const releaseNotes = createReleaseService({
+    storage: browserApi.storage.local,
+    runtime: browserApi.runtime
+});
 let theme = 'light';
-chrome.storage.local.get(["sidebarCollapsed", "theme"], (data) => {
-    try {
-        const sidebar = document.getElementById('sidebar');
-        sidebar.classList.add('no-transition');
-        if (data.sidebarCollapsed) {
-            sidebar.classList.add('collapsed');
-        }
-        if (data.theme) {
-            theme = data.theme;
-            document.body.className = data.theme;
-        }
-
-        setTimeout(() => {
-            sidebar.classList.remove('no-transition');
-        }, 100);
-    } catch (error) {
-        console.error('Error updating sidebar:', error);
+settings.load().then(stored => {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.add('no-transition');
+    if (stored.sidebarCollapsed) {
+        sidebar.classList.add('collapsed');
     }
+    if (stored.storedTheme) {
+        theme = stored.storedTheme;
+        document.body.className = theme;
+    }
+
+    setTimeout(() => {
+        sidebar.classList.remove('no-transition');
+    }, 100);
+}).catch(error => {
+    console.error('Error updating sidebar:', error);
 });
 function toggleTheme(){
-    theme = theme === 'light' ? 'dark' : 'light';
+    theme = nextTheme(theme);
     document.body.className = theme;
     const emojiPickers = document.querySelectorAll('.emoji-picker-on-top');
     emojiPickers.forEach(picker => {
         picker.className = picker.className.replace(/light|dark/g, theme);
     });
-    chrome.storage.local.set({ theme });
+    settings.saveTheme(theme).catch(error => {
+        console.error('Could not save the theme:', error);
+    });
 }
-const scrollAnimation = {
-    isScrolling: false,
-    scrollX: 0,
-    scrollY: 0,
-    animationFrameId: null
-};
 const CHROME_STRING = 'chrome';
 const settingsButton = document.querySelector('.settings-button');
 const columnsContainer = document.getElementById('columns-container');
 const colorOptions = ['tab-default', 'tab-pink', 'tab-yellow', 'tab-blue', 'tab-purple'];
-let dropIndicator = null;
-let dropType = null;
 let deletionArea;
 let newColumnIndicator = null;
 const appState = createStateStore();
 const stateStorage = createStateStorageService({
-    storage: chrome.storage.local,
+    storage: browserApi.storage.local,
     stateStore: appState,
     idFactory: generateUniqueId,
     createDefaultColumn: () => ({
@@ -145,6 +153,21 @@ document.getElementById("add-column").addEventListener("click", () => {
 });
 
 deletionArea = renderDeletionArea(document);
+const dragController = createDragController(document, {
+    columnsContainer,
+    getDeletionArea: () => deletionArea,
+    getNewColumnIndicator: () => newColumnIndicator,
+    onDragStart: () => closeAllMenus()
+});
+function handleDragStart(event) {
+    dragController.handleTabDragStart(event);
+}
+function handleColumnDragStart(event) {
+    dragController.handleColumnDragStart(event);
+}
+function handleDragEnd(event) {
+    dragController.handleDragEnd(event);
+}
 function closeAllMenus() {
     menuController.closeAll();
 }
@@ -378,44 +401,13 @@ function openAllInColumn(column, subgroup = null, dropPosition = null) {
     }
     urls = urls.filter(Boolean);
     if (urls.length === 0) return;
-    if(!chrome.capabilities.tabGroups){
-        urls.forEach((url, i) => {
-            const createProperties = { url: url, active: false };
-            if (dropPosition !== null) {
-                createProperties.index = dropPosition + i;
-            }
-            chrome.tabs.create(createProperties);
-        });   
-    }
-    else{
-        // Open all tabs
-        const createTabs = urls.map((url, i) => 
-            new Promise(resolve => {
-                const createProperties = { url: url, active: false };
-                if (dropPosition !== null) {
-                    createProperties.index = dropPosition + i;
-                }
-                chrome.tabs.create(createProperties, resolve);
-            })
-        );
-        // After all tabs are created, group them
-        Promise.all(createTabs).then(tabs => {
-            const tabIds = tabs.map(tab => tab.id); // Extract tab IDs
-            chrome.tabs.group({ tabIds: tabIds }, groupId => {
-                // Set the title of the group
-                let title;
-                if(subgroup){
-                    title = Array.isArray(subgroup)
-                        ? subgroup[subgroup.length - 2]
-                        : subgroup.title;
-                }
-                else{
-                    title = column.querySelector('.column-title-text').textContent;
-                }
-                chrome.tabGroups.update(groupId, { title });
-            });
-        });
-    }
+    // Browsers without tab groups simply open the tabs; the repository decides.
+    const groupTitle = subgroup
+        ? (Array.isArray(subgroup) ? subgroup[subgroup.length - 2] : subgroup.title)
+        : column.querySelector('.column-title-text')?.textContent;
+    openTabs.openUrls(urls, { index: dropPosition, groupTitle }).catch(error => {
+        console.error('Could not open saved tabs:', error);
+    });
 }
 
 /* Column Functions */
@@ -426,357 +418,6 @@ function maximizeColumn(column) {
     setColumnMinimized(column, false);
 }
 
-/* Tab Drag and Drop */
-function handleDragStart(event) {
-    // Don't initiate tab drag if dragging from an input/textarea (e.g., text selection)
-    if (event.target.tagName === 'TEXTAREA' || event.target.tagName === 'INPUT') {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-    }
-    event.stopPropagation();
-    closeAllMenus();
-    const tabItem = event.target.closest('.tab-item');
-    if(!tabItem) return;
-    event.dataTransfer.setData("text/plain", tabItem.id);
-    event.dataTransfer.setDragImage(tabItem, 0, 0);
-    dropType = "list-item";
-
-    const draggedItems = document.querySelectorAll('.selected');
-    const isDraggedItemSelected = tabItem.classList.contains('selected');
-    
-    if (isDraggedItemSelected && draggedItems.length > 1) {
-        draggedItems.forEach(item => item.classList.add('dragging'));
-    } 
-    // If dragging an unselected item, only add dragging to that item
-    else {
-        draggedItems.forEach(item => item.classList.remove('selected'));
-        tabItem.classList.add('dragging');
-    }
-}
-function calculateDropPosition(event, tabItems, isMinimized = false) {
-    if(isMinimized){
-        return tabItems.length;
-    } 
-
-    // If dragging a subgroup, filter out items that are inside subgroups
-    const draggedElement = document.querySelector('.dragging');
-    if (draggedElement && draggedElement.classList.contains('subgroup-item')) {
-        tabItems = tabItems.filter(item => !item.closest('.expanded-tabs'));
-    }
-
-    let dropPosition = tabItems.length;
-    for (let i = 0; i < tabItems.length; i++) {
-        const tabRect = tabItems[i].getBoundingClientRect();
-        if (event.clientY < tabRect.top + tabRect.height / 2) {
-            dropPosition = i;
-            break;
-        }
-    }
-    return dropPosition;
-}
-
-/* Column Drag and Drop */
-function handleColumnDragStart(event) {
-    // Don't initiate column drag if dragging from an input/textarea (e.g., text selection)
-    if (event.target.tagName === 'TEXTAREA' || event.target.tagName === 'INPUT') {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-    }
-    
-    const column = event.target.closest('.column');
-    if(!column) return;
-    
-    // Don't initiate drag if the column is in edit mode (draggable is false)
-    if (!column.draggable) {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-    }
-    closeAllMenus();
-    if (event.target.closest('.tab-item')) {
-        event.preventDefault();
-        return;
-    }
-
-    // Remove .selected class from all items
-    const draggedItems = document.querySelectorAll('.selected');
-    draggedItems.forEach(item => item.classList.remove('selected'));
-
-    event.dataTransfer.setData("text/plain", column.id);
-    event.dataTransfer.setDragImage(column, 0, 0);
-    dropType = "column";
-    column.classList.add("dragging");
-}
-function calculateColumnDropPosition(event, columns) {
-    let dropPosition = columns.length;
-    for (let i = 0; i < columns.length; i++) {
-        const columnRect = columns[i].getBoundingClientRect();
-        if (event.clientX < columnRect.left + columnRect.width / 2) {
-            dropPosition = i;
-            break;
-        }
-    }
-    return dropPosition;
-}
-
-/* General Drag and Drop */
-function startScrollAnimation(container) {
-    function animate() {
-        if (!scrollAnimation.isScrolling) return;
-
-        if (scrollAnimation.scrollX !== 0 || scrollAnimation.scrollY !== 0) {
-            container.scrollBy(scrollAnimation.scrollX, scrollAnimation.scrollY);
-            scrollAnimation.animationFrameId = requestAnimationFrame(animate);
-        } else {
-            stopScrollAnimation();
-        }
-    }
-    scrollAnimation.animationFrameId = requestAnimationFrame(animate);
-}
-function stopScrollAnimation() {
-    scrollAnimation.isScrolling = false;
-    scrollAnimation.scrollX = 0;
-    scrollAnimation.scrollY = 0;
-    if (scrollAnimation.animationFrameId) {
-        cancelAnimationFrame(scrollAnimation.animationFrameId);
-        scrollAnimation.animationFrameId = null;
-    }
-}
-function handleDragOver(event) {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-
-    /* Auto Scroll */
-    const scrollThreshold = 240;
-    const maxScrollSpeed = 15;
-    const containerRect = columnsContainer.getBoundingClientRect();
-    function calculateScrollSpeed(distance) {
-        if (distance <= 0) return 0;
-        if (distance >= scrollThreshold) return 0;
-        
-        // Create a smooth acceleration curve
-        const scrollProgress = 1 - (distance / scrollThreshold);
-        return maxScrollSpeed * Math.pow(scrollProgress, 2);
-    }
-    const leftSpeed = calculateScrollSpeed(event.clientX - containerRect.left);
-    const rightSpeed = calculateScrollSpeed(containerRect.right - event.clientX);
-    const topSpeed = calculateScrollSpeed(event.clientY - containerRect.top);
-    const bottomSpeed = calculateScrollSpeed(containerRect.bottom - event.clientY);
-    scrollAnimation.scrollX = -leftSpeed + rightSpeed;
-    scrollAnimation.scrollY = -topSpeed + bottomSpeed;
-    if (!scrollAnimation.isScrolling && (scrollAnimation.scrollX !== 0 || scrollAnimation.scrollY !== 0)) {
-        scrollAnimation.isScrolling = true;
-        startScrollAnimation(columnsContainer);
-    } 
-    else if (scrollAnimation.scrollX === 0 && scrollAnimation.scrollY === 0) {
-        stopScrollAnimation();
-    }
-
-    /* Deletion Area and New Column Indicator */
-    deletionArea.style.display = 'flex';
-    if (deletionArea.contains(event.target)) {
-        deletionArea.classList.add('deletion-area-active');
-        dropIndicator.style.display = 'none';
-        return;
-    } 
-    else if (newColumnIndicator.contains(event.target)) {
-        newColumnIndicator.classList.add('new-column-indicator-active');
-        dropIndicator.style.display = 'none';
-        return;
-    }
-    
-    const column = event.target.closest('.column');
-    const sidebar = document.getElementById('sidebar');
-    const sidebarRect = sidebar.getBoundingClientRect();
-    const sidebarCheck = event.target.closest('#sidebar');
-    const openTabsList = document.getElementById('open-tabs-list');
-    const spaceContainer = document.getElementById('space-container');
-    const spaceContainerRect = spaceContainer.getBoundingClientRect();
-    const spaceContainerLeft = spaceContainerRect.left;
-    const spaceContainerRight = spaceContainerRect.right;
-    const containerScrollTop = sidebarCheck ? sidebar.scrollTop : columnsContainer.scrollTop;
-
-    if (!dropIndicator) {
-        dropIndicator = document.createElement('div');
-        dropIndicator.className = 'drop-indicator';
-        const dropIndicatorContainer = document.createElement('div');
-        dropIndicatorContainer.className = 'drop-indicator-container';
-        dropIndicatorContainer.appendChild(dropIndicator);
-        document.body.appendChild(dropIndicatorContainer);
-    }
-
-    /* List Item Drag Over */
-    if (dropType === "list-item") {
-        newColumnIndicator.style.display = 'flex';
-        let element;
-        if(sidebarCheck){
-            element = openTabsList;
-        }
-        else if(column){
-            element = column;
-        }
-        else{
-            dropIndicator.style.display = 'none';
-            return;
-        }
-        const rect = element.getBoundingClientRect();
-        // Only get top-level tab items (excluding items inside subgroups)
-        const listItems = Array.from(element.children).filter(item => 
-            item.classList.contains('tab-item') && !item.closest('.expanded-tabs')
-        );
-        const isMinimized = column && column.classList.contains('minimized');
-        const dropPosition = calculateDropPosition(event, listItems, isMinimized);
-
-        let indicatorLeft = rect.left;
-        let width = rect.width;
-        if(sidebarCheck){
-            indicatorLeft = sidebarRect.left;
-            width = sidebarRect.width;
-        }
-        else{
-            // Left boundary
-            if (indicatorLeft < spaceContainerLeft) {
-                const difference = spaceContainerLeft - indicatorLeft;
-                indicatorLeft = spaceContainerLeft;
-                width = width - difference;
-            }
-            // Right boundary 
-            if (indicatorLeft + width > spaceContainerRight) {
-                width = spaceContainerRight - indicatorLeft;
-            }
-        }
-        dropIndicator.style.width = `${width}px`;
-        dropIndicator.style.height = '2px';
-        dropIndicator.style.left = `${indicatorLeft}px`;
-
-        const rectTopScroll = rect.top + containerScrollTop;
-        const containerRect = openTabsList ? sidebarRect : spaceContainerRect;
-        let indicatorTop;
-        if (dropPosition === listItems.length) {
-            const lastItem = listItems[listItems.length - 1];
-            indicatorTop = isMinimized || !lastItem 
-                ? rectTopScroll 
-                : lastItem.getBoundingClientRect().bottom + containerScrollTop;
-        } else {
-            indicatorTop = listItems[dropPosition].getBoundingClientRect().top + containerScrollTop;
-        }
-        indicatorTop = Math.max(indicatorTop, containerRect.top);
-        indicatorTop = Math.min(indicatorTop, containerRect.bottom - 2);
-        dropIndicator.style.top = `${indicatorTop}px`;
-
-        const draggedTabs = Array.from(document.querySelectorAll('.dragging'));
-
-        // Check if dragging directly over a tab or group
-        const targetTab = listItems.find(item => {
-            if (item.closest('#open-tabs-list') || item.classList.contains('dragging') || item.closest('.expanded-tabs')) {
-                return false;
-            }
-            // Check if the tab is already in the target subgroup
-            const targetSubgroup = item.closest('.subgroup-item');
-            if (targetSubgroup && draggedTabs.some(tab => targetSubgroup.contains(tab))) {
-                return false;
-            }
-            const itemRect = item.getBoundingClientRect();
-            const itemHeight = itemRect.bottom - itemRect.top;
-
-            // Calculate middle third region
-            const middleThirdTop = itemRect.top + itemHeight / 3;
-            const middleThirdBottom = itemRect.bottom - itemHeight / 3;
-
-            // Calculate fixed 32px exclusion region
-            const fixedMargin = 32;
-            const fixedTop = itemRect.top + fixedMargin;
-            const fixedBottom = itemRect.bottom - fixedMargin;
-
-            // Use larger region
-            return fixedBottom - fixedTop > middleThirdBottom - middleThirdTop
-            ? event.clientY >= fixedTop && event.clientY <= fixedBottom
-            : event.clientY >= middleThirdTop && event.clientY <= middleThirdBottom;
-        });
-
-        document.querySelectorAll('.tab-item').forEach(item => {
-            item.classList.remove('targeted');
-        });
-        if (targetTab) {
-            targetTab.classList.add('targeted');
-            dropIndicator.style.display = 'none';
-        } else {
-            dropIndicator.style.display = 'block';
-        }
-        
-        let draggedTabsFromSubgroup = null;
-        if (draggedTabs.length > 0) {
-            const firstSubgroup = draggedTabs[0].closest('.subgroup-item');
-            const allFromSameSubgroup = draggedTabs.every(tab => tab.closest('.subgroup-item') === firstSubgroup);
-
-            if (allFromSameSubgroup && !draggedTabs[0].classList.contains('subgroup-item')) {
-                draggedTabsFromSubgroup = firstSubgroup;
-            }
-        }
-        const targetInSubgroup = event.target.closest('.subgroup-item');
-
-        // Rearrange tabs within the same subgroup
-        if (draggedTabsFromSubgroup && targetInSubgroup && targetInSubgroup === draggedTabsFromSubgroup) {
-            const subgroupItems = Array.from(draggedTabsFromSubgroup.querySelectorAll('.tab-item')).filter(item => item.closest('.expanded-tabs'));
-            const subgroupDropPosition = calculateDropPosition(event, subgroupItems, isMinimized);
-
-            let subgroupRect = draggedTabsFromSubgroup.getBoundingClientRect();
-            let subgroupIndicatorLeft = subgroupRect.left;
-            let subgroupWidth = subgroupRect.width;
-
-            dropIndicator.style.width = `${subgroupWidth}px`;
-            dropIndicator.style.height = '2px';
-            dropIndicator.style.left = `${subgroupIndicatorLeft}px`;
-
-            let subgroupIndicatorTop;
-            if (subgroupDropPosition === subgroupItems.length) {
-                const lastSubItem = subgroupItems[subgroupDropPosition - 1];
-                subgroupIndicatorTop = lastSubItem 
-                    ? lastSubItem.getBoundingClientRect().bottom + containerScrollTop
-                    : subgroupRect.top + containerScrollTop;
-            } else {
-                subgroupIndicatorTop = subgroupItems[subgroupDropPosition].getBoundingClientRect().top + containerScrollTop;
-            }
-
-            dropIndicator.style.top = `${subgroupIndicatorTop}px`;
-        }
-    }
-    /* Column Drag Over */
-    else if (dropType === "column") {
-        newColumnIndicator.style.display = 'none';
-        dropIndicator.style.display = 'block';
-
-        const columns = Array.from(columnsContainer.querySelectorAll('.column'));
-        const dropPosition = calculateColumnDropPosition(event, columns);
-
-        let indicatorLeft;
-        const width = 2;
-        let height = containerRect.height;
-
-        if (dropPosition === columns.length) {
-            const lastColumn = columns[columns.length - 1];
-            indicatorLeft = lastColumn ? lastColumn.getBoundingClientRect().right : containerRect.left;
-        } else {
-            const targetColumn = columns[dropPosition];
-            indicatorLeft = targetColumn.getBoundingClientRect().left;
-        }
-
-        // Keep the indicator within the visible column container.
-        if (indicatorLeft < spaceContainerLeft) {
-            indicatorLeft = spaceContainerLeft;
-        }
-        if (indicatorLeft > spaceContainerRight - width) {
-            indicatorLeft = spaceContainerRight - width;
-        }
-
-        dropIndicator.style.width = `${width}px`;
-        dropIndicator.style.height = `${height}px`;
-        dropIndicator.style.left = `${indicatorLeft}px`;
-        dropIndicator.style.top = `${containerRect.top + containerScrollTop}px`;
-    }
-}
 function descriptorForSavedElement(element) {
     if (element.id.startsWith('tab-')) {
         return { type: 'tab', tabId: element.id.slice('tab-'.length) };
@@ -789,22 +430,9 @@ function descriptorForSavedElement(element) {
 
 async function persistItemsDrop(elements, target, initialState = appState.getState()) {
     const openElements = elements.filter(element => element.id.startsWith('opentab-'));
-    const capturedTabs = await Promise.all(openElements.map(async element => {
-        const browserTabId = Number(element.id.slice('opentab-'.length));
-        const tab = await chrome.tabs.get(browserTabId);
-        const id = generateUniqueId();
-        return {
-            element,
-            browserTabId,
-            savedTab: {
-                title: tab.title,
-                url: tab.url,
-                favIconUrl: tab.favIconUrl || getFaviconUrl(tab.url),
-                id,
-                color: '#FFFFFF'
-            }
-        };
-    }));
+    const capturedTabs = (await openTabs.capture(
+        openElements.map(element => Number(element.id.slice('opentab-'.length)))
+    )).map((capture, index) => ({ ...capture, element: openElements[index] }));
 
     let nextState = capturedTabs.length > 0
         ? addTabs(initialState, capturedTabs.map(captured => captured.savedTab))
@@ -827,188 +455,123 @@ async function persistItemsDrop(elements, target, initialState = appState.getSta
     persistCanonicalState(nextState);
 
     if (capturedTabs.length > 0) {
-        await chrome.tabs.remove(capturedTabs.map(captured => captured.browserTabId));
+        await openTabs.close(capturedTabs.map(captured => captured.browserTabId));
     }
 }
 
-function targetItemAtPointer(event, tabItems, draggedItems) {
-    return tabItems.find(item => {
-        if (item.closest('#open-tabs-list') || item.classList.contains('dragging') || item.closest('.expanded-tabs')) {
-            return false;
+async function deleteDroppedItems(items) {
+    let nextState = appState.getState();
+    const browserTabIds = [];
+    items.forEach(item => {
+        if (item.id.startsWith('opentab-')) {
+            browserTabIds.push(Number(item.id.slice('opentab-'.length)));
+        } else if (item.classList.contains('subgroup-item')) {
+            nextState = removeGroup(nextState, item.id, { deleteTabs: true });
+        } else if (item.id.startsWith('tab-')) {
+            nextState = removeTabs(nextState, item.id.slice('tab-'.length));
         }
-        const targetSubgroup = item.closest('.subgroup-item');
-        if (targetSubgroup && draggedItems.some(tab => targetSubgroup.contains(tab))) {
-            return false;
-        }
-        const itemRect = item.getBoundingClientRect();
-        const itemHeight = itemRect.bottom - itemRect.top;
-        const middleThirdTop = itemRect.top + itemHeight / 3;
-        const middleThirdBottom = itemRect.bottom - itemHeight / 3;
-        const fixedTop = itemRect.top + 32;
-        const fixedBottom = itemRect.bottom - 32;
-        return fixedBottom - fixedTop > middleThirdBottom - middleThirdTop
-            ? event.clientY >= fixedTop && event.clientY <= fixedBottom
-            : event.clientY >= middleThirdTop && event.clientY <= middleThirdBottom;
     });
+    if (nextState !== appState.getState()) persistCanonicalState(nextState);
+    if (browserTabIds.length > 0) await openTabs.close(browserTabIds);
+}
+
+/** Reopen dropped items as browser tabs, in the order they were dropped. */
+async function reopenDroppedItems(items, index) {
+    let nextState = appState.getState();
+    let browserIndex = index;
+    for (const item of items) {
+        if (item.id.startsWith('opentab-')) {
+            await openTabs.move(Number(item.id.slice('opentab-'.length)), browserIndex);
+        } else if (item.classList.contains('subgroup-item')) {
+            const sourceColumn = nextState.columns.find(column =>
+                column.items.some(candidate => candidate.type === 'group' && candidate.id === item.id)
+            );
+            const group = sourceColumn?.items.find(candidate =>
+                candidate.type === 'group' && candidate.id === item.id
+            );
+            if (sourceColumn && group) {
+                openAllInColumn(document.getElementById(sourceColumn.id), group, browserIndex);
+                browserIndex += group.tabIds.length;
+                nextState = removeGroup(nextState, group.id, { deleteTabs: true });
+                continue;
+            }
+        } else if (item.id.startsWith('tab-')) {
+            await openTabs.openInBackground(item.dataset.url, browserIndex);
+            nextState = removeTabs(nextState, item.id.slice('tab-'.length));
+        }
+        browserIndex += 1;
+    }
+    if (nextState !== appState.getState()) persistCanonicalState(nextState);
+}
+
+/** Apply a drop the drag controller has already interpreted. */
+async function applyDropDescriptor(descriptor) {
+    switch (descriptor.type) {
+        case 'delete-column':
+            deleteColumn(descriptor.column);
+            return;
+        case 'move-column':
+            persistCanonicalState(
+                moveColumn(appState.getState(), descriptor.column.id, descriptor.index),
+                { includeTabs: false }
+            );
+            return;
+        case 'delete-items':
+            await deleteDroppedItems(descriptor.items);
+            return;
+        case 'new-column': {
+            const columnId = `column-${Date.now()}`;
+            const nextState = addColumn(appState.getState(), {
+                id: columnId,
+                title: 'New Column',
+                minimized: false,
+                emoji: getRandomEmoji(),
+                items: []
+            });
+            await persistItemsDrop(descriptor.items, {
+                type: 'column',
+                columnId,
+                index: 0
+            }, nextState);
+            return;
+        }
+        case 'open-tabs':
+            await reopenDroppedItems(descriptor.items, descriptor.index);
+            return;
+        case 'group':
+            await persistItemsDrop(descriptor.items, {
+                type: 'group',
+                groupId: descriptor.groupId,
+                index: descriptor.index
+            });
+            return;
+        case 'item':
+            await persistItemsDrop(descriptor.items, {
+                type: 'item',
+                item: descriptor.item
+            });
+            return;
+        case 'column':
+            await persistItemsDrop(descriptor.items, {
+                type: 'column',
+                columnId: descriptor.columnId,
+                index: descriptor.index
+            });
+            return;
+    }
 }
 
 async function handleDrop(event) {
     event.preventDefault();
-    const eventDropData = event.dataTransfer.getData("text/plain");
-    const droppedColumn = document.getElementById(eventDropData);
-    if (droppedColumn && droppedColumn.classList.contains('column')) {
-        if (deletionArea.contains(event.target)) {
-            deleteColumn(droppedColumn);
-            return;
-        }
-        const columns = Array.from(columnsContainer.querySelectorAll('.column'));
-        const dropPosition = calculateColumnDropPosition(event, columns);
-        persistCanonicalState(
-            moveColumn(appState.getState(), droppedColumn.id, dropPosition),
-            { includeTabs: false }
-        );
-        return;
-    }
-
-    const draggedItems = Array.from(document.querySelectorAll('.dragging'));
-    const tabItem = draggedItems.find(item => item.id === eventDropData) ||
-        Array.from(document.querySelectorAll('.tab-item')).find(item => item.id === eventDropData);
-    if (!tabItem) return;
-    const itemsToProcess = draggedItems.length > 1 ? draggedItems : [tabItem];
-
-    if (deletionArea.contains(event.target)) {
-        let nextState = appState.getState();
-        const browserTabIds = [];
-        itemsToProcess.forEach(item => {
-            if (item.id.startsWith('opentab-')) {
-                browserTabIds.push(Number(item.id.slice('opentab-'.length)));
-            } else if (item.classList.contains('subgroup-item')) {
-                nextState = removeGroup(nextState, item.id, { deleteTabs: true });
-            } else if (item.id.startsWith('tab-')) {
-                nextState = removeTabs(nextState, item.id.slice('tab-'.length));
-            }
-        });
-        if (nextState !== appState.getState()) persistCanonicalState(nextState);
-        if (browserTabIds.length > 0) await chrome.tabs.remove(browserTabIds);
-        return;
-    }
-
-    if (newColumnIndicator.contains(event.target)) {
-        const columnId = `column-${Date.now()}`;
-        const nextState = addColumn(appState.getState(), {
-            id: columnId,
-            title: 'New Column',
-            minimized: false,
-            emoji: getRandomEmoji(),
-            items: []
-        });
-        await persistItemsDrop(itemsToProcess, {
-            type: 'column',
-            columnId,
-            index: 0
-        }, nextState);
-        return;
-    }
-
-    const columnElement = event.target.closest('.column');
-    const sidebar = event.target.closest('#sidebar');
-    const destination = columnElement || (sidebar && document.getElementById('open-tabs-list'));
-    if (!destination) return;
-    const isMinimized = destination.classList.contains('minimized');
-    const tabItems = Array.from(destination.querySelectorAll('.tab-item'))
-        .filter(item => !item.closest('.expanded-tabs'));
-    const dropPosition = calculateDropPosition(event, tabItems, isMinimized);
-
-    if (destination.id === 'open-tabs-list') {
-        let nextState = appState.getState();
-        let browserIndex = dropPosition;
-        for (const item of itemsToProcess) {
-            if (item.id.startsWith('opentab-')) {
-                await chrome.tabs.move(Number(item.id.slice('opentab-'.length)), { index: browserIndex });
-            } else if (item.classList.contains('subgroup-item')) {
-                const sourceColumn = nextState.columns.find(column =>
-                    column.items.some(candidate => candidate.type === 'group' && candidate.id === item.id)
-                );
-                const group = sourceColumn?.items.find(candidate =>
-                    candidate.type === 'group' && candidate.id === item.id
-                );
-                if (sourceColumn && group) {
-                    openAllInColumn(document.getElementById(sourceColumn.id), group, browserIndex);
-                    browserIndex += group.tabIds.length;
-                    nextState = removeGroup(nextState, group.id, { deleteTabs: true });
-                    continue;
-                }
-            } else if (item.id.startsWith('tab-')) {
-                await chrome.tabs.create({ url: item.dataset.url, active: false, index: browserIndex });
-                nextState = removeTabs(nextState, item.id.slice('tab-'.length));
-            }
-            browserIndex += 1;
-        }
-        if (nextState !== appState.getState()) persistCanonicalState(nextState);
-        return;
-    }
-
-    const firstSubgroup = itemsToProcess[0].closest('.subgroup-item');
-    const allFromSameSubgroup = itemsToProcess.every(item => item.closest('.subgroup-item') === firstSubgroup);
-    const draggedSubgroup = itemsToProcess.some(item => item.classList.contains('subgroup-item'));
-    const targetSubgroup = event.target.closest('.subgroup-item');
-    if (!draggedSubgroup && firstSubgroup && allFromSameSubgroup && targetSubgroup === firstSubgroup) {
-        const subgroupItems = Array.from(firstSubgroup.querySelectorAll('.expanded-tabs .tab-item'));
-        await persistItemsDrop(itemsToProcess, {
-            type: 'group',
-            groupId: firstSubgroup.id,
-            index: calculateDropPosition(event, subgroupItems, false)
-        });
-        return;
-    }
-
-    const targetItem = targetItemAtPointer(event, tabItems, draggedItems);
-    if (targetItem) {
-        const itemTarget = targetItem.classList.contains('subgroup-item')
-            ? { type: 'group', groupId: targetItem.id }
-            : { type: 'tab', tabId: targetItem.id.slice('tab-'.length) };
-        await persistItemsDrop(itemsToProcess, {
-            type: 'item',
-            item: itemTarget
-        });
-        return;
-    }
-
-    await persistItemsDrop(itemsToProcess, {
-        type: 'column',
-        columnId: destination.id,
-        index: dropPosition
-    });
-}
-function handleDragEnd(event) {
-    stopScrollAnimation();
-    document.querySelectorAll('.tab-item.dragging').forEach(item => {
-        item.classList.remove("dragging");
-    });
-    event.target.closest('.column')?.classList.remove("dragging");
-    if (deletionArea){
-        deletionArea.style.display = 'none';
-        deletionArea.classList.remove('deletion-area-active');
-    } 
-    if (newColumnIndicator){
-        newColumnIndicator.style.display = 'none';
-        newColumnIndicator.classList.remove('new-column-indicator-active');
-    } 
-    if (dropIndicator) dropIndicator.style.display = 'none';
-    document.querySelectorAll('.tab-item').forEach(item => {
-        item.style.outline = 'none';
-    });
+    const descriptor = dragController.resolveDrop(event);
+    if (descriptor) await applyDropDescriptor(descriptor);
 }
 
 /* Display Helper Functions */
 function getFaviconUrl(tabUrl) {
-    try {
-        const url = new URL(tabUrl);
-        return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`;
-    } catch (error) {
-        console.error("Invalid favicon URL:", tabUrl, error);
-        return '';
-    }
+    const faviconUrl = faviconServiceUrl(tabUrl);
+    if (!faviconUrl) console.error("Invalid favicon URL:", tabUrl);
+    return faviconUrl;
 }
 function toggleSubgroupExpandedState(expandButton) {
     return setSubgroupExpanded(expandButton);
@@ -1364,21 +927,7 @@ function displaySavedTabs(state) {
         columnsContainer.appendChild(newColumnIndicator);
 }
 function fetchOpenTabs() {
-    chrome.tabs.query({ currentWindow: true }, (tabs) => {
-        const excludedPrefixes = [
-            `${CHROME_STRING}://`,
-            'edge://',
-            'opera://',
-            'vivaldi://',
-            'brave://',
-            'moz-extension://',
-            'about:',
-            'file://',
-            'safari-web-extension://'
-        ];      
-        tabs = tabs.filter(tab => 
-            (!excludedPrefixes.some(prefix => tab.url.startsWith(prefix))) && tab.url !== ""
-        );
+    openTabs.list().then((tabs) => {
         const sidebar = document.getElementById('sidebar');
         const isCollapsed = sidebar.classList.contains('collapsed');
         const classes = ['tab-item'];
@@ -1403,12 +952,8 @@ function fetchOpenTabs() {
                 onDragEnd: handleDragEnd
             });
             closeButton.addEventListener("click", () => {
-                chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                    let activeTab = tabs[0];
-                    
-                    chrome.tabs.remove(tab.id, () => {
-                        chrome.tabs.update(activeTab.id, { active: true });
-                    });
+                openTabs.closeKeepingFocus(tab.id).catch(error => {
+                    console.error('Could not close the open tab:', error);
                 });
             });
 
@@ -1421,25 +966,23 @@ function fetchOpenTabs() {
             tabTitle.addEventListener("click", () => {
                 const allItems = document.querySelectorAll('li');
                 allItems.forEach(item => item.classList.remove('selected'));
-                chrome.tabs.update(tab.id, { active: true });
+                openTabs.activate(tab.id).catch(error => {
+                    console.error('Could not switch to the open tab:', error);
+                });
             });
 
             openTabsList.appendChild(li);
         });
+    }).catch(error => {
+        console.error('Could not read the open tabs:', error);
     });
 }
 
-chrome.tabs.onUpdated.addListener(fetchOpenTabs);
-chrome.tabs.onRemoved.addListener(() => {
-    if(userBrowser === 'firefox'){
-        setTimeout(fetchOpenTabs, 150);
-    }
-    else{
-        fetchOpenTabs();
-    }
+// Firefox reports removals before the window settles, so it refreshes later.
+openTabs.onChanged(fetchOpenTabs, {
+    removalDelay: userBrowser === 'firefox' ? 150 : 0
 });
-chrome.tabs.onMoved.addListener(fetchOpenTabs);
-chrome.storage.onChanged.addListener(async changes => {
+browserApi.storage.onChanged.addListener(async changes => {
     try {
         const synchronized = await stateStorage.synchronize(changes);
         if (synchronized?.type === 'state') {
@@ -1463,13 +1006,10 @@ chrome.storage.onChanged.addListener(async changes => {
         return;
     }
 
-    if (changes.sidebarCollapsed) {
-        if(changes.sidebarCollapsed.newValue) {
-            document.getElementById('sidebar').classList.add('collapsed');
-        } 
-        else {
-            document.getElementById('sidebar').classList.remove('collapsed');
-        }
+    const sidebarChange = settings.readSidebarChange(changes);
+    if (sidebarChange) {
+        document.getElementById('sidebar')
+            .classList.toggle('collapsed', sidebarChange.sidebarCollapsed);
     }
 });
 fetchOpenTabs();
@@ -1491,21 +1031,20 @@ async function initializeStoredState() {
 
 initializeStoredState();
 
-document.querySelector('.minimize-sidebar').addEventListener('click', () => {
-    chrome.storage.local.set({ sidebarCollapsed: true }, () => {
-        //console.log("Sidebar collapsed state saved");
+function setSidebarCollapsed(collapsed) {
+    settings.saveSidebarCollapsed(collapsed).then(() => {
         document.querySelectorAll('#open-tabs-list .tab-item').forEach(tab => {
-            tab.classList.add('collapsed');
+            tab.classList.toggle('collapsed', collapsed);
         });
+    }).catch(error => {
+        console.error('Could not save the sidebar state:', error);
     });
+}
+document.querySelector('.minimize-sidebar').addEventListener('click', () => {
+    setSidebarCollapsed(true);
 });
 document.querySelector('.maximize-sidebar').addEventListener('click', () => {
-    chrome.storage.local.set({ sidebarCollapsed: false }, () => {
-        //console.log("Sidebar expanded state saved");
-        document.querySelectorAll('#open-tabs-list .tab-item').forEach(tab => {
-            tab.classList.remove('collapsed');
-        });
-    });
+    setSidebarCollapsed(false);
 });
 
 document.addEventListener('dragover', function(event) {
@@ -1535,19 +1074,15 @@ const handleClickOutside = (e) => {
 };
 document.addEventListener('click', handleClickOutside);
 document.addEventListener('drop', handleDrop);
-document.addEventListener('dragover', handleDragOver);
+document.addEventListener('dragover', event => dragController.handleDragOver(event));
 
-chrome.storage.local.get(['release', 'whatsNewClicked'], (data) => {
-    const release = chrome.runtime.getManifest().version;
-    const previousRelease = data.release;
-    let whatsNewClicked = data.whatsNewClicked || false;
+releaseNotes.load().then((releaseState) => {
+    let whatsNewClicked = releaseState.whatsNewClicked;
 
-    if (previousRelease !== release) {
+    if (releaseState.isNewRelease) {
         const notification = document.createElement('div');
         notification.classList.add('notification-circle');
         settingsButton.appendChild(notification);
-        whatsNewClicked = false;
-        chrome.storage.local.set({ whatsNewClicked: false });
     }
 
     settingsButton.addEventListener('click', () => {
@@ -1559,7 +1094,9 @@ chrome.storage.local.get(['release', 'whatsNewClicked'], (data) => {
         const settingsNotification = document.querySelector('.notification-circle:not(.inline-notification)');
         if (settingsNotification) {
             settingsNotification.remove();
-            chrome.storage.local.set({ release: release });
+            releaseNotes.acknowledgeRelease().catch(error => {
+                console.error('Could not save the installed release:', error);
+            });
         }
 
         let releaseNotesNotification = document.querySelector('.inline-notification');
@@ -1568,16 +1105,18 @@ chrome.storage.local.get(['release', 'whatsNewClicked'], (data) => {
             { text: theme === 'dark' ? "Toggle Light Theme" : "Toggle Dark Theme", action: () => { toggleTheme(); closeAllMenus() } },
             { text: "Export Data", action: () => { exportAllData(); closeAllMenus(); } },
             { text: "Import Data", action: () => { importAllData(); closeAllMenus(); } },
-            { text: "What's New", action: () => { 
+            { text: "What's New", action: () => {
                 if (releaseNotesNotification) {
                     releaseNotesNotification.remove();
                 }
-                chrome.tabs.create({ url: 'https://tabsmagic.com/releasenotes', active: true });
+                openSettingsPage('https://tabsmagic.com/releasenotes');
                 closeAllMenus();
                 whatsNewClicked = true;
-                chrome.storage.local.set({ whatsNewClicked: true });
+                releaseNotes.markWhatsNewClicked().catch(error => {
+                    console.error('Could not save the release notes state:', error);
+                });
             }},
-            { text: "Feedback", action: () => { chrome.tabs.create({ url: 'https://tabsmagic.com/contact', active: true }); closeAllMenus() } }
+            { text: "Feedback", action: () => { openSettingsPage('https://tabsmagic.com/contact'); closeAllMenus() } }
         ];
         const settingsMenu = menuController.open('settings', 'settings', () =>
             createMenuDropdown(menuItems, settingsButton)
@@ -1595,34 +1134,50 @@ chrome.storage.local.get(['release', 'whatsNewClicked'], (data) => {
             }
         }
     });
+}).catch(error => {
+    console.error('Could not read the installed release:', error);
 });
 
-function exportAllData() {
-    chrome.storage.local.get(null, (all) => {
-        try {
-            const payload = createExportPayload(all);
-            const json = JSON.stringify(payload, null, 2);
-
-            // Trigger download
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `tabextend-export-${Date.now()}.json`;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }, 0);
-        } catch (e) {
-            console.error('Export failed:', e);
-        }
+function openSettingsPage(url) {
+    openTabs.openPage(url).catch(error => {
+        console.error('Could not open the page:', error);
     });
 }
-const IMPORT_BACKUP_KEY = 'tabsMagicImportBackup';
 
-const importStorageAdapter = chrome.storage.local;
+function downloadExport(exported) {
+    const blob = new Blob([exported.json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = exported.filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 0);
+}
+
+function exportAllData() {
+    dataTransfer.createExport()
+        .then(downloadExport)
+        .catch(error => {
+            console.error('Export failed:', error);
+        });
+}
+
+function reportImportFailure(error) {
+    console.error('Import failed:', error);
+    if (error.rollbackError) {
+        console.error('Import rollback failed:', error.rollbackError);
+        alert(`Import failed and automatic rollback also failed. Your pre-import backup may still be available in extension storage.\n\n${error.message}`);
+        return;
+    }
+    const stateMessage = error.rolledBack
+        ? 'The attempted changes were rolled back.'
+        : 'No imported data was written.';
+    alert(`Import failed. ${stateMessage}\n\n${error.message}`);
+}
 
 function importAllData() {
     if (!confirm('Importing will overwrite existing data. Proceed?')) return;
@@ -1638,41 +1193,20 @@ function importAllData() {
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
-                const text = e.target.result;
-                const parsed = JSON.parse(text);
-                const prepared = prepareImportData(parsed, {
-                    idFactory: generateUniqueId,
-                    now: () => Date.now()
-                });
+                const result = await dataTransfer.importFromText(e.target.result);
 
-                if (!prepared.valid) {
-                    alert(`Import rejected:\n${prepared.errors.slice(0, 8).join('\n')}`);
+                if (!result.imported) {
+                    alert(`Import rejected:\n${result.errors.slice(0, 8).join('\n')}`);
                     return;
                 }
 
-                await importStorageSafely({
-                    storage: importStorageAdapter,
-                    data: prepared.data,
-                    backupKey: IMPORT_BACKUP_KEY,
-                    now: () => new Date().toISOString()
-                });
-
-                if (prepared.recovered > 0) {
-                    console.log(`Recovered ${prepared.recovered} unreferenced imported tab(s)`);
+                if (result.recovered > 0) {
+                    console.log(`Recovered ${result.recovered} unreferenced imported tab(s)`);
                 }
                 location.reload();
 
             } catch (err) {
-                console.error('Import failed:', err);
-                if (err.rollbackError) {
-                    console.error('Import rollback failed:', err.rollbackError);
-                    alert(`Import failed and automatic rollback also failed. Your pre-import backup may still be available in extension storage.\n\n${err.message}`);
-                    return;
-                }
-                const stateMessage = err.rolledBack
-                    ? 'The attempted changes were rolled back.'
-                    : 'No imported data was written.';
-                alert(`Import failed. ${stateMessage}\n\n${err.message}`);
+                reportImportFailure(err);
             }
         };
         reader.readAsText(file);
