@@ -24,6 +24,7 @@ function createTabsRepositoryStub(options = {}) {
     const tabs = options.tabs || [];
     return {
         calls,
+        capabilities: options.capabilities || {},
         onUpdated: createEvent(),
         onRemoved: createEvent(),
         onMoved: createEvent(),
@@ -84,6 +85,28 @@ test('lists only listable tabs of the current window', async () => {
         [1]
     );
     assert.deepEqual(tabs.calls[0], ['query', { currentWindow: true }]);
+});
+
+test('lists local files only where the browser can open them', async () => {
+    const openTabs = [
+        { id: 1, url: 'https://example.com' },
+        { id: 2, url: 'file:///home/notes.html' }
+    ];
+
+    const withoutFileUrls = createService({ tabs: openTabs });
+    assert.deepEqual(
+        (await withoutFileUrls.service.list()).map(tab => tab.id),
+        [1]
+    );
+
+    const withFileUrls = createService({
+        tabs: openTabs,
+        capabilities: { fileUrls: true }
+    });
+    assert.deepEqual(
+        (await withFileUrls.service.list()).map(tab => tab.id),
+        [1, 2]
+    );
 });
 
 test('captures open tabs as stored tabs without closing them', async () => {

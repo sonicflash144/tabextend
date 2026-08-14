@@ -21,6 +21,7 @@ import {
     moveColumn,
     removeColumn,
     removeGroup,
+    removeReopenedGroup,
     removeTabs,
     ungroup,
     updateColumn,
@@ -28,6 +29,7 @@ import {
     updateTab
 } from './src/domain/operations.mjs';
 import { applyDrop } from './src/domain/drop-operations.mjs';
+import { isFileUrl } from './src/domain/browser-tabs.mjs';
 import {
     createColorMenu as renderColorMenu,
     createDeletionArea as renderDeletionArea,
@@ -36,6 +38,7 @@ import {
     setColumnMinimized
 } from './src/ui/rendering.mjs';
 import { createBoardView } from './src/ui/board-view.mjs';
+import { createOpenFailureReporter } from './src/ui/open-failure.mjs';
 import { createOpenTabsView } from './src/ui/open-tabs-view.mjs';
 import { createTabPresenter, TAB_COLOR_CLASSES } from './src/ui/tab-presentation.mjs';
 import { createDragController } from './src/ui/controllers/drag-controller.mjs';
@@ -56,6 +59,11 @@ const dataTransfer = createDataTransferService({
 const releaseNotes = createReleaseService({
     storage: browserApi.storage.local,
     runtime: browserApi.runtime
+});
+const openFailures = createOpenFailureReporter({
+    showAlert: message => alert(message),
+    logError: (message, error) => console.error(message, error),
+    canOpenFileUrls: browserApi.capabilities.fileUrls
 });
 let theme = 'light';
 settings
@@ -234,18 +242,53 @@ function deleteColumn(event) {
     }
     persistCanonicalState(removeColumn(appState.getState(), column.id, { deleteTabs: true }));
 }
-/** Only URLs the browser may navigate to are ever reopened. */
-function navigableUrls(tabs) {
-    return tabs.map(tab => safePageUrl(tab.url)).filter(Boolean);
+/**
+ * Saved tabs paired with the URL the browser may navigate to, dropping the
+ * ones it may not. The tab travels with its URL because deciding what leaves
+ * the board after a reopen needs to know which tab each URL came from.
+ */
+function navigableTabs(tabs) {
+    return tabs.map(tab => ({ tab, url: safePageUrl(tab.url) })).filter(entry => entry.url);
 }
 
-function openSavedTabs(tabs, groupTitle, index = null) {
-    const urls = navigableUrls(tabs);
-    if (urls.length === 0) return;
-    // Browsers without tab groups simply open the tabs; the repository decides.
-    openTabs.openUrls(urls, { index, groupTitle }).catch(error => {
-        console.error('Could not open saved tabs:', error);
-    });
+/**
+ * Reopen saved tabs as browser tabs and report which of them the browser
+ * actually opened, so a caller that clears them off the board only clears
+ * those. Chrome refuses a local file without file access, and a refusal must
+ * not take the rest of the batch — or the saved tab itself — with it.
+ */
+async function openSavedTabs(entries, groupTitle, index = null) {
+    if (entries.length === 0) return [];
+    const urls = entries.map(entry => entry.url);
+    try {
+        // Browsers without tab groups simply open the tabs; the repository decides.
+        const { opened, refused } = await openTabs.openUrls(urls, { index, groupTitle });
+        if (refused.length > 0) {
+            openFailures.report(
+                'Could not open saved tabs:',
+                refused[0].error,
+                refused.map(result => result.url)
+            );
+        }
+        const openedUrls = new Set(opened.map(result => result.url));
+        return entries.filter(entry => openedUrls.has(entry.url));
+    } catch (error) {
+        // Grouping failed after the tabs were created, so what opened is
+        // unknown. Nothing counts as opened, which keeps the board intact.
+        openFailures.report('Could not open saved tabs:', error, urls);
+        return [];
+    }
+}
+
+/** Reopen one saved tab, reporting a refusal rather than throwing out of a drop. */
+async function openSavedTabInBackground(url, index) {
+    try {
+        await openTabs.openInBackground(url, index);
+        return true;
+    } catch (error) {
+        openFailures.report('Could not reopen the saved tab:', error, [url]);
+        return false;
+    }
 }
 
 function openAllInColumn(columnId) {
@@ -253,15 +296,16 @@ function openAllInColumn(columnId) {
     const state = appState.getState();
     const column = getColumn(state, columnId);
     if (!column) return;
-    openSavedTabs(getColumnTabs(state, columnId), column.title);
+    openSavedTabs(navigableTabs(getColumnTabs(state, columnId)), column.title);
 }
 
+/** Reopen a group, resolving with the entries the browser opened. */
 function openAllInGroup(groupId, index = null) {
     closeAllMenus();
     const state = appState.getState();
     const { group } = findGroup(state, groupId);
-    if (!group) return;
-    openSavedTabs(getGroupTabs(state, groupId), group.title, index);
+    if (!group) return Promise.resolve([]);
+    return openSavedTabs(navigableTabs(getGroupTabs(state, groupId)), group.title, index);
 }
 
 /* Column Functions */
@@ -347,16 +391,23 @@ async function reopenDroppedItems(items, index) {
         } else if (item.classList.contains('subgroup-item')) {
             const { group } = findGroup(nextState, item.id);
             if (group) {
-                openAllInGroup(group.id, browserIndex);
-                browserIndex += group.tabIds.length;
-                nextState = removeGroup(nextState, group.id, { deleteTabs: true });
+                // Awaited, because only the tabs the browser opened may leave
+                // the board; a local file it refused keeps its place.
+                const opened = await openAllInGroup(group.id, browserIndex);
+                browserIndex += opened.length;
+                nextState = removeReopenedGroup(
+                    nextState,
+                    group.id,
+                    opened.map(entry => entry.tab.id)
+                );
                 continue;
             }
         } else if (item.id.startsWith('tab-')) {
             const tabId = item.id.slice('tab-'.length);
-            const [url] = navigableUrls([getTab(nextState, tabId)].filter(Boolean));
-            if (url) await openTabs.openInBackground(url, browserIndex);
-            nextState = removeTabs(nextState, tabId);
+            const [entry] = navigableTabs([getTab(nextState, tabId)].filter(Boolean));
+            const opened = entry ? await openSavedTabInBackground(entry.url, browserIndex) : true;
+            // A tab the browser refused to open stays on the board.
+            if (opened) nextState = removeTabs(nextState, tabId);
         }
         browserIndex += 1;
     }
@@ -427,13 +478,27 @@ async function applyDropDescriptor(descriptor) {
 async function handleDrop(event) {
     event.preventDefault();
     const descriptor = dragController.resolveDrop(event);
-    if (descriptor) await applyDropDescriptor(descriptor);
+    // One drop explains its refusals once, however many tabs it reopened.
+    if (descriptor) await openFailures.batch(() => applyDropDescriptor(descriptor));
 }
 
 /* Tab Display */
 function handleFaviconClick(li, event) {
     closeAllMenus();
     selectionController.handleItemClick(li, event);
+}
+
+/**
+ * An extension page may not navigate to a local file, so those links open
+ * through the tabs API instead, in a new tab. Every other link keeps the
+ * browser's own handling, including modifier clicks.
+ */
+function openTabLink(tab, url) {
+    if (!isFileUrl(url)) return false;
+    openTabs.openPage(url).catch(error => {
+        openFailures.report('Could not open the local file:', error, [url]);
+    });
+    return true;
 }
 const boardView = createBoardView(document, {
     container: columnsContainer,
@@ -445,6 +510,7 @@ const boardView = createBoardView(document, {
         onColumnDragStart: handleColumnDragStart,
         onDragEnd: handleDragEnd,
         onTabSelect: handleFaviconClick,
+        onTabOpen: openTabLink,
         onTabMenu: openTabMenu,
         onColumnMenu: openColumnMenu,
         onGroupMenu: openGroupMenu,

@@ -12,31 +12,46 @@ export const RESTRICTED_URL_PREFIXES = [
     'brave://',
     'moz-extension://',
     'about:',
-    'file://',
     'safari-web-extension://'
 ];
 
+export const FILE_URL_PREFIX = 'file://';
+
 const SAVED_TAB_DEFAULT_COLOR = '#FFFFFF';
 
-/** Browser-internal pages that the extension may neither list nor save. */
-export function isRestrictedUrl(url) {
+/** A local file, which only some browsers let an extension list and open. */
+export function isFileUrl(url) {
+    return typeof url === 'string' && url.toLowerCase().startsWith(FILE_URL_PREFIX);
+}
+
+/**
+ * Browser-internal pages that the extension may neither list nor save. Local
+ * files are restricted unless the caller says the browser can open them, so
+ * callers that know nothing about the browser keep the historical behaviour.
+ */
+export function isRestrictedUrl(url, options = {}) {
     if (typeof url !== 'string' || url === '') return true;
     const normalized = url.toLowerCase();
+    if (normalized.startsWith(FILE_URL_PREFIX)) return options.allowFileUrls !== true;
     return RESTRICTED_URL_PREFIXES.some(prefix => normalized.startsWith(prefix));
 }
 
-export function isListableTab(tab) {
-    return Boolean(tab) && !isRestrictedUrl(tab.url);
+export function isListableTab(tab, options = {}) {
+    return Boolean(tab) && !isRestrictedUrl(tab.url, options);
 }
 
-export function filterListableTabs(tabs) {
-    return (Array.isArray(tabs) ? tabs : []).filter(isListableTab);
+export function filterListableTabs(tabs, options = {}) {
+    return (Array.isArray(tabs) ? tabs : []).filter(tab => isListableTab(tab, options));
 }
 
 /** Favicon fallback for tabs the browser did not supply an icon for. */
 export function faviconServiceUrl(tabUrl) {
     try {
         const url = new URL(tabUrl);
+        // A local file never has an icon to look up: a plain path carries no
+        // host at all, and a network share must not send its host, which is
+        // private to that network, to the icon service.
+        if (!url.hostname || url.protocol === 'file:') return '';
         return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`;
     } catch {
         return '';

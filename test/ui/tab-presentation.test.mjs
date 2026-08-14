@@ -5,7 +5,9 @@ import {
     createTabPresenter,
     daysUntil,
     formatTabDate,
+    LOCAL_FILE_ICON,
     parseNoteDate,
+    presentOpenTab,
     presentTab,
     resolveColorClass,
     TAB_COLOR_CLASSES
@@ -135,6 +137,7 @@ test('a stored tab is presented with safe urls, colour, note, and date', () => {
     assert.deepEqual(presented, {
         navigableUrl: 'https://example.com/alpha',
         faviconUrl: 'https://example.com/icon.png',
+        faviconFallback: null,
         colorClass: 'tab-purple',
         noteDisplayText: 'line one\nline two',
         noteEditableText: 'line one\nline two',
@@ -156,6 +159,48 @@ test('unsafe stored urls are dropped rather than rendered', () => {
 
     assert.equal(presented.navigableUrl, '');
     assert.equal(presented.faviconUrl, '');
+});
+
+test('a local file keeps its link and names an icon for its empty slot', () => {
+    const presented = presentTab({ id: 'alpha', url: 'file:///home/notes.html' }, { now: NOON });
+
+    assert.equal(presented.navigableUrl, 'file:///home/notes.html');
+    assert.equal(presented.faviconUrl, '');
+    assert.equal(presented.faviconFallback, LOCAL_FILE_ICON);
+
+    // A stored icon that can actually render still wins, and asks for none.
+    const withIcon = presentTab(
+        { url: 'file:///home/notes.html', favIconUrl: 'https://example.com/i.png' },
+        { now: NOON }
+    );
+    assert.equal(withIcon.faviconUrl, 'https://example.com/i.png');
+    assert.equal(withIcon.faviconFallback, null);
+});
+
+test('only local files ask for a fallback icon', () => {
+    assert.equal(
+        presentTab({ url: 'javascript:alert(1)', favIconUrl: 'javascript:alert(1)' }, { now: NOON })
+            .faviconFallback,
+        null
+    );
+    assert.equal(presentTab({ url: 'https://example.com' }, { now: NOON }).faviconFallback, null);
+});
+
+test('an open local file names the icon instead of a hostless favicon lookup', () => {
+    assert.deepEqual(presentOpenTab({ url: 'file:///home/notes.html' }), {
+        faviconUrl: '',
+        faviconFallback: LOCAL_FILE_ICON
+    });
+    // A network share has a host, so it reaches the icon slot by a different
+    // route, and still has to land on the icon rather than a lookup.
+    assert.deepEqual(presentOpenTab({ url: 'file://myserver/share/doc.html' }), {
+        faviconUrl: '',
+        faviconFallback: LOCAL_FILE_ICON
+    });
+    assert.deepEqual(presentOpenTab({ url: 'https://example.com/page' }), {
+        faviconUrl: 'https://www.google.com/s2/favicons?domain=example.com&sz=32',
+        faviconFallback: null
+    });
 });
 
 test('the presenter binds the clock and parser once', () => {

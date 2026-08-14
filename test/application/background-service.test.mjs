@@ -41,10 +41,11 @@ function createStorage(initial = {}) {
     };
 }
 
-function createBrowserApi(tabs = []) {
+function createBrowserApi(tabs = [], capabilities = {}) {
     const calls = [];
     return {
         calls,
+        capabilities,
         runtime: { onInstalled: createEvent() },
         action: { onClicked: createEvent() },
         contextMenus: {
@@ -74,7 +75,7 @@ function createBrowserApi(tabs = []) {
 }
 
 function createService(options = {}) {
-    const browserApi = createBrowserApi(options.tabs || []);
+    const browserApi = createBrowserApi(options.tabs || [], options.capabilities || {});
     const storage = createStorage(options.stored || {});
     let counter = 0;
     const queue = createBackgroundTabQueue({
@@ -133,6 +134,20 @@ test('shows the save menu only on savable pages', async () => {
         ['menuUpdate', SAVE_TAB_MENU_ID, { visible: false }],
         ['get', 3],
         ['menuUpdate', SAVE_TAB_MENU_ID, { visible: false }]
+    ]);
+});
+
+test('offers to save a local file only where the browser can open one', async () => {
+    const withoutFileUrls = createService();
+    await withoutFileUrls.browserApi.tabs.onUpdated.emit(1, {}, { url: 'file:///home/notes.html' });
+    assert.deepEqual(withoutFileUrls.browserApi.calls, [
+        ['menuUpdate', SAVE_TAB_MENU_ID, { visible: false }]
+    ]);
+
+    const withFileUrls = createService({ capabilities: { fileUrls: true } });
+    await withFileUrls.browserApi.tabs.onUpdated.emit(1, {}, { url: 'file:///home/notes.html' });
+    assert.deepEqual(withFileUrls.browserApi.calls, [
+        ['menuUpdate', SAVE_TAB_MENU_ID, { visible: true }]
     ]);
 });
 

@@ -27,23 +27,29 @@ test('continues writing the historical br-based note format', () => {
     assert.equal(textToLegacyStoredNote('first\r\nsecond\nthird'), 'first<br>second<br>third');
 });
 
-test('allows ordinary and custom navigable URLs', () => {
+test('allows ordinary, custom, and local-file navigable URLs', () => {
     assert.equal(safePageUrl('https://example.com/a?b=1'), 'https://example.com/a?b=1');
     assert.equal(safePageUrl('web+notes://open/123'), 'web+notes://open/123');
+    // Whether a local file may be listed or opened is a browser capability,
+    // not a content-safety question; navigating to one runs no script.
+    assert.equal(safePageUrl('file:///home/notes.html'), 'file:///home/notes.html');
 });
 
-test('rejects scriptable, internal, file, relative, and malformed page URLs', () => {
+test('rejects scriptable, internal, relative, and malformed page URLs', () => {
     for (const value of [
         'javascript:alert(1)',
         'DATA:text/html,<script>alert(1)</script>',
         'vbscript:msgbox(1)',
-        'file:///secrets.txt',
         'chrome://settings',
         '/relative/path',
         'not a url'
     ]) {
         assert.equal(safePageUrl(value), '', value);
     }
+});
+
+test('still refuses a local file as an image source', () => {
+    assert.equal(safeImageUrl('file:///home/user/.ssh/id_rsa'), '');
 });
 
 test('only permits supported image protocols and image data URLs', () => {

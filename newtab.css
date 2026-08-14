@@ -182,7 +182,9 @@ a {
     text-decoration: none;
     font-size: 18px;
 }
-#tab-list img, #open-tabs-list img {
+/* The favicon slot holds an img or, for a tab with no icon of its own, an
+   inline svg, so it is matched by class rather than by element. */
+#open-tabs-list .tab-favicon {
     vertical-align: middle;
 }
 
@@ -291,7 +293,7 @@ a {
         margin-right: 8px;
         cursor: pointer;
     }
-        .tab-info-left img {
+        .tab-info-left .tab-favicon {
             width: 24px;
             height: 24px;
         }

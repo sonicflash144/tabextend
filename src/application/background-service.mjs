@@ -19,6 +19,7 @@ export function createBackgroundService(options) {
     }
 
     const { action, contextMenus, tabs } = browserApi;
+    const allowFileUrls = browserApi.capabilities?.fileUrls === true;
 
     function report(error) {
         if (error) onError(error);
@@ -40,7 +41,7 @@ export function createBackgroundService(options) {
         if (!url) return Promise.resolve();
         return Promise.resolve(
             contextMenus.update(SAVE_TAB_MENU_ID, {
-                visible: !isRestrictedUrl(url)
+                visible: !isRestrictedUrl(url, { allowFileUrls })
             })
         ).catch(report);
     }

@@ -16,7 +16,9 @@ export function createOpenTabsService(options) {
 
     /** Tabs of the current window that the extension is allowed to show. */
     async function list() {
-        return filterListableTabs(await tabs.query({ currentWindow: true }));
+        return filterListableTabs(await tabs.query({ currentWindow: true }), {
+            allowFileUrls: tabs.capabilities?.fileUrls === true
+        });
     }
 
     /** Read open tabs and convert them into stored tabs without closing them. */
@@ -53,7 +55,11 @@ export function createOpenTabsService(options) {
         return tabs.move(browserTabId, { index });
     }
 
-    /** Open several stored tabs together, grouped where the browser can. */
+    /**
+     * Open several stored tabs together, grouped where the browser can, and
+     * report each URL as `opened` or `refused` rather than letting one refusal
+     * hide what the rest did.
+     */
     function openUrls(urls, openOptions = {}) {
         return tabs.openUrls(urls, openOptions);
     }
