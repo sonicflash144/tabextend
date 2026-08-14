@@ -201,6 +201,7 @@ a {
     -webkit-line-clamp: 6;
     line-clamp: 6;
     -webkit-box-orient: vertical;
+    white-space: pre-wrap;
     user-select: none;
     -webkit-user-select: none;
 }
@@ -434,6 +435,10 @@ a {
         border: none;
         font-size: var(--chrome-emoji-size);
         cursor: pointer;
+    }
+    html[data-browser="firefox"] .emoji-button,
+    html[data-browser="safari"] .emoji-button {
+        font-size: var(--firefox-emoji-size);
     }
         .emoji-button:hover {
             transform: scale(1.1);

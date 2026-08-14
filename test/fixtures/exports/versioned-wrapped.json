@@ -1,0 +1,24 @@
+{
+  "formatVersion": 1,
+  "exportedAt": "2026-08-13T12:00:00.000Z",
+  "exportedData": {
+    "savedTabs": [
+      {
+        "id": "stable-id-1",
+        "title": "Versioned tab",
+        "url": "https://example.net/",
+        "favIconUrl": "",
+        "color": "tab-default"
+      }
+    ],
+    "columnState": [
+      {
+        "id": "column-versioned",
+        "title": "Versioned",
+        "emoji": "🍏",
+        "minimized": true,
+        "tabIds": ["tab-stable-id-1"]
+      }
+    ]
+  }
+}

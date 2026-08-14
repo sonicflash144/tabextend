@@ -26,11 +26,24 @@ Tabs Magic is a browser extension designed to help you organize and manage your 
 
 ## Installation
 
-Tabs Magic is available for multiple browsers:
+Tabs Magic is available for all major browsers:
 
-- **Chrome and Other Chromium Browsers**: Available on the [Chrome Web Store](https://chromewebstore.google.com/detail/tabs-magic/epjcnbdchmflcppaajkbckidicdmpmnc). 
+- **Chrome and Other Chromium Browsers**: Available on the [Chrome Web Store](https://chromewebstore.google.com/detail/tabs-magic/epjcnbdchmflcppaajkbckidicdmpmnc).
 
 - **Firefox**: Available on the [Firefox Add-ons site](https://addons.mozilla.org/en-US/firefox/addon/tabs-magic/).
+
+- **Safari**: Available on the [App Store](https://apps.apple.com/us/app/tabs-magic/id6740145686).
+
+## Cross-Browser Builds
+
+Chrome, Firefox, and Safari use the same application source and production bundles. The root Chrome manifest supplies shared metadata, while small Firefox and Safari differences remain in overrides under `browser/`.
+
+- `npm run build:browsers`: build submission-ready `chrome.zip`, `firefox.zip`, and `safari.zip` archives in `build/`.
+- `npm run build:chrome`, `npm run build:firefox`, or `npm run build:safari`: build one target.
+- Chrome and Firefox submission portals accept their corresponding ZIP archive directly. Unzip an archive locally when loading it as an unpacked or temporary extension.
+- For Safari, unzip `build/safari.zip` and pass the resulting directory to `xcrun safari-web-extension-packager` on macOS with Xcode installed.
+
+The Firefox override uses an event-page background script because Firefox does not currently support Manifest V3 extension service workers. Safari prefers a service worker while retaining its supported script fallback.
 
 ## Usage
 

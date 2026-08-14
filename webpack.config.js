@@ -2,10 +2,13 @@ const path = require('path');
 
 module.exports = {
   devtool: 'source-map',
-  entry: './newtab.js', // Entry point of your application
+  entry: {
+    bundle: './newtab.js',
+    background: './background.js'
+  },
   output: {
-    filename: 'bundle.js', // Output bundle file
-    path: path.resolve(__dirname, 'dist'), // Output directory
+    filename: '[name].js',
+    path: path.resolve(__dirname, 'dist') // Output directory
   },
   module: {
     rules: [
@@ -15,13 +18,13 @@ module.exports = {
         use: {
           loader: 'babel-loader',
           options: {
-            presets: ['@babel/preset-env'],
-          },
-        },
-      },
-    ],
+            presets: ['@babel/preset-env']
+          }
+        }
+      }
+    ]
   },
   resolve: {
-    extensions: ['.js'],
-  },
+    extensions: ['.js']
+  }
 };

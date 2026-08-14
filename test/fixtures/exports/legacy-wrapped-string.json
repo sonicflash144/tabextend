@@ -1,0 +1,28 @@
+{
+  "exportedAt": "2025-01-02T03:04:05.000Z",
+  "exportedData": {
+    "savedTabs": [
+      {
+        "id": "m4qzabc123",
+        "title": "Current-style tab",
+        "url": "https://example.org/article",
+        "favIconUrl": "https://example.org/favicon.ico",
+        "color": "tab-blue",
+        "note": "A note with<br>legacy line breaks",
+        "parsedDate": null
+      },
+      { "temp": 1735787045000 }
+    ],
+    "columnState": [
+      {
+        "id": "column-1735787045000",
+        "title": "Reading",
+        "emoji": "📚",
+        "minimized": false,
+        "tabIds": ["tab-m4qzabc123"]
+      }
+    ],
+    "sidebarCollapsed": false,
+    "theme": "dark"
+  }
+}

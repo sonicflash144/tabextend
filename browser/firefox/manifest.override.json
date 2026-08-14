@@ -1,0 +1,15 @@
+{
+  "permissions": ["tabs", "storage", "activeTab", "contextMenus"],
+  "background": {
+    "service_worker": null,
+    "scripts": ["dist/background.js"]
+  },
+  "chrome_settings_overrides": {
+    "homepage": "newtab.html"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "sageywang@gmail.com"
+    }
+  }
+}
