@@ -341,7 +341,7 @@ test('links inside a row never become the drag source', () => {
 
 test('an open tab renders collapsed when the sidebar is collapsed', () => {
     const view = createOpenTabView(document, {
-        tab: { id: 42, title: 'Open tab' },
+        tab: { id: 42, title: 'Open tab', pinned: true },
         classes: ['collapsed'],
         faviconUrl: 'https://example.com/icon.png'
     });
@@ -351,6 +351,10 @@ test('an open tab renders collapsed when the sidebar is collapsed', () => {
     assert.equal(view.title.textContent, 'Open tab');
     assert.ok(view.closeButton.classList.contains('close-button'));
     assert.ok(view.infoLeft.querySelector('img').classList.contains('tab-favicon'));
+    assert.equal(
+        view.faviconContainer.querySelector('.pinned-tab-indicator').ariaLabel,
+        'Pinned tab'
+    );
 });
 
 test('an open local file marks its fallback slot like any other sidebar favicon', () => {

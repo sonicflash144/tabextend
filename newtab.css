@@ -187,6 +187,24 @@ a {
 #open-tabs-list .tab-favicon {
     vertical-align: middle;
 }
+#open-tabs-list .open-tab-favicon-container {
+    position: relative;
+    width: 24px;
+    height: 24px;
+}
+    #open-tabs-list .pinned-tab-indicator {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        width: 14px;
+        height: 14px;
+        color: var(--text-color);
+        background-color: currentColor;
+        -webkit-mask: url('icons/pin.svg') center / contain no-repeat;
+        mask: url('icons/pin.svg') center / contain no-repeat;
+        filter: drop-shadow(0 0 1px var(--background-color));
+        pointer-events: none;
+    }
 
 #tab-list-container {
     display: flex;

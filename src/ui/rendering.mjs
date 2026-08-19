@@ -476,9 +476,18 @@ export function createOpenTabView(document, options) {
     infoContainer.classList.add('tab-info-container');
     const infoLeft = document.createElement('div');
     infoLeft.classList.add('tab-info-left');
+    const faviconContainer = document.createElement('div');
+    faviconContainer.classList.add('open-tab-favicon-container');
     const faviconImage = createFavicon(document, { faviconUrl, faviconFallback });
     faviconImage.draggable = false;
-    infoLeft.appendChild(faviconImage);
+    faviconContainer.appendChild(faviconImage);
+    if (tab.pinned === true) {
+        const pinIndicator = document.createElement('span');
+        pinIndicator.classList.add('pinned-tab-indicator');
+        pinIndicator.setAttribute('aria-label', 'Pinned tab');
+        faviconContainer.appendChild(pinIndicator);
+    }
+    infoLeft.appendChild(faviconContainer);
     const infoRight = document.createElement('div');
     infoRight.classList.add('tab-info-right');
     const title = document.createElement('span');
@@ -494,7 +503,7 @@ export function createOpenTabView(document, options) {
     actions.appendChild(closeButton);
     infoContainer.append(infoLeft, infoRight, actions);
     item.appendChild(infoContainer);
-    return { item, infoLeft, title, closeButton };
+    return { item, infoLeft, faviconContainer, title, closeButton };
 }
 
 export function createNewColumnIndicator(document) {

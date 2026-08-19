@@ -5,7 +5,11 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { inflateRawSync } from 'node:zlib';
 
-import { createTargetManifest, SUPPORTED_BROWSERS } from '../../scripts/build-browsers.mjs';
+import {
+    createTargetManifest,
+    SHARED_EXTENSION_PATHS,
+    SUPPORTED_BROWSERS
+} from '../../scripts/build-browsers.mjs';
 import { createZipFromDirectory } from '../../scripts/zip-directory.mjs';
 
 function unzipEntries(archive) {
@@ -41,6 +45,7 @@ function unzipEntries(archive) {
 
 test('build configuration produces focused manifests for every browser', async () => {
     assert.deepEqual(SUPPORTED_BROWSERS, ['chrome', 'firefox', 'safari']);
+    assert.ok(SHARED_EXTENSION_PATHS.includes('icons'));
 
     const chrome = await createTargetManifest('chrome');
     assert.equal(chrome.background.service_worker, 'dist/background.js');

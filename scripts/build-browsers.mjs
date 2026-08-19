@@ -11,7 +11,7 @@ export const SUPPORTED_BROWSERS = ['chrome', 'firefox', 'safari'];
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const buildRoot = path.join(repositoryRoot, 'build');
 const stagingRoot = path.join(buildRoot, '.staging');
-const sharedFiles = ['icon.png', 'newtab.css', 'newtab.html'];
+export const SHARED_EXTENSION_PATHS = ['icon.png', 'icons', 'newtab.css', 'newtab.html'];
 
 function isObject(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -71,8 +71,10 @@ async function writeTarget(browser) {
     await mkdir(outputDirectory, { recursive: true });
 
     await Promise.all(
-        sharedFiles.map(file =>
-            cp(path.join(repositoryRoot, file), path.join(outputDirectory, file))
+        SHARED_EXTENSION_PATHS.map(file =>
+            cp(path.join(repositoryRoot, file), path.join(outputDirectory, file), {
+                recursive: true
+            })
         )
     );
     await cp(path.join(repositoryRoot, 'dist'), path.join(outputDirectory, 'dist'), {
