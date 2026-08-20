@@ -38,31 +38,31 @@ test('day differences ignore the time of day', () => {
 test('due dates read as relative names near today and as dates further out', () => {
     assert.deepEqual(formatTabDate(at(13), { now: NOON }), {
         formattedDate: 'Today',
-        dateDisplayColor: '#058527'
+        dateDisplayClass: 'date-today'
     });
     assert.deepEqual(formatTabDate(at(14), { now: NOON }), {
         formattedDate: 'Tomorrow',
-        dateDisplayColor: '#C76E00'
+        dateDisplayClass: 'date-tomorrow'
     });
     // Within the week, the weekday name is enough.
     assert.deepEqual(formatTabDate(at(16), { now: NOON }), {
         formattedDate: 'Sunday',
-        dateDisplayColor: '#ababab'
+        dateDisplayClass: 'date-later'
     });
     assert.deepEqual(formatTabDate(at(25), { now: NOON }), {
         formattedDate: '08/25/26',
-        dateDisplayColor: '#ababab'
+        dateDisplayClass: 'date-later'
     });
 });
 
 test('a passed due date is marked overdue, and no date shows nothing', () => {
     const overdue = formatTabDate(at(11), { now: NOON });
-    assert.equal(overdue.dateDisplayColor, '#e63c30');
+    assert.equal(overdue.dateDisplayClass, 'date-overdue');
     assert.equal(overdue.formattedDate, '08/11/26');
 
     assert.deepEqual(formatTabDate(null, { now: NOON }), {
         formattedDate: '',
-        dateDisplayColor: '#e63c30'
+        dateDisplayClass: 'date-overdue'
     });
 });
 
@@ -142,7 +142,7 @@ test('a stored tab is presented with safe urls, colour, note, and date', () => {
         noteDisplayText: 'line one\nline two',
         noteEditableText: 'line one\nline two',
         formattedDate: 'Today',
-        dateDisplayColor: '#058527'
+        dateDisplayClass: 'date-today'
     });
 });
 

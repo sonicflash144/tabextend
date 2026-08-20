@@ -283,7 +283,7 @@ export function createSavedTabView(document, options) {
         faviconFallback,
         colorClass,
         formattedDate,
-        dateDisplayColor,
+        dateDisplayClass,
         noteDisplayText,
         noteEditableText,
         onDragStart,
@@ -337,7 +337,7 @@ export function createSavedTabView(document, options) {
     if (!formattedDate) dateDisplay.classList.add('hidden');
     dateDisplay.id = `date-display-${tab.id}`;
     dateDisplay.textContent = formattedDate || '';
-    dateDisplay.style.backgroundColor = dateDisplayColor;
+    if (dateDisplayClass) dateDisplay.classList.add(dateDisplayClass);
     infoRight.append(titleDisplay, titleInput, noteDisplay, noteInput, dateDisplay);
 
     const actions = document.createElement('div');

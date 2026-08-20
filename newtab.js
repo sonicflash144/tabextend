@@ -7,7 +7,6 @@ import { createOpenTabsService } from './src/application/open-tabs-service.mjs';
 import { createReleaseService } from './src/application/release-service.mjs';
 import { createSettingsService, nextTheme } from './src/application/settings-service.mjs';
 import { createBrowserApiFromGlobal } from './src/infrastructure/browser-api.mjs';
-import { createTabsRepository } from './src/infrastructure/tabs-repository.mjs';
 import { createStateStore, getTab } from './src/domain/state.mjs';
 import {
     addColumn,
@@ -70,9 +69,8 @@ function getBrowser() {
 }
 
 const browserApi = createBrowserApiFromGlobal(globalThis);
-const tabsRepository = createTabsRepository(browserApi);
 const openTabs = createOpenTabsService({
-    tabs: tabsRepository,
+    browserApi,
     idFactory: generateUniqueId
 });
 const settings = createSettingsService({ storage: browserApi.storage.local });

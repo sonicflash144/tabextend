@@ -140,7 +140,8 @@ export function createBoardView(document, options) {
 
     function wireNoteEditing(tab, item, view, presentation) {
         const { noteDisplay, noteInput, dateDisplay } = view;
-        const { formattedDate, dateDisplayColor } = presentation;
+        const { formattedDate, dateDisplayClass } = presentation;
+        let currentDateDisplayClass = dateDisplayClass;
 
         noteDisplay.addEventListener('click', () => beginNoteEdit(item));
 
@@ -181,14 +182,16 @@ export function createBoardView(document, options) {
             const { parsedDate } = presenter.parseNote(noteInput.value);
             const preview = parsedDate
                 ? presenter.formatDate(parsedDate)
-                : { formattedDate, dateDisplayColor };
+                : { formattedDate, dateDisplayClass };
             if (!preview.formattedDate) {
                 dateDisplay.classList.add('hidden');
                 return;
             }
             dateDisplay.textContent = preview.formattedDate;
             dateDisplay.classList.remove('hidden');
-            dateDisplay.style.backgroundColor = preview.dateDisplayColor;
+            if (currentDateDisplayClass) dateDisplay.classList.remove(currentDateDisplayClass);
+            if (preview.dateDisplayClass) dateDisplay.classList.add(preview.dateDisplayClass);
+            currentDateDisplayClass = preview.dateDisplayClass;
         });
     }
 

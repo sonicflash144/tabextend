@@ -5,19 +5,20 @@ import { filterListableTabs, savedTabFromBrowserTab } from '../domain/browser-ta
  * capturing open tabs as stored tabs, and reopening stored tabs.
  */
 export function createOpenTabsService(options) {
-    const { tabs, idFactory } = options;
+    const { browserApi, idFactory } = options;
 
-    if (!tabs || typeof tabs.query !== 'function') {
-        throw new Error('A tabs repository is required.');
+    if (!browserApi?.tabs || typeof browserApi.tabs.query !== 'function') {
+        throw new Error('A WebExtension tabs API is required.');
     }
     if (typeof idFactory !== 'function') {
         throw new Error('An id factory is required.');
     }
+    const { tabs, tabGroups, capabilities = {} } = browserApi;
 
     /** Tabs of the current window that the extension is allowed to show. */
     async function list() {
         return filterListableTabs(await tabs.query({ currentWindow: true }), {
-            allowFileUrls: tabs.capabilities?.fileUrls === true
+            allowFileUrls: capabilities.fileUrls === true
         });
     }
 
@@ -42,13 +43,14 @@ export function createOpenTabsService(options) {
 
     /** Close a tab while keeping the window focused on its active tab. */
     async function closeKeepingFocus(browserTabId) {
-        const activeTab = await tabs.queryActiveTab();
+        const activeTabs = await tabs.query({ active: true, currentWindow: true });
+        const activeTab = activeTabs[0] || null;
         await tabs.remove(browserTabId);
-        if (activeTab) await tabs.activate(activeTab.id);
+        if (activeTab) await tabs.update(activeTab.id, { active: true });
     }
 
     function activate(browserTabId) {
-        return tabs.activate(browserTabId);
+        return tabs.update(browserTabId, { active: true });
     }
 
     function move(browserTabId, index) {
@@ -60,8 +62,35 @@ export function createOpenTabsService(options) {
      * report each URL as `opened` or `refused` rather than letting one refusal
      * hide what the rest did.
      */
-    function openUrls(urls, openOptions = {}) {
-        return tabs.openUrls(urls, openOptions);
+    async function openUrls(urls, openOptions = {}) {
+        const { index = null, groupTitle = null } = openOptions;
+        const targets = (Array.isArray(urls) ? urls : []).filter(Boolean);
+        if (targets.length === 0) return { opened: [], refused: [] };
+
+        const results = await Promise.all(
+            targets.map(async (url, offset) => {
+                const createProperties = { url, active: false };
+                if (index !== null) createProperties.index = index + offset;
+                try {
+                    return { url, tab: await tabs.create(createProperties) };
+                } catch (error) {
+                    return { url, error };
+                }
+            })
+        );
+
+        const opened = results.filter(result => !result.error);
+        const refused = results.filter(result => result.error);
+
+        if (capabilities.tabGroups) {
+            const tabIds = opened.map(result => result.tab?.id).filter(id => id !== undefined);
+            if (tabIds.length > 0) {
+                const groupId = await tabs.group({ tabIds });
+                if (groupTitle) await tabGroups.update(groupId, { title: groupTitle });
+            }
+        }
+
+        return { opened, refused };
     }
 
     /** Open one stored tab behind the current one, without grouping it. */

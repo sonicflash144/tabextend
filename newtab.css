@@ -236,6 +236,18 @@ a {
     padding: 2px 4px;
     font-size: 12px;
 }
+    .date-display.date-overdue {
+        background-color: #e63c30;
+    }
+    .date-display.date-today {
+        background-color: #058527;
+    }
+    .date-display.date-tomorrow {
+        background-color: #c76e00;
+    }
+    .date-display.date-later {
+        background-color: #ababab;
+    }
 .tab-note {
     margin-top: 5px;
     width: 100%;

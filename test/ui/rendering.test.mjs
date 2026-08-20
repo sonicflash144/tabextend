@@ -37,7 +37,7 @@ function savedTabView(overrides = {}) {
         faviconUrl: 'https://example.com/icon.png',
         colorClass: 'tab-blue',
         formattedDate: '',
-        dateDisplayColor: '',
+        dateDisplayClass: '',
         noteDisplayText: '',
         noteEditableText: '',
         ...overrides
@@ -68,7 +68,7 @@ test('a saved tab renders its title, note, date, and colour', () => {
     const view = savedTabView({
         tab: { id: 'alpha', title: 'Alpha' },
         formattedDate: 'Tomorrow',
-        dateDisplayColor: 'rgb(255, 0, 0)',
+        dateDisplayClass: 'date-tomorrow',
         noteDisplayText: 'a note',
         noteEditableText: 'a note'
     });
@@ -86,6 +86,7 @@ test('a saved tab renders its title, note, date, and colour', () => {
     assert.equal(view.noteInput.value, 'a note');
     assert.equal(view.dateDisplay.textContent, 'Tomorrow');
     assert.equal(view.dateDisplay.classList.contains('hidden'), false);
+    assert.equal(view.dateDisplay.classList.contains('date-tomorrow'), true);
 });
 
 test('a saved tab without a date keeps its date row hidden', () => {
