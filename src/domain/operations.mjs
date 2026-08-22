@@ -2,6 +2,11 @@ function normalizeId(id) {
     return String(id);
 }
 
+function normalizedIdSet(ids) {
+    const values = Array.isArray(ids) || ids instanceof Set ? ids : [ids];
+    return new Set([...values].map(normalizeId));
+}
+
 function cloneItem(item) {
     if (item.type === 'group') {
         return { ...item, tabIds: [...item.tabIds] };
@@ -45,20 +50,29 @@ export function findGroupLocation(state, groupId) {
     return null;
 }
 
-export function removeTabPlacements(state, tabIds) {
-    const values = Array.isArray(tabIds) || tabIds instanceof Set ? [...tabIds] : [tabIds];
-    const removedIds = new Set(values.map(normalizeId));
-    const nextState = cloneCanonicalState(state);
-    nextState.columns = nextState.columns.map(column => ({
-        ...column,
-        items: column.items.flatMap(item => {
+function removeTabPlacementsFromDraft(state, removedIds) {
+    state.columns.forEach(column => {
+        column.items = column.items.flatMap(item => {
             if (item.type === 'tab') {
                 return removedIds.has(item.tabId) ? [] : [item];
             }
-            const remainingTabIds = item.tabIds.filter(tabId => !removedIds.has(tabId));
-            return remainingTabIds.length === 0 ? [] : [{ ...item, tabIds: remainingTabIds }];
-        })
-    }));
+            item.tabIds = item.tabIds.filter(tabId => !removedIds.has(tabId));
+            return item.tabIds.length === 0 ? [] : [item];
+        });
+    });
+    return state;
+}
+
+function removeTabsFromDraft(state, removedIds) {
+    removedIds.forEach(id => state.tabs.delete(id));
+    state.tabOrder = state.tabOrder.filter(id => !removedIds.has(id));
+    return removeTabPlacementsFromDraft(state, removedIds);
+}
+
+export function removeTabPlacements(state, tabIds) {
+    const nextState = cloneCanonicalState(state);
+    const removedIds = normalizedIdSet(tabIds);
+    removeTabPlacementsFromDraft(nextState, removedIds);
     return nextState;
 }
 
@@ -82,30 +96,34 @@ export function addTabs(state, tabs, options = {}) {
     return nextState;
 }
 
-export function updateTab(state, tabId, changes) {
-    const id = normalizeId(tabId);
-    const currentTab = state.tabs.get(id);
-    if (!currentTab) return state;
+export function updateTabs(state, tabIds, changes) {
+    const ids = [...normalizedIdSet(tabIds)].filter(id => state.tabs.has(id));
+    if (ids.length === 0) return state;
 
     const nextState = cloneCanonicalState(state);
-    const resolvedChanges =
-        typeof changes === 'function' ? changes({ ...nextState.tabs.get(id) }) : changes;
-    nextState.tabs.set(id, {
-        ...nextState.tabs.get(id),
-        ...resolvedChanges,
-        id
+    ids.forEach(id => {
+        const currentTab = nextState.tabs.get(id);
+        const resolvedChanges =
+            typeof changes === 'function' ? changes({ ...currentTab }) : changes;
+        nextState.tabs.set(id, {
+            ...currentTab,
+            ...resolvedChanges,
+            id
+        });
     });
     return nextState;
 }
 
+export function updateTab(state, tabId, changes) {
+    return updateTabs(state, [tabId], changes);
+}
+
 export function removeTabs(state, tabIds) {
-    const removedIds = new Set((Array.isArray(tabIds) ? tabIds : [tabIds]).map(normalizeId));
+    const removedIds = normalizedIdSet(tabIds);
     if (![...removedIds].some(id => state.tabs.has(id))) return state;
 
     const nextState = cloneCanonicalState(state);
-    removedIds.forEach(id => nextState.tabs.delete(id));
-    nextState.tabOrder = nextState.tabOrder.filter(id => !removedIds.has(id));
-    return removeTabPlacements(nextState, removedIds);
+    return removeTabsFromDraft(nextState, removedIds);
 }
 
 export function addColumn(state, column, index = state.columns.length) {
@@ -169,7 +187,10 @@ export function removeColumn(state, columnId, options = {}) {
 
     const nextState = cloneCanonicalState(state);
     nextState.columns = nextState.columns.filter(candidate => candidate.id !== id);
-    return options.deleteTabs ? removeTabs(nextState, tabIdsInColumn(column)) : nextState;
+    if (options.deleteTabs) {
+        removeTabsFromDraft(nextState, normalizedIdSet(tabIdsInColumn(column)));
+    }
+    return nextState;
 }
 
 export function createGroup(state, columnId, index, group) {
@@ -241,7 +262,10 @@ export function removeGroup(state, groupId, options = {}) {
     const nextState = cloneCanonicalState(state);
     const nextLocation = findGroupLocation(nextState, groupId);
     nextLocation.column.items.splice(nextLocation.itemIndex, 1);
-    return options.deleteTabs ? removeTabs(nextState, groupTabIds) : nextState;
+    if (options.deleteTabs) {
+        removeTabsFromDraft(nextState, normalizedIdSet(groupTabIds));
+    }
+    return nextState;
 }
 
 /**

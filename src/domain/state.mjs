@@ -152,11 +152,6 @@ export function getColumnTabs(state, columnId) {
         .filter(Boolean);
 }
 
-export function replaceColumnsFromLegacy(state, columnState) {
-    const legacy = canonicalStateToLegacy(state);
-    return canonicalStateFromLegacy(legacy.savedTabs, columnState);
-}
-
 export function validateCanonicalState(state) {
     const errors = [];
     if (!isObject(state)) return { valid: false, errors: ['State must be an object.'] };
@@ -249,22 +244,13 @@ export function validateCanonicalState(state) {
 
 export function createStateStore(initialState = canonicalStateFromLegacy()) {
     let currentState = initialState;
-    const listeners = new Set();
     return {
         getState() {
             return currentState;
         },
         replace(nextState) {
             currentState = nextState;
-            listeners.forEach(listener => listener(currentState));
             return currentState;
-        },
-        replaceLegacy(savedTabs, columnState) {
-            return this.replace(canonicalStateFromLegacy(savedTabs, columnState));
-        },
-        subscribe(listener) {
-            listeners.add(listener);
-            return () => listeners.delete(listener);
         }
     };
 }

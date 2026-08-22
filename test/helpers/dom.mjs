@@ -8,6 +8,7 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 
 // The real page markup, so tests see the ids and structure the extension ships.
 const pageHtml = readFileSync(path.join(repositoryRoot, 'newtab.html'), 'utf8');
+const pageCss = readFileSync(path.join(repositoryRoot, 'newtab.css'), 'utf8');
 
 const EXPOSED_GLOBALS = [
     'window',
@@ -58,6 +59,14 @@ export function createPageDom() {
             window.close();
         }
     };
+}
+
+/** Attach the page stylesheet when a test needs to assert computed presentation. */
+export function loadPageStyles(document) {
+    const style = document.createElement('style');
+    style.textContent = pageCss;
+    document.head.appendChild(style);
+    return style;
 }
 
 /**

@@ -195,27 +195,7 @@ export function createDraggableListItem(document, options = {}) {
 }
 
 export function setColumnMinimized(column, minimized) {
-    const titleSpan = column.querySelector('.column-title-text');
-    const titleInput = column.querySelector('.column-title-input');
-    const maximizeButton = column.querySelector('.maximize-column');
-    const minimizeButton = column.querySelector('.minimize-column');
-    const titleGroup = column.querySelector('.title-group');
-    const menuContainer = column.querySelector('.menu-container');
-    const menuButton = column.querySelector('.more-options');
-    const headerContainer = column.querySelector('.header-container');
-
     column.classList.toggle('minimized', minimized);
-    titleSpan.classList.toggle('vertical-text', minimized);
-    titleInput.classList.toggle('vertical-text', minimized);
-    titleGroup.classList.toggle('vertical', minimized);
-    maximizeButton.style.display = minimized ? 'inline' : 'none';
-    minimizeButton.style.display = minimized ? 'none' : 'inline';
-    menuContainer.classList.toggle('vertical', minimized);
-    menuButton.classList.toggle('vertical', minimized);
-    headerContainer.classList.toggle('vertical', minimized);
-    column.querySelectorAll('.tab-item').forEach(item => {
-        item.style.display = minimized ? 'none' : 'flex';
-    });
 }
 
 export function setSubgroupExpanded(expandButton, expanded) {

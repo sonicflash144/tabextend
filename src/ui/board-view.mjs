@@ -359,8 +359,6 @@ export function createBoardView(document, options) {
                 const tab = getTab(state, item.tabId);
                 if (tab) column.appendChild(renderTab(tab));
             });
-
-            if (columnData.minimized) setColumnMinimized(column, true);
         });
 
         const newColumnIndicator = createNewColumnIndicator(document);

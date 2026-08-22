@@ -16,7 +16,8 @@ import {
     ungroup,
     updateColumn,
     updateGroup,
-    updateTab
+    updateTab,
+    updateTabs
 } from './src/domain/operations.mjs';
 import { isFileUrl } from './src/domain/browser-tabs.mjs';
 import {
@@ -269,17 +270,11 @@ boardMenus = createBoardMenuController(document, {
     beginNoteEdit: boardView.beginNoteEdit,
     handlers: {
         onClearDates: tabIds => {
-            const nextState = tabIds.reduce(
-                (state, tabId) => updateTab(state, tabId, { parsedDate: null }),
-                appState.getState()
-            );
+            const nextState = updateTabs(appState.getState(), tabIds, { parsedDate: null });
             persistCanonicalState(nextState, { includeColumns: false });
         },
         onColorChange: (tabIds, color) => {
-            const nextState = tabIds.reduce(
-                (state, tabId) => updateTab(state, tabId, { color }),
-                appState.getState()
-            );
+            const nextState = updateTabs(appState.getState(), tabIds, { color });
             persistCanonicalState(nextState, { includeColumns: false });
         },
         onDeleteTabs: tabIds => persistCanonicalState(removeTabs(appState.getState(), tabIds)),

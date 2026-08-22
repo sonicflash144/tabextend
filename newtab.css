@@ -355,10 +355,10 @@ a {
             width: 16px;
             height: 16px;
         }
-        .menu-container.vertical {
+        .column.minimized .menu-container {
             margin-left: 0;
         }
-        .more-options.vertical {
+        .column.minimized .header-container .more-options {
             transform: rotate(90deg);
         }
 
@@ -375,7 +375,7 @@ a {
         justify-content: center;
         gap: 2px;
     }
-    .title-group.vertical {
+    .column.minimized .title-group {
         flex-direction: column;
         align-items: flex-start;
         justify-content: flex-start;
@@ -397,8 +397,14 @@ a {
         .maximize-column {
             display: none;
         }
+        .column.minimized .maximize-column {
+            display: inline;
+        }
+        .column.minimized .minimize-column {
+            display: none;
+        }
 
-    .header-container.vertical {
+    .column.minimized .header-container {
         margin-top: 12px;
         flex-direction: column;
         align-items: flex-start;
@@ -425,7 +431,8 @@ a {
 #columns-container {
     display: flex;
     gap: 10px;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 .column {
     border: 1px solid var(--column-border-color);
@@ -489,7 +496,7 @@ a {
         text-overflow: ellipsis;
         margin-right: 4px;
     }
-        .column-title-text.vertical-text {
+        .column.minimized .column-title-text {
             max-height: calc(80vh - 225px);
         }
     .column li {
@@ -504,7 +511,6 @@ a {
     }
 
     .column.minimized {
-        height: calc(100vh - 140px);
         min-width: 48px;
         width: 48px;
         padding: 4px;
@@ -513,6 +519,17 @@ a {
         flex-direction: column;
         align-items: center;
     }
+        .column.minimized .column-title-text,
+        .column.minimized .column-title-input {
+            writing-mode: vertical-lr;
+            text-orientation: mixed;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .column.minimized .tab-item {
+            display: none;
+        }
 
 .drag-handle {
     cursor: grab;
@@ -614,14 +631,6 @@ a {
 
 .delete-icon, .new-column-icon {
     opacity: 0.5;
-}
-
-.vertical-text {
-    writing-mode: vertical-lr;
-    text-orientation: mixed;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .subgroup-favicon {

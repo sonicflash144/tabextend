@@ -4,7 +4,6 @@ import {
     addTabs,
     moveColumn,
     removeColumn,
-    removeGroup,
     removeReopenedGroup,
     removeTabs
 } from '../domain/operations.mjs';
@@ -120,18 +119,21 @@ export function createDropWorkflow(options) {
     }
 
     async function deleteDroppedItems(dragged) {
-        let nextState = stateStore.getState();
+        const initialState = stateStore.getState();
         const browserTabIds = [];
+        const savedTabIds = new Set();
         dragged.forEach(item => {
             if (item.type === 'open-tab') {
                 browserTabIds.push(item.browserTabId);
             } else if (item.type === 'group') {
-                nextState = removeGroup(nextState, item.groupId, { deleteTabs: true });
+                const { group } = findGroup(initialState, item.groupId);
+                group?.tabIds.forEach(tabId => savedTabIds.add(tabId));
             } else if (item.type === 'tab') {
-                nextState = removeTabs(nextState, item.tabId);
+                savedTabIds.add(item.tabId);
             }
         });
-        if (nextState !== stateStore.getState()) persist(nextState);
+        const nextState = removeTabs(initialState, savedTabIds);
+        if (nextState !== initialState) persist(nextState);
         if (browserTabIds.length > 0) await tabs.close(browserTabIds);
         return nextState;
     }

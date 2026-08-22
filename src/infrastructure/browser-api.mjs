@@ -1,4 +1,4 @@
-import { createExtensionEventAdapter, createExtensionMethod } from './chrome-primitives.mjs';
+import { createExtensionEventAdapter, createExtensionMethod } from './extension-primitives.mjs';
 import { createStorageRepository } from './storage-repository.mjs';
 
 /** Resolve the native WebExtension namespace and its asynchronous API style. */
