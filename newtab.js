@@ -2,53 +2,76 @@ import { Chrono } from 'chrono-node';
 import 'emoji-picker-element';
 import { createStateStorageService } from './src/application/state-storage.mjs';
 import { createDataTransferService } from './src/application/data-transfer.mjs';
+import { createDropWorkflow } from './src/application/drop-workflow.mjs';
 import { createOpenTabsService } from './src/application/open-tabs-service.mjs';
 import { createReleaseService } from './src/application/release-service.mjs';
 import { createSettingsService, nextTheme } from './src/application/settings-service.mjs';
 import { createBrowserApiFromGlobal } from './src/infrastructure/browser-api.mjs';
-import { createTabsRepository } from './src/infrastructure/tabs-repository.mjs';
-import {
-    createStateStore,
-    findGroup,
-    getColumn,
-    getColumnTabs,
-    getGroupTabs,
-    getTab
-} from './src/domain/state.mjs';
+import { createStateStore, getTab } from './src/domain/state.mjs';
 import {
     addColumn,
-    addTabs,
-    moveColumn,
     removeColumn,
     removeGroup,
-    removeReopenedGroup,
     removeTabs,
     ungroup,
     updateColumn,
     updateGroup,
-    updateTab
+    updateTab,
+    updateTabs
 } from './src/domain/operations.mjs';
-import { applyDrop } from './src/domain/drop-operations.mjs';
 import { isFileUrl } from './src/domain/browser-tabs.mjs';
 import {
-    createColorMenu as renderColorMenu,
     createDeletionArea as renderDeletionArea,
-    createMenuDropdown as renderMenuDropdown,
-    createNotificationDot,
     setColumnMinimized
 } from './src/ui/rendering.mjs';
 import { createBoardView } from './src/ui/board-view.mjs';
 import { createOpenFailureReporter } from './src/ui/open-failure.mjs';
 import { createOpenTabsView } from './src/ui/open-tabs-view.mjs';
 import { createTabPresenter, TAB_COLOR_CLASSES } from './src/ui/tab-presentation.mjs';
+import { createBoardMenuController } from './src/ui/controllers/board-menu-controller.mjs';
 import { createDragController } from './src/ui/controllers/drag-controller.mjs';
 import { createMenuController } from './src/ui/controllers/menu-controller.mjs';
 import { createSelectionController } from './src/ui/controllers/selection-controller.mjs';
-import { safePageUrl, textToLegacyStoredNote } from './src/security/content.mjs';
+import { createSettingsMenuController } from './src/ui/controllers/settings-menu-controller.mjs';
+import { textToLegacyStoredNote } from './src/security/content.mjs';
+
+function generateUniqueId() {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+}
+
+const getRandomEmoji = () => {
+    const range = [0x1f34f, 0x1f37f]; // Food and Drink
+    const codePoint = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
+    return String.fromCodePoint(codePoint);
+};
+
+function createNewColumn() {
+    return {
+        id: `column-${Date.now()}`,
+        title: 'New Column',
+        minimized: false,
+        emoji: getRandomEmoji(),
+        items: []
+    };
+}
+
+function getBrowser() {
+    let userAgent = navigator.userAgent.toLowerCase();
+    if (userAgent.indexOf('chrome') > -1) {
+        userAgent = 'chrome';
+    } else if (userAgent.indexOf('firefox') > -1) {
+        userAgent = 'firefox';
+    } else if (userAgent.indexOf('safari') > -1) {
+        userAgent = 'safari';
+    } else {
+        userAgent = 'chrome';
+    }
+    return userAgent;
+}
+
 const browserApi = createBrowserApiFromGlobal(globalThis);
-const tabsRepository = createTabsRepository(browserApi);
 const openTabs = createOpenTabsService({
-    tabs: tabsRepository,
+    browserApi,
     idFactory: generateUniqueId
 });
 const settings = createSettingsService({ storage: browserApi.storage.local });
@@ -65,44 +88,14 @@ const openFailures = createOpenFailureReporter({
     logError: (message, error) => console.error(message, error),
     canOpenFileUrls: browserApi.capabilities.fileUrls
 });
-let theme = 'light';
-settings
-    .load()
-    .then(stored => {
-        const sidebar = document.getElementById('sidebar');
-        sidebar.classList.add('no-transition');
-        if (stored.sidebarCollapsed) {
-            sidebar.classList.add('collapsed');
-        }
-        if (stored.storedTheme) {
-            theme = stored.storedTheme;
-            document.body.className = theme;
-        }
-
-        setTimeout(() => {
-            sidebar.classList.remove('no-transition');
-        }, 100);
-    })
-    .catch(error => {
-        console.error('Error updating sidebar:', error);
-    });
-function toggleTheme() {
-    theme = nextTheme(theme);
-    document.body.className = theme;
-    const emojiPickers = document.querySelectorAll('.emoji-picker-on-top');
-    emojiPickers.forEach(picker => {
-        picker.className = picker.className.replace(/light|dark/g, theme);
-    });
-    settings.saveTheme(theme).catch(error => {
-        console.error('Could not save the theme:', error);
-    });
-}
-const CHROME_STRING = 'chrome';
 const settingsButton = document.querySelector('.settings-button');
 const columnsContainer = document.getElementById('columns-container');
 const colorOptions = TAB_COLOR_CLASSES;
+const userBrowser = getBrowser();
+let theme = 'light';
 let deletionArea;
 let newColumnIndicator = null;
+let boardMenus;
 const appState = createStateStore();
 const stateStorage = createStateStorageService({
     storage: browserApi.storage.local,
@@ -116,8 +109,23 @@ const stateStorage = createStateStorageService({
         items: []
     })
 });
+const tabPresenter = createTabPresenter({ chrono: new Chrono() });
 const menuController = createMenuController();
 const selectionController = createSelectionController(document);
+const dropWorkflow = createDropWorkflow({
+    stateStore: appState,
+    persist: persistCanonicalState,
+    tabs: openTabs,
+    reportOpenFailure: (message, error, urls) => openFailures.report(message, error, urls),
+    idFactory: generateUniqueId,
+    createColumn: createNewColumn
+});
+const dragController = createDragController(document, {
+    columnsContainer,
+    getDeletionArea: () => deletionArea,
+    getNewColumnIndicator: () => newColumnIndicator,
+    onDragStart: () => closeAllMenus()
+});
 
 function persistCanonicalState(nextState, options = {}) {
     stateStorage.persist(nextState, options).catch(error => {
@@ -126,34 +134,18 @@ function persistCanonicalState(nextState, options = {}) {
     return nextState;
 }
 
-function generateUniqueId() {
-    return Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+function toggleTheme() {
+    theme = nextTheme(theme);
+    document.body.className = theme;
+    const emojiPickers = document.querySelectorAll('.emoji-picker-on-top');
+    emojiPickers.forEach(picker => {
+        picker.className = picker.className.replace(/light|dark/g, theme);
+    });
+    settings.saveTheme(theme).catch(error => {
+        console.error('Could not save the theme:', error);
+    });
 }
 
-const tabPresenter = createTabPresenter({ chrono: new Chrono() });
-const getRandomEmoji = () => {
-    const range = [0x1f34f, 0x1f37f]; // Food and Drink
-    const codePoint = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
-    return String.fromCodePoint(codePoint);
-};
-document.getElementById('add-column').addEventListener('click', () => {
-    const nextState = addColumn(appState.getState(), {
-        id: `column-${Date.now()}`,
-        title: 'New Column',
-        minimized: false,
-        emoji: getRandomEmoji(),
-        items: []
-    });
-    persistCanonicalState(nextState, { includeTabs: false });
-});
-
-deletionArea = renderDeletionArea(document);
-const dragController = createDragController(document, {
-    columnsContainer,
-    getDeletionArea: () => deletionArea,
-    getNewColumnIndicator: () => newColumnIndicator,
-    onDragStart: () => closeAllMenus()
-});
 function handleDragStart(event) {
     dragController.handleTabDragStart(event);
 }
@@ -163,41 +155,11 @@ function handleColumnDragStart(event) {
 function handleDragEnd(event) {
     dragController.handleDragEnd(event);
 }
+
 function closeAllMenus() {
     menuController.closeAll();
 }
-function getBrowser() {
-    let userAgent = navigator.userAgent.toLowerCase();
-    if (userAgent.indexOf(CHROME_STRING) > -1) {
-        userAgent = CHROME_STRING;
-    } else if (userAgent.indexOf('firefox') > -1) {
-        userAgent = 'firefox';
-    } else if (userAgent.indexOf('safari') > -1) {
-        userAgent = 'safari';
-    } else {
-        userAgent = CHROME_STRING;
-    }
-    return userAgent;
-}
-const userBrowser = getBrowser();
-document.documentElement.dataset.browser = userBrowser;
 
-/* Tab and Subgroup Functions */
-function deleteTab(id) {
-    const tabIds = Array.isArray(id) ? id : [id];
-    persistCanonicalState(removeTabs(appState.getState(), tabIds));
-}
-function deleteSubgroup(groupId) {
-    persistCanonicalState(removeGroup(appState.getState(), groupId, { deleteTabs: true }));
-}
-function ungroupSubgroup(groupId) {
-    persistCanonicalState(ungroup(appState.getState(), groupId));
-}
-
-/* Tab Menu Actions */
-function createMenuDropdown(menuItems, button) {
-    return renderMenuDropdown(document, menuItems, button);
-}
 function saveTabNote(id, note) {
     const { parsedDate, remainingNote } = tabPresenter.parseNote(note);
     const changes = {
@@ -206,106 +168,15 @@ function saveTabNote(id, note) {
     if (parsedDate) changes.parsedDate = parsedDate.getTime();
     persistCanonicalState(updateTab(appState.getState(), id, changes), { includeColumns: false });
 }
-function removeDate(tabIds, dateDisplay) {
-    if (!Array.isArray(tabIds)) tabIds = [tabIds];
-    const nextState = tabIds.reduce(
-        (state, tabId) => updateTab(state, tabId, { parsedDate: null }),
-        appState.getState()
-    );
-    dateDisplay.textContent = '';
-    dateDisplay.classList.add('hidden');
-    persistCanonicalState(nextState, { includeColumns: false });
-}
-function openColorMenu(tabIds, moreOptionsButton) {
-    if (!Array.isArray(tabIds)) tabIds = [tabIds];
-    menuController.toggle('color', 'color', () =>
-        renderColorMenu(document, {
-            colors: colorOptions,
-            button: moreOptionsButton,
-            onSelect: color => {
-                const nextState = tabIds.reduce(
-                    (state, tabId) => updateTab(state, tabId, { color }),
-                    appState.getState()
-                );
-                persistCanonicalState(nextState, { includeColumns: false });
-                closeAllMenus();
-            }
-        })
-    );
-}
-/* Column Menu Actions */
-function deleteColumn(event) {
-    closeAllMenus();
-    let column = event;
-    if (event instanceof Event) {
-        column = event.target.closest('.column');
-    }
-    persistCanonicalState(removeColumn(appState.getState(), column.id, { deleteTabs: true }));
-}
-/**
- * Saved tabs paired with the URL the browser may navigate to, dropping the
- * ones it may not. The tab travels with its URL because deciding what leaves
- * the board after a reopen needs to know which tab each URL came from.
- */
-function navigableTabs(tabs) {
-    return tabs.map(tab => ({ tab, url: safePageUrl(tab.url) })).filter(entry => entry.url);
-}
-
-/**
- * Reopen saved tabs as browser tabs and report which of them the browser
- * actually opened, so a caller that clears them off the board only clears
- * those. Chrome refuses a local file without file access, and a refusal must
- * not take the rest of the batch — or the saved tab itself — with it.
- */
-async function openSavedTabs(entries, groupTitle, index = null) {
-    if (entries.length === 0) return [];
-    const urls = entries.map(entry => entry.url);
-    try {
-        // Browsers without tab groups simply open the tabs; the repository decides.
-        const { opened, refused } = await openTabs.openUrls(urls, { index, groupTitle });
-        if (refused.length > 0) {
-            openFailures.report(
-                'Could not open saved tabs:',
-                refused[0].error,
-                refused.map(result => result.url)
-            );
-        }
-        const openedUrls = new Set(opened.map(result => result.url));
-        return entries.filter(entry => openedUrls.has(entry.url));
-    } catch (error) {
-        // Grouping failed after the tabs were created, so what opened is
-        // unknown. Nothing counts as opened, which keeps the board intact.
-        openFailures.report('Could not open saved tabs:', error, urls);
-        return [];
-    }
-}
-
-/** Reopen one saved tab, reporting a refusal rather than throwing out of a drop. */
-async function openSavedTabInBackground(url, index) {
-    try {
-        await openTabs.openInBackground(url, index);
-        return true;
-    } catch (error) {
-        openFailures.report('Could not reopen the saved tab:', error, [url]);
-        return false;
-    }
-}
-
 function openAllInColumn(columnId) {
     closeAllMenus();
-    const state = appState.getState();
-    const column = getColumn(state, columnId);
-    if (!column) return;
-    openSavedTabs(navigableTabs(getColumnTabs(state, columnId)), column.title);
+    dropWorkflow.openAllInColumn(columnId);
 }
 
 /** Reopen a group, resolving with the entries the browser opened. */
 function openAllInGroup(groupId, index = null) {
     closeAllMenus();
-    const state = appState.getState();
-    const { group } = findGroup(state, groupId);
-    if (!group) return Promise.resolve([]);
-    return openSavedTabs(navigableTabs(getGroupTabs(state, groupId)), group.title, index);
+    return dropWorkflow.openAllInGroup(groupId, index);
 }
 
 /* Column Functions */
@@ -316,170 +187,11 @@ function maximizeColumn(column) {
     setColumnMinimized(column, false);
 }
 
-function descriptorForSavedElement(element) {
-    if (element.id.startsWith('tab-')) {
-        return { type: 'tab', tabId: element.id.slice('tab-'.length) };
-    }
-    if (element.classList.contains('subgroup-item')) {
-        return { type: 'group', groupId: element.id };
-    }
-    return null;
-}
-
-async function persistItemsDrop(elements, target, initialState = appState.getState()) {
-    const openElements = elements.filter(element => element.id.startsWith('opentab-'));
-    const capturedTabs = (
-        await openTabs.capture(
-            openElements.map(element => Number(element.id.slice('opentab-'.length)))
-        )
-    ).map((capture, index) => ({ ...capture, element: openElements[index] }));
-
-    let nextState =
-        capturedTabs.length > 0
-            ? addTabs(
-                  initialState,
-                  capturedTabs.map(captured => captured.savedTab)
-              )
-            : initialState;
-    const capturedByElement = new Map(
-        capturedTabs.map(captured => [captured.element, captured.savedTab.id])
-    );
-    const dragged = elements
-        .map(element => {
-            if (capturedByElement.has(element)) {
-                return { type: 'tab', tabId: capturedByElement.get(element) };
-            }
-            return descriptorForSavedElement(element);
-        })
-        .filter(Boolean);
-
-    nextState = applyDrop(nextState, {
-        dragged,
-        target,
-        groupIdFactory: () => `group-${generateUniqueId()}`
-    });
-    persistCanonicalState(nextState);
-
-    if (capturedTabs.length > 0) {
-        await openTabs.close(capturedTabs.map(captured => captured.browserTabId));
-    }
-}
-
-async function deleteDroppedItems(items) {
-    let nextState = appState.getState();
-    const browserTabIds = [];
-    items.forEach(item => {
-        if (item.id.startsWith('opentab-')) {
-            browserTabIds.push(Number(item.id.slice('opentab-'.length)));
-        } else if (item.classList.contains('subgroup-item')) {
-            nextState = removeGroup(nextState, item.id, { deleteTabs: true });
-        } else if (item.id.startsWith('tab-')) {
-            nextState = removeTabs(nextState, item.id.slice('tab-'.length));
-        }
-    });
-    if (nextState !== appState.getState()) persistCanonicalState(nextState);
-    if (browserTabIds.length > 0) await openTabs.close(browserTabIds);
-}
-
-/** Reopen dropped items as browser tabs, in the order they were dropped. */
-async function reopenDroppedItems(items, index) {
-    let nextState = appState.getState();
-    let browserIndex = index;
-    for (const item of items) {
-        if (item.id.startsWith('opentab-')) {
-            await openTabs.move(Number(item.id.slice('opentab-'.length)), browserIndex);
-        } else if (item.classList.contains('subgroup-item')) {
-            const { group } = findGroup(nextState, item.id);
-            if (group) {
-                // Awaited, because only the tabs the browser opened may leave
-                // the board; a local file it refused keeps its place.
-                const opened = await openAllInGroup(group.id, browserIndex);
-                browserIndex += opened.length;
-                nextState = removeReopenedGroup(
-                    nextState,
-                    group.id,
-                    opened.map(entry => entry.tab.id)
-                );
-                continue;
-            }
-        } else if (item.id.startsWith('tab-')) {
-            const tabId = item.id.slice('tab-'.length);
-            const [entry] = navigableTabs([getTab(nextState, tabId)].filter(Boolean));
-            const opened = entry ? await openSavedTabInBackground(entry.url, browserIndex) : true;
-            // A tab the browser refused to open stays on the board.
-            if (opened) nextState = removeTabs(nextState, tabId);
-        }
-        browserIndex += 1;
-    }
-    if (nextState !== appState.getState()) persistCanonicalState(nextState);
-}
-
-/** Apply a drop the drag controller has already interpreted. */
-async function applyDropDescriptor(descriptor) {
-    switch (descriptor.type) {
-        case 'delete-column':
-            deleteColumn(descriptor.column);
-            return;
-        case 'move-column':
-            persistCanonicalState(
-                moveColumn(appState.getState(), descriptor.column.id, descriptor.index),
-                { includeTabs: false }
-            );
-            return;
-        case 'delete-items':
-            await deleteDroppedItems(descriptor.items);
-            return;
-        case 'new-column': {
-            const columnId = `column-${Date.now()}`;
-            const nextState = addColumn(appState.getState(), {
-                id: columnId,
-                title: 'New Column',
-                minimized: false,
-                emoji: getRandomEmoji(),
-                items: []
-            });
-            await persistItemsDrop(
-                descriptor.items,
-                {
-                    type: 'column',
-                    columnId,
-                    index: 0
-                },
-                nextState
-            );
-            return;
-        }
-        case 'open-tabs':
-            await reopenDroppedItems(descriptor.items, descriptor.index);
-            return;
-        case 'group':
-            await persistItemsDrop(descriptor.items, {
-                type: 'group',
-                groupId: descriptor.groupId,
-                index: descriptor.index
-            });
-            return;
-        case 'item':
-            await persistItemsDrop(descriptor.items, {
-                type: 'item',
-                item: descriptor.item
-            });
-            return;
-        case 'column':
-            await persistItemsDrop(descriptor.items, {
-                type: 'column',
-                columnId: descriptor.columnId,
-                index: descriptor.index
-            });
-            return;
-    }
-}
-
 async function handleDrop(event) {
     event.preventDefault();
     const descriptor = dragController.resolveDrop(event);
     // One drop explains its refusals once, however many tabs it reopened.
-    if (descriptor) await openFailures.batch(() => applyDropDescriptor(descriptor));
+    if (descriptor) await openFailures.batch(() => dropWorkflow.apply(descriptor));
 }
 
 /* Tab Display */
@@ -500,6 +212,7 @@ function openTabLink(tab, url) {
     });
     return true;
 }
+
 const boardView = createBoardView(document, {
     container: columnsContainer,
     presenter: tabPresenter,
@@ -511,9 +224,9 @@ const boardView = createBoardView(document, {
         onDragEnd: handleDragEnd,
         onTabSelect: handleFaviconClick,
         onTabOpen: openTabLink,
-        onTabMenu: openTabMenu,
-        onColumnMenu: openColumnMenu,
-        onGroupMenu: openGroupMenu,
+        onTabMenu: context => boardMenus.openTabMenu(context),
+        onColumnMenu: context => boardMenus.openColumnMenu(context),
+        onGroupMenu: context => boardMenus.openGroupMenu(context),
         onNoteSave: (tab, note) => saveTabNote(tab.id, note),
         onTitleSave: (tab, title) =>
             persistCanonicalState(updateTab(appState.getState(), tab.id, { title }), {
@@ -548,112 +261,36 @@ const boardView = createBoardView(document, {
             })
     }
 });
-
-function openTabMenu(context) {
-    const { tab, item, dateDisplay, moreOptionsButton, formattedDate } = context;
-    const selectedItems = document.querySelectorAll('.selected');
-    const isCurrentTabSelected = item.classList.contains('selected');
-
-    // Only clear the selection when opening an unselected tab's menu.
-    if (!isCurrentTabSelected) selectionController.clear();
-
-    let menuItems;
-    if (selectedItems.length > 1 && isCurrentTabSelected) {
-        // A multi-selection only offers the actions that apply to every tab.
-        const selectedTabIds = Array.from(selectedItems).map(selected =>
-            selected.id.slice('tab-'.length)
-        );
-        const hasDate = selectedTabIds.some(tabId => {
-            const selectedTab = getTab(appState.getState(), tabId);
-            return selectedTab && selectedTab.parsedDate;
-        });
-
-        menuItems = [
-            {
-                text: 'Clear Date',
-                action: () => {
-                    removeDate(selectedTabIds, dateDisplay);
-                    closeAllMenus();
-                },
-                hidden: !hasDate
-            },
-            { text: 'Color', action: () => openColorMenu(selectedTabIds, moreOptionsButton) },
-            { text: 'Delete', action: () => deleteTab(selectedTabIds) }
-        ];
-    } else {
-        const noteButtonText = tab.note && tab.note.trim() !== '' ? 'Edit Note' : 'Add Note';
-        menuItems = [
-            {
-                text: 'Rename',
-                action: () => {
-                    boardView.beginTitleEdit(item);
-                    closeAllMenus();
-                }
-            },
-            {
-                text: noteButtonText,
-                action: () => {
-                    boardView.beginNoteEdit(item);
-                    closeAllMenus();
-                }
-            },
-            {
-                text: 'Clear Date',
-                action: () => {
-                    removeDate(tab.id, dateDisplay);
-                    closeAllMenus();
-                },
-                hidden: !formattedDate
-            },
-            { text: 'Color', action: () => openColorMenu(tab.id, moreOptionsButton) },
-            { text: 'Delete', action: () => deleteTab(tab.id) }
-        ];
+boardMenus = createBoardMenuController(document, {
+    menuController,
+    selectionController,
+    colors: colorOptions,
+    getTab: tabId => getTab(appState.getState(), tabId),
+    beginTitleEdit: boardView.beginTitleEdit,
+    beginNoteEdit: boardView.beginNoteEdit,
+    handlers: {
+        onClearDates: tabIds => {
+            const nextState = updateTabs(appState.getState(), tabIds, { parsedDate: null });
+            persistCanonicalState(nextState, { includeColumns: false });
+        },
+        onColorChange: (tabIds, color) => {
+            const nextState = updateTabs(appState.getState(), tabIds, { color });
+            persistCanonicalState(nextState, { includeColumns: false });
+        },
+        onDeleteTabs: tabIds => persistCanonicalState(removeTabs(appState.getState(), tabIds)),
+        onOpenColumn: openAllInColumn,
+        onDeleteColumn: columnId => {
+            closeAllMenus();
+            persistCanonicalState(
+                removeColumn(appState.getState(), columnId, { deleteTabs: true })
+            );
+        },
+        onOpenGroup: openAllInGroup,
+        onUngroup: groupId => persistCanonicalState(ungroup(appState.getState(), groupId)),
+        onDeleteGroup: groupId =>
+            persistCanonicalState(removeGroup(appState.getState(), groupId, { deleteTabs: true }))
     }
-    menuController.toggle('options', tab.id, () =>
-        createMenuDropdown(menuItems, moreOptionsButton)
-    );
-}
-
-function openColumnMenu({ column, menuButton }) {
-    selectionController.clear();
-
-    const menuItems = [
-        { text: 'Open All', action: () => openAllInColumn(column.id) },
-        { text: 'Delete Column', action: () => deleteColumn(column) }
-    ];
-    menuController.toggle('column', column.id, () => createMenuDropdown(menuItems, menuButton));
-}
-
-function openGroupMenu({ group, moreOptionsButton }) {
-    selectionController.clear();
-
-    const menuItems = [
-        {
-            text: 'Open All',
-            action: () => {
-                openAllInGroup(group.id);
-                closeAllMenus();
-            }
-        },
-        {
-            text: 'Ungroup',
-            action: () => {
-                ungroupSubgroup(group.id);
-                closeAllMenus();
-            }
-        },
-        {
-            text: 'Delete',
-            action: () => {
-                deleteSubgroup(group.id);
-                closeAllMenus();
-            }
-        }
-    ];
-    menuController.toggle('options', group.id, () =>
-        createMenuDropdown(menuItems, moreOptionsButton)
-    );
-}
+});
 
 function displaySavedTabs(state) {
     newColumnIndicator = boardView.render(state);
@@ -689,42 +326,6 @@ function fetchOpenTabs() {
         });
 }
 
-// Firefox reports removals before the window settles, so it refreshes later.
-openTabs.onChanged(fetchOpenTabs, {
-    removalDelay: userBrowser === 'firefox' ? 150 : 0
-});
-browserApi.storage.onChanged.addListener(async changes => {
-    try {
-        const synchronized = await stateStorage.synchronize(changes);
-        if (synchronized?.type === 'state') {
-            console.log('Changes detected', changes);
-            if (changes.columnState && changes.animation) {
-                const column = document.getElementById(changes.animation.newValue.columnId);
-                if (changes.animation.newValue.minimized === true) {
-                    minimizeColumn(column);
-                } else {
-                    maximizeColumn(column);
-                }
-                return;
-            }
-            displaySavedTabs(synchronized.state);
-            return;
-        }
-        if (synchronized?.type === 'background-tabs') return;
-    } catch (error) {
-        console.error('Could not synchronize extension storage:', error);
-        return;
-    }
-
-    const sidebarChange = settings.readSidebarChange(changes);
-    if (sidebarChange) {
-        document
-            .getElementById('sidebar')
-            .classList.toggle('collapsed', sidebarChange.sidebarCollapsed);
-    }
-});
-fetchOpenTabs();
-
 async function initializeStoredState() {
     try {
         const result = await stateStorage.initialize();
@@ -740,8 +341,6 @@ async function initializeStoredState() {
     }
 }
 
-initializeStoredState();
-
 function setSidebarCollapsed(collapsed) {
     settings
         .saveSidebarCollapsed(collapsed)
@@ -754,16 +353,7 @@ function setSidebarCollapsed(collapsed) {
             console.error('Could not save the sidebar state:', error);
         });
 }
-document.querySelector('.minimize-sidebar').addEventListener('click', () => {
-    setSidebarCollapsed(true);
-});
-document.querySelector('.maximize-sidebar').addEventListener('click', () => {
-    setSidebarCollapsed(false);
-});
 
-document.addEventListener('dragover', function (event) {
-    event.preventDefault();
-});
 const handleClickOutside = e => {
     const clickedButton = e.target.closest('.more-options, .menu-option, .settings-button');
     const isMoreOptionsButton = clickedButton !== null;
@@ -789,103 +379,6 @@ const handleClickOutside = e => {
         emojiPickers.forEach(picker => (picker.style.display = 'none'));
     }
 };
-document.addEventListener('click', handleClickOutside);
-document.addEventListener('drop', handleDrop);
-document.addEventListener('dragover', event => dragController.handleDragOver(event));
-
-releaseNotes
-    .load()
-    .then(releaseState => {
-        let whatsNewClicked = releaseState.whatsNewClicked;
-
-        if (releaseState.isNewRelease) {
-            settingsButton.appendChild(createNotificationDot(document));
-        }
-
-        settingsButton.addEventListener('click', () => {
-            if (menuController.isOpen('settings', 'settings')) {
-                closeAllMenus();
-                return;
-            }
-
-            const settingsNotification = document.querySelector(
-                '.notification-circle:not(.inline-notification)'
-            );
-            if (settingsNotification) {
-                settingsNotification.remove();
-                releaseNotes.acknowledgeRelease().catch(error => {
-                    console.error('Could not save the installed release:', error);
-                });
-            }
-
-            let releaseNotesNotification = document.querySelector('.inline-notification');
-
-            const menuItems = [
-                {
-                    text: theme === 'dark' ? 'Toggle Light Theme' : 'Toggle Dark Theme',
-                    action: () => {
-                        toggleTheme();
-                        closeAllMenus();
-                    }
-                },
-                {
-                    text: 'Export Data',
-                    action: () => {
-                        exportAllData();
-                        closeAllMenus();
-                    }
-                },
-                {
-                    text: 'Import Data',
-                    action: () => {
-                        importAllData();
-                        closeAllMenus();
-                    }
-                },
-                {
-                    text: "What's New",
-                    action: () => {
-                        if (releaseNotesNotification) {
-                            releaseNotesNotification.remove();
-                        }
-                        openSettingsPage('https://tabsmagic.com/releasenotes');
-                        closeAllMenus();
-                        whatsNewClicked = true;
-                        releaseNotes.markWhatsNewClicked().catch(error => {
-                            console.error('Could not save the release notes state:', error);
-                        });
-                    }
-                },
-                {
-                    text: 'Feedback',
-                    action: () => {
-                        openSettingsPage('https://tabsmagic.com/contact');
-                        closeAllMenus();
-                    }
-                }
-            ];
-            const settingsMenu = menuController.open('settings', 'settings', () =>
-                createMenuDropdown(menuItems, settingsButton)
-            );
-
-            if (!whatsNewClicked) {
-                const whatsNewButton = Array.from(
-                    settingsMenu.querySelectorAll('button.menu-option')
-                ).find(btn => btn.textContent.trim().startsWith("What's New"));
-
-                if (whatsNewButton) {
-                    releaseNotesNotification = createNotificationDot(document, { inline: true });
-                    whatsNewButton.insertBefore(
-                        releaseNotesNotification,
-                        whatsNewButton.firstChild
-                    );
-                }
-            }
-        });
-    })
-    .catch(error => {
-        console.error('Could not read the installed release:', error);
-    });
 
 function openSettingsPage(url) {
     openTabs.openPage(url).catch(error => {
@@ -965,3 +458,100 @@ function importAllData() {
 
     input.click();
 }
+
+const settingsMenu = createSettingsMenuController(document, {
+    button: settingsButton,
+    menuController,
+    releaseService: releaseNotes,
+    getTheme: () => theme,
+    toggleTheme,
+    onExport: exportAllData,
+    onImport: importAllData,
+    onOpenPage: openSettingsPage,
+    onError: (message, error) => console.error(message, error)
+});
+
+settings
+    .load()
+    .then(stored => {
+        const sidebar = document.getElementById('sidebar');
+        sidebar.classList.add('no-transition');
+        if (stored.sidebarCollapsed) {
+            sidebar.classList.add('collapsed');
+        }
+        if (stored.storedTheme) {
+            theme = stored.storedTheme;
+            document.body.className = theme;
+        }
+
+        setTimeout(() => {
+            sidebar.classList.remove('no-transition');
+        }, 100);
+    })
+    .catch(error => {
+        console.error('Error updating sidebar:', error);
+    });
+
+document.getElementById('add-column').addEventListener('click', () => {
+    const nextState = addColumn(appState.getState(), createNewColumn());
+    persistCanonicalState(nextState, { includeTabs: false });
+});
+
+deletionArea = renderDeletionArea(document);
+document.documentElement.dataset.browser = userBrowser;
+
+// Firefox reports removals before the window settles, so it refreshes later.
+openTabs.onChanged(fetchOpenTabs, {
+    removalDelay: userBrowser === 'firefox' ? 150 : 0
+});
+browserApi.storage.onChanged.addListener(async changes => {
+    try {
+        const synchronized = await stateStorage.synchronize(changes);
+        if (synchronized?.type === 'state') {
+            console.log('Changes detected', changes);
+            if (changes.columnState && changes.animation) {
+                const column = document.getElementById(changes.animation.newValue.columnId);
+                if (changes.animation.newValue.minimized === true) {
+                    minimizeColumn(column);
+                } else {
+                    maximizeColumn(column);
+                }
+                return;
+            }
+            displaySavedTabs(synchronized.state);
+            return;
+        }
+        if (synchronized?.type === 'background-tabs') return;
+    } catch (error) {
+        console.error('Could not synchronize extension storage:', error);
+        return;
+    }
+
+    const sidebarChange = settings.readSidebarChange(changes);
+    if (sidebarChange) {
+        document
+            .getElementById('sidebar')
+            .classList.toggle('collapsed', sidebarChange.sidebarCollapsed);
+    }
+});
+fetchOpenTabs();
+
+initializeStoredState();
+
+document.querySelector('.minimize-sidebar').addEventListener('click', () => {
+    setSidebarCollapsed(true);
+});
+document.querySelector('.maximize-sidebar').addEventListener('click', () => {
+    setSidebarCollapsed(false);
+});
+
+document.addEventListener('dragover', function (event) {
+    event.preventDefault();
+});
+document.addEventListener('click', handleClickOutside);
+document.addEventListener('drop', handleDrop);
+document.addEventListener('dragover', event => dragController.handleDragOver(event));
+
+settingsMenu.start().catch(error => {
+    console.error('Could not read the installed release:', error);
+});

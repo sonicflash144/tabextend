@@ -18,7 +18,7 @@ import {
     setSubgroupExpanded
 } from '../../src/ui/rendering.mjs';
 import { createEditableTitleController } from '../../src/ui/controllers/editable-title-controller.mjs';
-import { click, createPageDom, setRect } from '../helpers/dom.mjs';
+import { click, createPageDom, loadPageStyles, setRect } from '../helpers/dom.mjs';
 
 let page;
 let document;
@@ -26,6 +26,7 @@ let document;
 before(() => {
     page = createPageDom();
     document = page.document;
+    loadPageStyles(document);
 });
 
 after(() => page.cleanup());
@@ -37,7 +38,7 @@ function savedTabView(overrides = {}) {
         faviconUrl: 'https://example.com/icon.png',
         colorClass: 'tab-blue',
         formattedDate: '',
-        dateDisplayColor: '',
+        dateDisplayClass: '',
         noteDisplayText: '',
         noteEditableText: '',
         ...overrides
@@ -64,11 +65,18 @@ test('the page markup the extension ships provides the containers the app needs'
     assert.ok(document.getElementById('add-column'));
 });
 
+test('the column strip scrolls horizontally without creating a secondary vertical scrollbar', () => {
+    const style = page.window.getComputedStyle(document.getElementById('columns-container'));
+
+    assert.equal(style.overflowX, 'auto');
+    assert.equal(style.overflowY, 'hidden');
+});
+
 test('a saved tab renders its title, note, date, and colour', () => {
     const view = savedTabView({
         tab: { id: 'alpha', title: 'Alpha' },
         formattedDate: 'Tomorrow',
-        dateDisplayColor: 'rgb(255, 0, 0)',
+        dateDisplayClass: 'date-tomorrow',
         noteDisplayText: 'a note',
         noteEditableText: 'a note'
     });
@@ -86,6 +94,7 @@ test('a saved tab renders its title, note, date, and colour', () => {
     assert.equal(view.noteInput.value, 'a note');
     assert.equal(view.dateDisplay.textContent, 'Tomorrow');
     assert.equal(view.dateDisplay.classList.contains('hidden'), false);
+    assert.equal(view.dateDisplay.classList.contains('date-tomorrow'), true);
 });
 
 test('a saved tab without a date keeps its date row hidden', () => {
@@ -222,7 +231,7 @@ test('a column without a stored emoji falls back to the supplied one', () => {
     assert.ok(view.emojiPicker.classList.contains('dark'));
 });
 
-test('minimizing and maximizing a column flips its header and hides its tabs', () => {
+test('minimizing and maximizing a column derives its presentation from one class', t => {
     const { titleGroup } = columnTitleGroup();
     const { column } = createColumnView(document, {
         id: 'column-1',
@@ -233,18 +242,76 @@ test('minimizing and maximizing a column flips its header and hides its tabs', (
         fallbackEmoji: '🍎'
     });
     column.appendChild(savedTabView().item);
+    document.getElementById('columns-container').appendChild(column);
+    t.after(() => column.remove());
+    const expandedHeight = page.window.getComputedStyle(column).height;
 
     setColumnMinimized(column, true);
     assert.ok(column.classList.contains('minimized'));
-    assert.ok(column.querySelector('.column-title-text').classList.contains('vertical-text'));
-    assert.equal(column.querySelector('.maximize-column').style.display, 'inline');
-    assert.equal(column.querySelector('.minimize-column').style.display, 'none');
-    assert.equal(column.querySelector('.tab-item').style.display, 'none');
+    assert.equal(page.window.getComputedStyle(column).height, expandedHeight);
+    assert.equal(
+        page.window.getComputedStyle(column.querySelector('.maximize-column')).display,
+        'inline'
+    );
+    assert.equal(
+        page.window.getComputedStyle(column.querySelector('.minimize-column')).display,
+        'none'
+    );
+    assert.equal(page.window.getComputedStyle(column.querySelector('.tab-item')).display, 'none');
+    assert.equal(
+        page.window.getComputedStyle(column.querySelector('.column-title-text')).writingMode,
+        'vertical-lr'
+    );
+    assert.equal(
+        page.window.getComputedStyle(column.querySelector('.column-title-input')).writingMode,
+        'vertical-lr'
+    );
+    assert.equal(
+        page.window.getComputedStyle(column.querySelector('.header-container')).flexDirection,
+        'column'
+    );
+    assert.equal(
+        page.window.getComputedStyle(column.querySelector('.title-group')).flexDirection,
+        'column'
+    );
+    assert.equal(
+        page.window.getComputedStyle(column.querySelector('.menu-container')).marginLeft,
+        '0px'
+    );
+    assert.equal(
+        page.window.getComputedStyle(column.querySelector('.menu-container .more-options'))
+            .transform,
+        'rotate(90deg)'
+    );
 
     setColumnMinimized(column, false);
     assert.equal(column.classList.contains('minimized'), false);
-    assert.equal(column.querySelector('.tab-item').style.display, 'flex');
-    assert.equal(column.querySelector('.maximize-column').style.display, 'none');
+    assert.equal(page.window.getComputedStyle(column.querySelector('.tab-item')).display, 'flex');
+    assert.equal(
+        page.window.getComputedStyle(column.querySelector('.maximize-column')).display,
+        'none'
+    );
+    assert.equal(
+        page.window.getComputedStyle(column.querySelector('.minimize-column')).display,
+        'inline-block'
+    );
+    assert.equal(
+        page.window.getComputedStyle(column.querySelector('.column-title-text')).writingMode,
+        'horizontal-tb'
+    );
+    assert.equal(
+        page.window.getComputedStyle(column.querySelector('.header-container')).flexDirection,
+        'row'
+    );
+    assert.equal(
+        page.window.getComputedStyle(column.querySelector('.title-group')).flexDirection,
+        'row'
+    );
+    assert.equal(
+        page.window.getComputedStyle(column.querySelector('.menu-container .more-options'))
+            .transform,
+        'none'
+    );
 });
 
 test('a subgroup starts collapsed and toggles between previews and tabs', () => {
@@ -341,7 +408,7 @@ test('links inside a row never become the drag source', () => {
 
 test('an open tab renders collapsed when the sidebar is collapsed', () => {
     const view = createOpenTabView(document, {
-        tab: { id: 42, title: 'Open tab' },
+        tab: { id: 42, title: 'Open tab', pinned: true },
         classes: ['collapsed'],
         faviconUrl: 'https://example.com/icon.png'
     });
@@ -351,6 +418,10 @@ test('an open tab renders collapsed when the sidebar is collapsed', () => {
     assert.equal(view.title.textContent, 'Open tab');
     assert.ok(view.closeButton.classList.contains('close-button'));
     assert.ok(view.infoLeft.querySelector('img').classList.contains('tab-favicon'));
+    assert.equal(
+        view.faviconContainer.querySelector('.pinned-tab-indicator').ariaLabel,
+        'Pinned tab'
+    );
 });
 
 test('an open local file marks its fallback slot like any other sidebar favicon', () => {

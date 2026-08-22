@@ -12,7 +12,6 @@ import {
     getColumnTabs,
     getGroupTabs,
     getTab,
-    replaceColumnsFromLegacy,
     validateCanonicalState
 } from '../../src/domain/state.mjs';
 
@@ -72,19 +71,6 @@ test('excludes temp markers from memory and adds one only when requested', () =>
     assert.deepEqual(canonicalStateToLegacy(state, { tempMarker: 200 }).savedTabs[1], {
         temp: 200
     });
-});
-
-test('replaces columns while retaining canonical tab records', () => {
-    const state = canonicalStateFromLegacy(
-        [{ id: 'one', title: 'One', url: 'https://example.com' }],
-        [{ id: 'old', title: 'Old', tabIds: ['tab-one'] }]
-    );
-    const updated = replaceColumnsFromLegacy(state, [
-        { id: 'new', title: 'New', tabIds: ['tab-one'] }
-    ]);
-
-    assert.equal(getTab(updated, 'one').title, 'One');
-    assert.equal(updated.columns[0].id, 'new');
 });
 
 test('canonical validation catches missing references', () => {
@@ -185,17 +171,14 @@ test('canonical validation reports malformed columns, items, and group tab lists
     assert.match(errors, /columns\[1\]\.items\[1\]\.tabIds must be an array/);
 });
 
-test('state store replaces legacy state and notifies subscribers', () => {
-    const store = createStateStore();
-    const seen = [];
-    const unsubscribe = store.subscribe(state => seen.push(state.columns.length));
+test('state store holds and replaces canonical state', () => {
+    const initialState = canonicalStateFromLegacy([], []);
+    const nextState = canonicalStateFromLegacy([], [{ id: 'one', title: 'One', tabIds: [] }]);
+    const store = createStateStore(initialState);
 
-    store.replaceLegacy([], [{ id: 'one', title: 'One', tabIds: [] }]);
-    unsubscribe();
-    store.replaceLegacy([], []);
-
-    assert.deepEqual(seen, [1]);
-    assert.equal(store.getState().columns.length, 0);
+    assert.equal(store.getState(), initialState);
+    assert.equal(store.replace(nextState), nextState);
+    assert.equal(store.getState(), nextState);
 });
 
 function boardState() {

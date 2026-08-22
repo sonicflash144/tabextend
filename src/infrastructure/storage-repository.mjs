@@ -1,4 +1,4 @@
-import { createExtensionEventAdapter, createExtensionMethod } from './chrome-primitives.mjs';
+import { createExtensionEventAdapter, createExtensionMethod } from './extension-primitives.mjs';
 
 /**
  * Storage boundary used by both extension entry points. Methods support the

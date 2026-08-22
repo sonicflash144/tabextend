@@ -33,10 +33,10 @@ const WEEKDAY_NAMES = [
  */
 export const LOCAL_FILE_ICON = 'file';
 
-const OVERDUE_COLOR = '#e63c30';
-const TODAY_COLOR = '#058527';
-const TOMORROW_COLOR = '#C76E00';
-const LATER_COLOR = '#ababab';
+const OVERDUE_DATE_CLASS = 'date-overdue';
+const TODAY_DATE_CLASS = 'date-today';
+const TOMORROW_DATE_CLASS = 'date-tomorrow';
+const LATER_DATE_CLASS = 'date-later';
 
 /** Stored colours may already be a palette class or a legacy hex value. */
 export function resolveColorClass(color) {
@@ -55,21 +55,21 @@ export function daysUntil(date, now = Date.now()) {
 /** The reminder badge: a relative name when it is near, a date when it is not. */
 export function formatTabDate(parsedDate, options = {}) {
     if (!parsedDate) {
-        return { formattedDate: '', dateDisplayColor: OVERDUE_COLOR };
+        return { formattedDate: '', dateDisplayClass: OVERDUE_DATE_CLASS };
     }
 
     const { now = Date.now() } = options;
     const date = new Date(parsedDate);
     const diffDays = daysUntil(date, now);
     let formattedDate;
-    let dateDisplayColor = LATER_COLOR;
+    let dateDisplayClass = LATER_DATE_CLASS;
 
     if (diffDays === 0) {
         formattedDate = 'Today';
-        dateDisplayColor = TODAY_COLOR;
+        dateDisplayClass = TODAY_DATE_CLASS;
     } else if (diffDays === 1) {
         formattedDate = 'Tomorrow';
-        dateDisplayColor = TOMORROW_COLOR;
+        dateDisplayClass = TOMORROW_DATE_CLASS;
     } else if (diffDays >= 2 && diffDays <= 7) {
         formattedDate = WEEKDAY_NAMES[date.getDay()];
     } else {
@@ -79,9 +79,9 @@ export function formatTabDate(parsedDate, options = {}) {
         formattedDate = `${month}/${day}/${year}`;
     }
 
-    if (diffDays < 0) dateDisplayColor = OVERDUE_COLOR;
+    if (diffDays < 0) dateDisplayClass = OVERDUE_DATE_CLASS;
 
-    return { formattedDate, dateDisplayColor };
+    return { formattedDate, dateDisplayClass };
 }
 
 /**

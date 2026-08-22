@@ -8,7 +8,7 @@ export function createExtensionMethod(target, methodName, runtime, errorResult, 
     if (!target || typeof target[methodName] !== 'function') {
         return (...args) => {
             const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
-            const error = new Error(`Chrome API method is unavailable: ${methodName}`);
+            const error = new Error(`WebExtension API method is unavailable: ${methodName}`);
             if (callback) {
                 callback(errorResult, error);
                 return undefined;
@@ -91,7 +91,3 @@ export function createExtensionEventAdapter(event) {
         }
     };
 }
-
-// Kept as aliases for modules that consumed the original Chrome-specific names.
-export const createChromeMethod = createExtensionMethod;
-export const createChromeEventAdapter = createExtensionEventAdapter;

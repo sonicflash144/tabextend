@@ -195,27 +195,7 @@ export function createDraggableListItem(document, options = {}) {
 }
 
 export function setColumnMinimized(column, minimized) {
-    const titleSpan = column.querySelector('.column-title-text');
-    const titleInput = column.querySelector('.column-title-input');
-    const maximizeButton = column.querySelector('.maximize-column');
-    const minimizeButton = column.querySelector('.minimize-column');
-    const titleGroup = column.querySelector('.title-group');
-    const menuContainer = column.querySelector('.menu-container');
-    const menuButton = column.querySelector('.more-options');
-    const headerContainer = column.querySelector('.header-container');
-
     column.classList.toggle('minimized', minimized);
-    titleSpan.classList.toggle('vertical-text', minimized);
-    titleInput.classList.toggle('vertical-text', minimized);
-    titleGroup.classList.toggle('vertical', minimized);
-    maximizeButton.style.display = minimized ? 'inline' : 'none';
-    minimizeButton.style.display = minimized ? 'none' : 'inline';
-    menuContainer.classList.toggle('vertical', minimized);
-    menuButton.classList.toggle('vertical', minimized);
-    headerContainer.classList.toggle('vertical', minimized);
-    column.querySelectorAll('.tab-item').forEach(item => {
-        item.style.display = minimized ? 'none' : 'flex';
-    });
 }
 
 export function setSubgroupExpanded(expandButton, expanded) {
@@ -283,7 +263,7 @@ export function createSavedTabView(document, options) {
         faviconFallback,
         colorClass,
         formattedDate,
-        dateDisplayColor,
+        dateDisplayClass,
         noteDisplayText,
         noteEditableText,
         onDragStart,
@@ -337,7 +317,7 @@ export function createSavedTabView(document, options) {
     if (!formattedDate) dateDisplay.classList.add('hidden');
     dateDisplay.id = `date-display-${tab.id}`;
     dateDisplay.textContent = formattedDate || '';
-    dateDisplay.style.backgroundColor = dateDisplayColor;
+    if (dateDisplayClass) dateDisplay.classList.add(dateDisplayClass);
     infoRight.append(titleDisplay, titleInput, noteDisplay, noteInput, dateDisplay);
 
     const actions = document.createElement('div');
@@ -476,9 +456,18 @@ export function createOpenTabView(document, options) {
     infoContainer.classList.add('tab-info-container');
     const infoLeft = document.createElement('div');
     infoLeft.classList.add('tab-info-left');
+    const faviconContainer = document.createElement('div');
+    faviconContainer.classList.add('open-tab-favicon-container');
     const faviconImage = createFavicon(document, { faviconUrl, faviconFallback });
     faviconImage.draggable = false;
-    infoLeft.appendChild(faviconImage);
+    faviconContainer.appendChild(faviconImage);
+    if (tab.pinned === true) {
+        const pinIndicator = document.createElement('span');
+        pinIndicator.classList.add('pinned-tab-indicator');
+        pinIndicator.setAttribute('aria-label', 'Pinned tab');
+        faviconContainer.appendChild(pinIndicator);
+    }
+    infoLeft.appendChild(faviconContainer);
     const infoRight = document.createElement('div');
     infoRight.classList.add('tab-info-right');
     const title = document.createElement('span');
@@ -494,7 +483,7 @@ export function createOpenTabView(document, options) {
     actions.appendChild(closeButton);
     infoContainer.append(infoLeft, infoRight, actions);
     item.appendChild(infoContainer);
-    return { item, infoLeft, title, closeButton };
+    return { item, infoLeft, faviconContainer, title, closeButton };
 }
 
 export function createNewColumnIndicator(document) {

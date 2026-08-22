@@ -84,6 +84,19 @@ export function createDragController(document, options = {}) {
         return toArray(document.querySelectorAll('.dragging'));
     }
 
+    function describeDraggedItem(item) {
+        if (item.id.startsWith('opentab-')) {
+            return { type: 'open-tab', browserTabId: Number(item.id.slice('opentab-'.length)) };
+        }
+        if (item.classList.contains('subgroup-item')) {
+            return { type: 'group', groupId: item.id };
+        }
+        if (item.id.startsWith('tab-')) {
+            return { type: 'tab', tabId: item.id.slice('tab-'.length) };
+        }
+        return null;
+    }
+
     /**
      * Insertion index within a list of item elements. A dragged subgroup
      * ignores items nested inside other subgroups.
@@ -379,10 +392,10 @@ export function createDragController(document, options = {}) {
 
         if (droppedColumn && droppedColumn.classList.contains('column')) {
             return deletionArea.contains(event.target)
-                ? { type: 'delete-column', column: droppedColumn }
+                ? { type: 'delete-column', columnId: droppedColumn.id }
                 : {
                       type: 'move-column',
-                      column: droppedColumn,
+                      columnId: droppedColumn.id,
                       index: columnDropIndex(event)
                   };
         }
@@ -393,12 +406,13 @@ export function createDragController(document, options = {}) {
             toArray(document.querySelectorAll('.tab-item')).find(item => item.id === droppedId);
         if (!tabItem) return null;
         const items = dragged.length > 1 ? dragged : [tabItem];
+        const draggedItems = items.map(describeDraggedItem).filter(Boolean);
 
         if (deletionArea.contains(event.target)) {
-            return { type: 'delete-items', items };
+            return { type: 'delete-items', dragged: draggedItems };
         }
         if (getNewColumnIndicator().contains(event.target)) {
-            return { type: 'new-column', items };
+            return { type: 'new-column', dragged: draggedItems };
         }
 
         const columnElement = event.target.closest('.column');
@@ -414,7 +428,7 @@ export function createDragController(document, options = {}) {
         const dropPosition = dropIndexForItems(event, listItems, isMinimized);
 
         if (destination.id === OPEN_TABS_LIST_ID) {
-            return { type: 'open-tabs', items, index: dropPosition };
+            return { type: 'open-tabs', dragged: draggedItems, index: dropPosition };
         }
 
         // Reordering within the subgroup the whole selection came from. A
@@ -428,7 +442,7 @@ export function createDragController(document, options = {}) {
             );
             return {
                 type: 'group',
-                items,
+                dragged: draggedItems,
                 groupId: draggedFromSubgroup.id,
                 index: dropIndexForItems(event, subgroupItems, false)
             };
@@ -438,7 +452,7 @@ export function createDragController(document, options = {}) {
         if (targetItem) {
             return {
                 type: 'item',
-                items,
+                dragged: draggedItems,
                 item: targetItem.classList.contains('subgroup-item')
                     ? { type: 'group', groupId: targetItem.id }
                     : { type: 'tab', tabId: targetItem.id.slice('tab-'.length) }
@@ -447,7 +461,7 @@ export function createDragController(document, options = {}) {
 
         return {
             type: 'column',
-            items,
+            dragged: draggedItems,
             columnId: destination.id,
             index: dropPosition
         };

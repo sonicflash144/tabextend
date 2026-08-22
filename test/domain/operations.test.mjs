@@ -14,7 +14,8 @@ import {
     ungroup,
     updateColumn,
     updateGroup,
-    updateTab
+    updateTab,
+    updateTabs
 } from '../../src/domain/operations.mjs';
 
 function stateFixture() {
@@ -51,6 +52,19 @@ test('tab operations add, update, and remove records without mutating prior stat
     assert.equal(removed.tabs.has('two'), false);
     assert.deepEqual(removed.tabOrder, ['one', 'three', 'four']);
     assert.deepEqual(removed.columns[0].items, [{ type: 'tab', tabId: 'one' }]);
+});
+
+test('updates several tabs in one immutable transformation', () => {
+    const initial = stateFixture();
+    const updated = updateTabs(initial, ['one', 'two', 'missing', 'one'], tab => ({
+        title: `${tab.title}!`
+    }));
+
+    assert.equal(updated.tabs.get('one').title, 'One!');
+    assert.equal(updated.tabs.get('two').title, 'Two!');
+    assert.equal(updated.tabs.get('three').title, 'Three');
+    assert.equal(initial.tabs.get('one').title, 'One');
+    assert.equal(updateTabs(initial, ['missing'], { title: 'No change' }), initial);
 });
 
 test('column operations preserve metadata while adding, updating, moving, and deleting', () => {

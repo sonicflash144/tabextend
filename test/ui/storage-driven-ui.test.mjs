@@ -232,10 +232,7 @@ test('dragging a tab onto another writes a subgroup that renders back', async ()
     assert.deepEqual(descriptor.item, { type: 'tab', tabId: 'beta' });
 
     const nextState = applyDrop(stateStore.getState(), {
-        dragged: descriptor.items.map(item => ({
-            type: 'tab',
-            tabId: item.id.slice('tab-'.length)
-        })),
+        dragged: descriptor.dragged,
         target: { type: 'item', item: descriptor.item },
         groupIdFactory: () => 'group-new'
     });

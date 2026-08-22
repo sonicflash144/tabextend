@@ -4,7 +4,7 @@ import { after, before, beforeEach, test } from 'node:test';
 import { canonicalStateFromLegacy } from '../../src/domain/state.mjs';
 import { createBoardView } from '../../src/ui/board-view.mjs';
 import { createTabPresenter } from '../../src/ui/tab-presentation.mjs';
-import { click, createPageDom, keyDown, setRect } from '../helpers/dom.mjs';
+import { click, createPageDom, keyDown, loadPageStyles, setRect } from '../helpers/dom.mjs';
 
 const NOON = new Date('2026-08-13T12:00:00').getTime();
 
@@ -14,6 +14,7 @@ let document;
 before(() => {
     page = createPageDom();
     document = page.document;
+    loadPageStyles(document);
 });
 
 after(() => page.cleanup());
@@ -142,8 +143,11 @@ test('a minimized column is collapsed after its tabs are rendered', () => {
 
     const column = document.getElementById('column-1');
     assert.ok(column.classList.contains('minimized'));
-    assert.equal(column.querySelector('.tab-item').style.display, 'none');
-    assert.equal(column.querySelector('.maximize-column').style.display, 'inline');
+    assert.equal(page.window.getComputedStyle(column.querySelector('.tab-item')).display, 'none');
+    assert.equal(
+        page.window.getComputedStyle(column.querySelector('.maximize-column')).display,
+        'inline'
+    );
 });
 
 test('a subgroup renders previews, nested tabs, and honours its expanded flag', () => {
@@ -567,6 +571,8 @@ test('typing a date into a note previews the due date it will be saved with', ()
 
     assert.equal(dateDisplay.textContent, 'Tomorrow');
     assert.equal(dateDisplay.classList.contains('hidden'), false);
+    assert.equal(dateDisplay.classList.contains('date-tomorrow'), true);
+    assert.equal(dateDisplay.classList.contains('date-overdue'), false);
 
     // Removing the date hides the badge again for a tab that had none.
     noteInput.value = 'ship it';
@@ -592,6 +598,7 @@ test('a tab that already has a due date keeps it while the note is edited', () =
     const dateDisplay = document.querySelector('#tab-alpha .date-display');
     const noteInput = document.querySelector('#tab-alpha .tab-note');
     assert.equal(dateDisplay.textContent, 'Today');
+    assert.equal(dateDisplay.classList.contains('date-today'), true);
 
     noteInput.value = 'no date here';
     noteInput.dispatchEvent(new page.window.Event('input'));

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { createChromeApiAdapters } from '../../src/infrastructure/chrome-api.mjs';
+import { createBrowserApiAdapters } from '../../src/infrastructure/browser-api.mjs';
 import { createStorageRepository } from '../../src/infrastructure/storage-repository.mjs';
 
 function createEvent() {
@@ -144,7 +144,7 @@ test('callback API reports errors without exposing runtime.lastError', async () 
         callback([]);
         chromeApi.runtime.lastError = null;
     };
-    const api = createChromeApiAdapters(chromeApi);
+    const api = createBrowserApiAdapters(chromeApi);
     const result = await new Promise(resolve => {
         api.tabs.query({}, (tabs, error) => resolve({ tabs, error }));
     });
@@ -154,7 +154,7 @@ test('callback API reports errors without exposing runtime.lastError', async () 
 });
 
 test('tab and tab-group adapters preserve arguments and results', async () => {
-    const api = createChromeApiAdapters(createFakeChrome());
+    const api = createBrowserApiAdapters(createFakeChrome());
 
     assert.deepEqual(await api.tabs.get(7), { id: 7, title: 'Tab 7' });
     assert.deepEqual(await api.tabs.create({ url: 'https://example.com' }), {
@@ -170,7 +170,7 @@ test('tab and tab-group adapters preserve arguments and results', async () => {
 
 test('event adapters subscribe and unsubscribe listeners', () => {
     const chromeApi = createFakeChrome();
-    const api = createChromeApiAdapters(chromeApi);
+    const api = createBrowserApiAdapters(chromeApi);
     let calls = 0;
     const listener = () => {
         calls += 1;
@@ -186,6 +186,6 @@ test('event adapters subscribe and unsubscribe listeners', () => {
 });
 
 test('runtime adapter exposes manifest data', () => {
-    const api = createChromeApiAdapters(createFakeChrome());
+    const api = createBrowserApiAdapters(createFakeChrome());
     assert.equal(api.runtime.getManifest().version, '1.2.3');
 });

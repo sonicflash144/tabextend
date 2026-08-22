@@ -53,7 +53,8 @@ function openTabs() {
             id: 7,
             title: 'Alpha',
             url: 'https://example.com/alpha',
-            favIconUrl: 'https://example.com/icon.png'
+            favIconUrl: 'https://example.com/icon.png',
+            pinned: true
         },
         { id: 9, title: 'Beta', url: 'https://beta.test/page' }
     ];
@@ -102,6 +103,17 @@ test('a tab without an icon falls back to the favicon service', () => {
         list.children[1].querySelector('img').getAttribute('src'),
         'https://www.google.com/s2/favicons?domain=beta.test&sz=32'
     );
+});
+
+test('only pinned tabs show a pin over their favicon', () => {
+    const { view } = createView();
+
+    view.render(openTabs());
+
+    const pinnedIndicator = list.children[0].querySelector('.pinned-tab-indicator');
+    assert.ok(pinnedIndicator);
+    assert.equal(pinnedIndicator.getAttribute('aria-label'), 'Pinned tab');
+    assert.equal(list.children[1].querySelector('.pinned-tab-indicator'), null);
 });
 
 test('an unsafe icon url is dropped rather than rendered', () => {

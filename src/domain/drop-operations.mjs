@@ -1,4 +1,4 @@
-import { cloneCanonicalState, findGroupLocation, removeTabPlacements } from './operations.mjs';
+import { findGroupLocation, removeTabPlacements } from './operations.mjs';
 
 function normalizeId(id) {
     return String(id);
@@ -74,12 +74,13 @@ function normalizeDragged(state, dragged) {
 }
 
 function removeDraggedItems(state, draggedGroupIds, draggedTabIds) {
-    const nextState = cloneCanonicalState(state);
-    nextState.columns = nextState.columns.map(column => ({
-        ...column,
-        items: column.items.filter(item => item.type !== 'group' || !draggedGroupIds.has(item.id))
-    }));
-    return removeTabPlacements(nextState, draggedTabIds);
+    const nextState = removeTabPlacements(state, draggedTabIds);
+    nextState.columns.forEach(column => {
+        column.items = column.items.filter(
+            item => item.type !== 'group' || !draggedGroupIds.has(item.id)
+        );
+    });
+    return nextState;
 }
 
 function flattenedTabIds(payload) {

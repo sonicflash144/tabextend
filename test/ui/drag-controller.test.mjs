@@ -274,13 +274,13 @@ test('dropping a column on the deletion area deletes it, elsewhere reorders it',
 
     assert.deepEqual(
         controller.resolveDrop(dragEvent('drop', deletionArea, { data: 'column-1' })),
-        { type: 'delete-column', column: first }
+        { type: 'delete-column', columnId: 'column-1' }
     );
 
     const moved = controller.resolveDrop(
         dragEvent('drop', columnsContainer, { data: 'column-1', clientX: 800 })
     );
-    assert.deepEqual(moved, { type: 'move-column', column: first, index: 2 });
+    assert.deepEqual(moved, { type: 'move-column', columnId: 'column-1', index: 2 });
 });
 
 test('dropping tabs into a column inserts them at the pointer', () => {
@@ -295,7 +295,7 @@ test('dropping tabs into a column inserts them at the pointer', () => {
 
     assert.deepEqual(descriptor, {
         type: 'column',
-        items: [rows[0]],
+        dragged: [{ type: 'tab', tabId: '1' }],
         columnId: 'column-1',
         index: 2
     });
@@ -313,7 +313,7 @@ test('resting the pointer on another tab groups onto it', () => {
 
     assert.deepEqual(descriptor, {
         type: 'item',
-        items: [rows[0]],
+        dragged: [{ type: 'tab', tabId: '1' }],
         item: { type: 'tab', tabId: '2' }
     });
 });
@@ -332,7 +332,7 @@ test('a tab dropped back on its own subgroup is reordered inside it', () => {
 
     assert.deepEqual(descriptor, {
         type: 'group',
-        items: [nested[0]],
+        dragged: [{ type: 'tab', tabId: '1' }],
         groupId: 'group-1',
         index: 2
     });
@@ -351,7 +351,7 @@ test('dragging the subgroup itself onto itself moves it instead of reordering', 
     );
 
     assert.equal(descriptor.type, 'column');
-    assert.deepEqual(descriptor.items, [item]);
+    assert.deepEqual(descriptor.dragged, [{ type: 'group', groupId: 'group-1' }]);
 });
 
 test('a selection holding a subgroup and one of its tabs is moved, not reordered', () => {
@@ -369,7 +369,10 @@ test('a selection holding a subgroup and one of its tabs is moved, not reordered
     );
 
     assert.equal(descriptor.type, 'column');
-    assert.equal(descriptor.items.length, 2);
+    assert.deepEqual(descriptor.dragged, [
+        { type: 'group', groupId: 'group-1' },
+        { type: 'tab', tabId: '1' }
+    ]);
 });
 
 test('drops onto the deletion area, a new column, and the sidebar', () => {
@@ -380,11 +383,11 @@ test('drops onto the deletion area, a new column, and the sidebar', () => {
 
     assert.deepEqual(controller.resolveDrop(dragEvent('drop', deletionArea, { data: 'tab-1' })), {
         type: 'delete-items',
-        items: [row]
+        dragged: [{ type: 'tab', tabId: '1' }]
     });
     assert.deepEqual(
         controller.resolveDrop(dragEvent('drop', newColumnIndicator, { data: 'tab-1' })),
-        { type: 'new-column', items: [row] }
+        { type: 'new-column', dragged: [{ type: 'tab', tabId: '1' }] }
     );
     assert.deepEqual(
         controller.resolveDrop(
@@ -392,7 +395,7 @@ test('drops onto the deletion area, a new column, and the sidebar', () => {
                 data: 'tab-1'
             })
         ),
-        { type: 'open-tabs', items: [row], index: 0 }
+        { type: 'open-tabs', dragged: [{ type: 'tab', tabId: '1' }], index: 0 }
     );
 });
 
