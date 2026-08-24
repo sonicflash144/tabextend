@@ -254,6 +254,7 @@ test('dragging near an edge scrolls the column container until it is released', 
 
     const scrolled = [];
     columnsContainer.scrollBy = (x, y) => scrolled.push([x, y]);
+    column.scrollBy = () => {};
 
     dragOver(column, 110, 960);
     assert.equal(frames.length, 1);
@@ -265,6 +266,23 @@ test('dragging near an edge scrolls the column container until it is released', 
     dragOver(column, 400, 600);
     frames.forEach(frame => frame());
     assert.equal(scrolled.length, 1);
+});
+
+test('dragging near a column edge scrolls that column vertically, independent of the board', () => {
+    const column = addColumn('column-1', { rect: { top: 64, height: 400, left: 240, width: 300 } });
+    const row = addTab(column, 'tab-1');
+    stackRects([row], { top: 100, height: 40, left: 240, width: 300 });
+    controller.handleTabDragStart(dragEvent('dragstart', row));
+
+    const scrolledColumn = [];
+    column.scrollBy = (x, y) => scrolledColumn.push([x, y]);
+
+    // Near the column's own bottom edge (464), clear of the board's edges.
+    dragOver(column, 450, 600);
+    assert.equal(frames.length, 1);
+    frames.pop()();
+    assert.equal(scrolledColumn.length, 1);
+    assert.ok(scrolledColumn[0][1] > 0, 'scrolls the column down, towards its bottom edge');
 });
 
 test('dropping a column on the deletion area deletes it, elsewhere reorders it', () => {

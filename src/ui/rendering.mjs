@@ -294,6 +294,7 @@ export function createSavedTabView(document, options) {
     titleDisplay.id = `title-display-${tab.id}`;
     titleDisplay.style.textDecoration = 'none';
     titleDisplay.textContent = typeof tab.title === 'string' ? tab.title : '';
+    titleDisplay.title = titleDisplay.textContent;
     // Local files already have to open through the tabs API. Leaving their
     // `file://` URL on an anchor lets Safari claim the gesture as a native
     // link drag before the draggable row can receive it.
@@ -479,6 +480,7 @@ export function createOpenTabView(document, options) {
     const title = document.createElement('span');
     title.classList.add('tab-title');
     title.textContent = typeof tab.title === 'string' ? tab.title : '';
+    title.title = title.textContent;
     infoRight.appendChild(title);
     const actions = document.createElement('div');
     actions.classList.add('tab-actions');

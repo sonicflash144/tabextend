@@ -37,20 +37,30 @@ export function createDragController(document, options = {}) {
         isScrolling: false,
         scrollX: 0,
         scrollY: 0,
+        verticalTarget: null,
         animationFrameId: null
     };
 
-    function startScrolling(container) {
-        function animate() {
-            if (!scrollAnimation.isScrolling) return;
+    // The board scrolls horizontally as one piece, but each column scrolls
+    // vertically on its own, so the two axes can target different elements.
+    // Browsers that auto-scroll a scrollable ancestor during native drag and
+    // drop (Chrome, Firefox) would otherwise mask this: Safari does not, so
+    // without this the vertical case only ever "worked" there by accident.
+    function animate() {
+        if (!scrollAnimation.isScrolling) return;
 
-            if (scrollAnimation.scrollX !== 0 || scrollAnimation.scrollY !== 0) {
-                container.scrollBy(scrollAnimation.scrollX, scrollAnimation.scrollY);
-                scrollAnimation.animationFrameId = requestFrame(animate);
-            } else {
-                stopScrolling();
-            }
+        const { scrollX, scrollY, verticalTarget } = scrollAnimation;
+        if (scrollX !== 0) columnsContainer.scrollBy(scrollX, 0);
+        if (scrollY !== 0 && verticalTarget) verticalTarget.scrollBy(0, scrollY);
+
+        if (scrollX !== 0 || (scrollY !== 0 && verticalTarget)) {
+            scrollAnimation.animationFrameId = requestFrame(animate);
+        } else {
+            stopScrolling();
         }
+    }
+
+    function startScrolling() {
         scrollAnimation.animationFrameId = requestFrame(animate);
     }
 
@@ -58,6 +68,7 @@ export function createDragController(document, options = {}) {
         scrollAnimation.isScrolling = false;
         scrollAnimation.scrollX = 0;
         scrollAnimation.scrollY = 0;
+        scrollAnimation.verticalTarget = null;
         if (scrollAnimation.animationFrameId) {
             cancelFrame(scrollAnimation.animationFrameId);
             scrollAnimation.animationFrameId = null;
@@ -66,14 +77,19 @@ export function createDragController(document, options = {}) {
 
     function updateAutoScroll(event) {
         const containerRect = columnsContainer.getBoundingClientRect();
-        const speeds = autoScrollSpeeds(event, containerRect);
-        scrollAnimation.scrollX = speeds.scrollX;
-        scrollAnimation.scrollY = speeds.scrollY;
+        const { scrollX } = autoScrollSpeeds(event, containerRect);
 
-        const scrolling = speeds.scrollX !== 0 || speeds.scrollY !== 0;
+        const column = event.target.closest('.column');
+        const scrollY = column ? autoScrollSpeeds(event, column.getBoundingClientRect()).scrollY : 0;
+
+        scrollAnimation.scrollX = scrollX;
+        scrollAnimation.scrollY = scrollY;
+        scrollAnimation.verticalTarget = column;
+
+        const scrolling = scrollX !== 0 || (scrollY !== 0 && Boolean(column));
         if (!scrollAnimation.isScrolling && scrolling) {
             scrollAnimation.isScrolling = true;
-            startScrolling(columnsContainer);
+            startScrolling();
         } else if (!scrolling) {
             stopScrolling();
         }

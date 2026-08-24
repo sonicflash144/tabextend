@@ -123,6 +123,7 @@ export function createBoardView(document, options) {
             const title = titleInput.value;
             endInlineEdit(item);
             titleDisplay.textContent = title;
+            titleDisplay.title = title;
             titleInput.classList.add('hidden');
             titleDisplay.classList.remove('hidden');
             onTitleSave(tab, title);
