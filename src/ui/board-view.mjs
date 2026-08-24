@@ -231,6 +231,7 @@ export function createBoardView(document, options) {
             spanClass: 'column-title-text',
             container: 'h2',
             defaultText: 'New Column',
+            showTooltip: true,
             onSave: value => {
                 column.dataset.title = value;
                 onColumnRename(column, value);
@@ -300,6 +301,7 @@ export function createBoardView(document, options) {
             inputClass: 'subgroup-title',
             spanClass: 'subgroup-title-text',
             defaultText: 'New Group',
+            showTooltip: true,
             onSave: value => onGroupRename(group, value)
         });
         const { item, faviconsContainer, expandedContainer, expandButton, moreOptionsButton } =

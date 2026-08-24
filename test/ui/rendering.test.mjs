@@ -55,6 +55,24 @@ function columnTitleGroup(text = 'Research') {
     });
 }
 
+function relativeLuminance(cssColor) {
+    const channels = cssColor
+        .match(/[\d.]+/g)
+        .slice(0, 3)
+        .map(Number);
+    const linear = channels.map(channel => {
+        const value = channel / 255;
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+
+function contrastRatio(firstColor, secondColor) {
+    const lighter = Math.max(relativeLuminance(firstColor), relativeLuminance(secondColor));
+    const darker = Math.min(relativeLuminance(firstColor), relativeLuminance(secondColor));
+    return (lighter + 0.05) / (darker + 0.05);
+}
+
 test('the page markup the extension ships provides the containers the app needs', () => {
     ['sidebar', 'open-tabs-list', 'main-content', 'space-container', 'columns-container'].forEach(
         id => assert.ok(document.getElementById(id), `missing #${id}`)
@@ -70,6 +88,21 @@ test('the column strip scrolls horizontally without creating a secondary vertica
 
     assert.equal(style.overflowX, 'auto');
     assert.equal(style.overflowY, 'hidden');
+});
+
+test('due-date badges keep readable contrast against their text', t => {
+    ['date-overdue', 'date-today', 'date-tomorrow', 'date-later'].forEach(className => {
+        const badge = document.createElement('div');
+        badge.classList.add('date-display', className);
+        document.body.appendChild(badge);
+        t.after(() => badge.remove());
+
+        const style = page.window.getComputedStyle(badge);
+        assert.ok(
+            contrastRatio(style.color, style.backgroundColor) >= 4.5,
+            `${className} must have at least 4.5:1 contrast`
+        );
+    });
 });
 
 test('a saved tab renders its title, note, date, and colour', () => {

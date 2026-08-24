@@ -237,16 +237,16 @@ a {
     font-size: 12px;
 }
     .date-display.date-overdue {
-        background-color: #e63c30;
+        background-color: #df342c;
     }
     .date-display.date-today {
         background-color: #058527;
     }
     .date-display.date-tomorrow {
-        background-color: #c76e00;
+        background-color: #b95e00;
     }
     .date-display.date-later {
-        background-color: #ababab;
+        background-color: #767676;
     }
 .tab-note {
     margin-top: 5px;

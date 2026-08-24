@@ -6,7 +6,8 @@ export function createEditableTitleController(document, options = {}) {
         spanClass = '',
         onSave = () => {},
         defaultText = 'New Title',
-        container = 'span'
+        container = 'span',
+        showTooltip = false
     } = options;
 
     // classList rejects empty tokens, so unnamed classes are simply skipped.
@@ -18,7 +19,11 @@ export function createEditableTitleController(document, options = {}) {
     addClass(titleGroup, groupClass);
     const titleSpan = document.createElement(container);
     addClass(titleSpan, spanClass);
-    titleSpan.textContent = initialText || defaultText;
+    function setDisplayedText(text) {
+        titleSpan.textContent = text || defaultText;
+        if (showTooltip) titleSpan.title = titleSpan.textContent;
+    }
+    setDisplayedText(initialText);
     const titleInput = document.createElement('input');
     titleInput.type = 'text';
     addClass(titleInput, inputClass);
@@ -43,7 +48,7 @@ export function createEditableTitleController(document, options = {}) {
         const subgroup = titleSpan.closest('.subgroup-item');
         if (subgroup) subgroup.draggable = true;
         const trimmedValue = titleInput.value.trim();
-        titleSpan.textContent = trimmedValue || defaultText;
+        setDisplayedText(trimmedValue);
         titleInput.style.display = 'none';
         titleSpan.style.display = 'inline';
         onSave(trimmedValue);

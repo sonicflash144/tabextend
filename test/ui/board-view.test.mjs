@@ -115,6 +115,7 @@ test('rendering builds the columns, tabs, and the new column indicator', () => {
 
     const column = document.getElementById('column-1');
     assert.equal(column.querySelector('.column-title-text').textContent, 'Research');
+    assert.equal(column.querySelector('.column-title-text').title, 'Research');
     assert.equal(column.dataset.emoji, '📚');
     assert.deepEqual(
         Array.from(column.querySelectorAll('.tab-item')).map(item => item.id),
@@ -161,6 +162,7 @@ test('a subgroup renders previews, nested tabs, and honours its expanded flag', 
 
     const subgroup = document.getElementById('group-1');
     assert.equal(subgroup.querySelector('.subgroup-title-text').textContent, 'Reading');
+    assert.equal(subgroup.querySelector('.subgroup-title-text').title, 'Reading');
     assert.equal(subgroup.querySelectorAll('.subgroup-favicon').length, 2);
     assert.deepEqual(
         Array.from(subgroup.querySelectorAll('.expanded-tabs .tab-item')).map(t => t.id),
@@ -243,6 +245,7 @@ test('renaming a column reports the new title and records it on the element', ()
     );
     assert.equal(column.dataset.title, 'Reading list');
     assert.equal(titleSpan.textContent, 'Reading list');
+    assert.equal(titleSpan.title, 'Reading list');
 });
 
 test('minimizing and maximizing a column reports each change once', () => {
@@ -397,6 +400,7 @@ test('renaming a subgroup reports the new title', () => {
     const renamed = calls.find(call => call[0] === 'groupRename');
     assert.equal(renamed[1].id, 'group-1');
     assert.equal(renamed[2], 'Later');
+    assert.equal(subgroup.querySelector('.subgroup-title-text').title, 'Later');
 });
 
 test('clicking a note opens its editor and locks the row against dragging', () => {
