@@ -7,6 +7,25 @@ export class ImportTransactionError extends Error {
     }
 }
 
+async function removeStorageKeys(storage, keys) {
+    if (keys.length === 0) return;
+    await storage.remove(keys);
+}
+
+async function writeStorageValues(storage, values, options) {
+    const { removeBeforeSet } = options;
+    const keys = Object.keys(values);
+    if (keys.length === 0) return;
+    // WebKit can underflow its quota calculation when it replaces Unicode-rich
+    // values because its total and replaced-value sizes use different units.
+    // Removing only the affected rows first avoids that calculation; callers
+    // enable this only for Safari and keep a durable backup before primary rows.
+    if (removeBeforeSet) {
+        await removeStorageKeys(storage, keys);
+    }
+    await storage.set(values);
+}
+
 function jsonValuesMatch(expected, actual) {
     if (expected === actual) return true;
     if (expected === null || actual === null) return false;
@@ -43,7 +62,33 @@ function mismatchedStorageKeys(expected, actual) {
     );
 }
 
-async function restorePreviousStorage(storage, previousStorage, importedKeys, backupKey) {
+async function restorePreviousStorage(storage, previousStorage, importedKeys, backupKey, options) {
+    const { removeBeforeSet } = options;
+    const valuesToRestore = Object.fromEntries(
+        importedKeys
+            .filter(key => Object.prototype.hasOwnProperty.call(previousStorage, key))
+            .map(key => [key, previousStorage[key]])
+    );
+
+    if (removeBeforeSet) {
+        await removeStorageKeys(storage, importedKeys);
+        await writeStorageValues(storage, valuesToRestore, {
+            removeBeforeSet: false
+        });
+
+        await removeStorageKeys(storage, [backupKey]);
+        if (Object.prototype.hasOwnProperty.call(previousStorage, backupKey)) {
+            await writeStorageValues(
+                storage,
+                { [backupKey]: previousStorage[backupKey] },
+                {
+                    removeBeforeSet: false
+                }
+            );
+        }
+        return;
+    }
+
     await storage.set(previousStorage);
     const newlyAddedKeys = importedKeys.filter(
         key => !Object.prototype.hasOwnProperty.call(previousStorage, key)
@@ -60,7 +105,13 @@ async function restorePreviousStorage(storage, previousStorage, importedKeys, ba
  * get, set, and remove methods and can be replaced with a fake in tests.
  */
 export async function importStorageSafely(options) {
-    const { storage, data, backupKey, now = () => new Date().toISOString() } = options;
+    const {
+        storage,
+        data,
+        backupKey,
+        now = () => new Date().toISOString(),
+        removeBeforeSet = false
+    } = options;
 
     const previousStorage = await storage.get(null);
     const backupData = { ...previousStorage };
@@ -68,17 +119,27 @@ export async function importStorageSafely(options) {
     const importedData = { ...data };
     delete importedData[backupKey];
     const importedKeys = Object.keys(importedData);
+    const backupValue = {
+        createdAt: now(),
+        data: backupData
+    };
+    const backupUpdate = { [backupKey]: backupValue };
     let backupWritten = false;
+    let previousBackupRemoved = false;
 
     try {
-        await storage.set({
-            [backupKey]: {
-                createdAt: now(),
-                data: backupData
-            }
+        if (removeBeforeSet) {
+            await removeStorageKeys(storage, [backupKey]);
+            previousBackupRemoved = true;
+        }
+        await writeStorageValues(storage, backupUpdate, {
+            removeBeforeSet: false
         });
         backupWritten = true;
-        await storage.set(importedData);
+
+        await writeStorageValues(storage, importedData, {
+            removeBeforeSet
+        });
 
         const storedData = await storage.get(importedKeys);
         const mismatchedKeys = mismatchedStorageKeys(importedData, storedData);
@@ -91,10 +152,32 @@ export async function importStorageSafely(options) {
         return { previousStorage, importedKeys };
     } catch (cause) {
         if (!backupWritten) {
+            if (
+                previousBackupRemoved &&
+                Object.prototype.hasOwnProperty.call(previousStorage, backupKey)
+            ) {
+                try {
+                    await writeStorageValues(
+                        storage,
+                        { [backupKey]: previousStorage[backupKey] },
+                        {
+                            removeBeforeSet: false
+                        }
+                    );
+                } catch (rollbackError) {
+                    throw new ImportTransactionError(cause.message, {
+                        cause,
+                        rolledBack: false,
+                        rollbackError
+                    });
+                }
+            }
             throw new ImportTransactionError(cause.message, { cause, rolledBack: false });
         }
         try {
-            await restorePreviousStorage(storage, previousStorage, importedKeys, backupKey);
+            await restorePreviousStorage(storage, previousStorage, importedKeys, backupKey, {
+                removeBeforeSet
+            });
         } catch (rollbackError) {
             throw new ImportTransactionError(cause.message, {
                 cause,

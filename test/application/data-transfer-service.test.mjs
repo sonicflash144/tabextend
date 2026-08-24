@@ -111,6 +111,23 @@ test('unreadable text fails before any write', async () => {
     assert.deepEqual(storage.values.savedTabs, [{ id: 'kept' }]);
 });
 
+test('historical transient values are accepted but not imported', async () => {
+    const { service, storage } = createService();
+
+    const result = await service.importFromText(
+        JSON.stringify({
+            savedTabs: [{ id: 'alpha', title: 'Alpha', url: 'https://example.com/alpha' }],
+            columnState: [{ id: 'column-one', title: 'Research', tabIds: ['tab-alpha'] }],
+            animation: { columnId: 'missing-column', minimized: true },
+            [IMPORT_BACKUP_KEY]: { stale: true }
+        })
+    );
+
+    assert.equal(result.imported, true);
+    assert.equal(storage.values.animation, undefined);
+    assert.notDeepEqual(storage.values[IMPORT_BACKUP_KEY], { stale: true });
+});
+
 test('a failed write is rolled back and reported', async () => {
     const { service, storage } = createService({ savedTabs: [{ id: 'kept' }] });
     const originalSet = storage.set.bind(storage);

@@ -23,6 +23,33 @@ function reverseObjectKeys(value) {
 function createFakeStorage(initial, options = {}) {
     let values = clone(initial);
     let setCalls = 0;
+
+    function serializedValue(value) {
+        return JSON.stringify(value);
+    }
+
+    function sqliteCharacterSize(entries) {
+        return Object.entries(entries).reduce(
+            (size, [key, value]) =>
+                size + Array.from(key).length + Array.from(serializedValue(value)).length,
+            0
+        );
+    }
+
+    function internalStringSize(value) {
+        const text = String(value);
+        const isEightBit = Array.from(text).every(character => character.codePointAt(0) <= 0xff);
+        return text.length * (isEightBit ? 1 : 2);
+    }
+
+    function internalStorageSize(entries) {
+        return Object.entries(entries).reduce(
+            (size, [key, value]) =>
+                size + internalStringSize(key) + internalStringSize(serializedValue(value)),
+            0
+        );
+    }
+
     return {
         async get(keys) {
             if (keys === null) return clone(values);
@@ -43,6 +70,18 @@ function createFakeStorage(initial, options = {}) {
             setCalls += 1;
             if (options.failSetCall === setCalls) {
                 throw new Error(`set call ${setCalls} failed`);
+            }
+            if (options.webkitReplacementQuotaBug) {
+                const replaced = Object.fromEntries(
+                    Object.keys(updates)
+                        .filter(key => Object.prototype.hasOwnProperty.call(values, key))
+                        .map(key => [key, values[key]])
+                );
+                const updatedSize =
+                    sqliteCharacterSize(values) -
+                    internalStorageSize(replaced) +
+                    internalStorageSize(updates);
+                if (updatedSize < 0) throw new Error('Exceeded storage quota');
             }
             values = { ...values, ...clone(updates) };
         },
@@ -182,4 +221,89 @@ test('does not nest a previous backup inside the new backup', async () => {
         createdAt: 'new',
         data: { savedTabs: [{ id: 'old' }], columnState: [] }
     });
+});
+
+test('Safari-safe replacement avoids WebKit quota underflow for a Unicode backup', async () => {
+    const initial = {
+        savedTabs: [{ id: 'old' }],
+        columnState: [],
+        [backupKey]: {
+            createdAt: 'old',
+            data: { savedTabs: [{ id: 'older', title: '🧭'.repeat(1000) }] }
+        }
+    };
+    const imported = { savedTabs: [{ id: 'new' }], columnState: [] };
+
+    await assert.rejects(
+        importStorageSafely({
+            storage: createFakeStorage(initial, { webkitReplacementQuotaBug: true }),
+            data: imported,
+            backupKey
+        }),
+        /Exceeded storage quota/
+    );
+
+    const storage = createFakeStorage(initial, { webkitReplacementQuotaBug: true });
+    await importStorageSafely({
+        storage,
+        data: imported,
+        backupKey,
+        now: () => 'new',
+        removeBeforeSet: true
+    });
+
+    assert.deepEqual(storage.snapshot(), {
+        savedTabs: imported.savedTabs,
+        columnState: imported.columnState,
+        [backupKey]: {
+            createdAt: 'new',
+            data: { savedTabs: [{ id: 'old' }], columnState: [] }
+        }
+    });
+});
+
+test('Safari-safe backup failure restores the previous backup before reporting failure', async () => {
+    const initial = {
+        savedTabs: [{ id: 'old' }],
+        columnState: [],
+        [backupKey]: { createdAt: 'old', data: { savedTabs: [{ id: 'older' }] } }
+    };
+    const storage = createFakeStorage(initial, { failSetCall: 1 });
+
+    await assert.rejects(
+        importStorageSafely({
+            storage,
+            data: { savedTabs: [{ id: 'new' }], columnState: [] },
+            backupKey,
+            removeBeforeSet: true
+        }),
+        error => error instanceof ImportTransactionError && !error.rolledBack
+    );
+
+    assert.deepEqual(storage.snapshot(), initial);
+});
+
+test('Safari-safe import failure restores primary values and the previous backup', async () => {
+    const initial = {
+        savedTabs: [{ id: 'old' }],
+        columnState: [],
+        [backupKey]: { createdAt: 'old', data: { savedTabs: [{ id: 'older' }] } }
+    };
+    const storage = createFakeStorage(initial, { failSetCall: 2 });
+
+    await assert.rejects(
+        importStorageSafely({
+            storage,
+            data: {
+                savedTabs: [{ id: 'new' }],
+                columnState: [],
+                theme: 'light'
+            },
+            backupKey,
+            removeBeforeSet: true
+        }),
+        error => error instanceof ImportTransactionError && error.rolledBack
+    );
+
+    assert.deepEqual(storage.snapshot(), initial);
 });

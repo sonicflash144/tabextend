@@ -69,6 +69,7 @@ function getBrowser() {
     return userAgent;
 }
 
+const userBrowser = getBrowser();
 const browserApi = createBrowserApiFromGlobal(globalThis);
 const openTabs = createOpenTabsService({
     browserApi,
@@ -77,7 +78,8 @@ const openTabs = createOpenTabsService({
 const settings = createSettingsService({ storage: browserApi.storage.local });
 const dataTransfer = createDataTransferService({
     storage: browserApi.storage.local,
-    idFactory: generateUniqueId
+    idFactory: generateUniqueId,
+    removeBeforeImportSet: userBrowser === 'safari'
 });
 const releaseNotes = createReleaseService({
     storage: browserApi.storage.local,
@@ -91,8 +93,8 @@ const openFailures = createOpenFailureReporter({
 });
 const settingsButton = document.querySelector('.settings-button');
 const columnsContainer = document.getElementById('columns-container');
+const importFileInput = document.getElementById('import-file-input');
 const colorOptions = TAB_COLOR_CLASSES;
-const userBrowser = getBrowser();
 let theme = 'light';
 let deletionArea;
 let newColumnIndicator = null;
@@ -338,6 +340,7 @@ async function initializeStoredState() {
         }
         displaySavedTabs(result.state);
     } catch (error) {
+        displaySavedTabs(appState.getState());
         console.error('Could not initialize extension storage:', error);
     }
 }
@@ -425,40 +428,56 @@ function reportImportFailure(error) {
     alert(`Import failed. ${stateMessage}\n\n${error.message}`);
 }
 
+async function displayImportedState() {
+    const importedState = await stateStorage.reload();
+    displaySavedTabs(importedState);
+
+    const stored = await settings.load();
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('collapsed', stored.sidebarCollapsed);
+    theme = stored.theme;
+    document.body.className = theme;
+}
+
+function handleImportFileSelection() {
+    const files = importFileInput.files;
+    const file = files && files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onerror = () => {
+        const error = reader.error || new Error('The selected import file could not be read.');
+        reportImportFailure(error);
+    };
+    reader.onload = async e => {
+        try {
+            await initialization;
+            const result = await dataTransfer.importFromText(e.target.result);
+
+            if (!result.imported) {
+                alert(`Import rejected:\n${result.errors.slice(0, 8).join('\n')}`);
+                return;
+            }
+
+            if (result.recovered > 0) {
+                console.log(`Recovered ${result.recovered} unreferenced imported tab(s)`);
+            }
+            await displayImportedState();
+        } catch (err) {
+            reportImportFailure(err);
+        }
+    };
+    reader.readAsText(file);
+}
+
 function importAllData() {
     if (!confirm('Importing will overwrite existing data. Proceed?')) return;
 
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json';
-
-    input.addEventListener('change', () => {
-        const file = input.files && input.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = async e => {
-            try {
-                const result = await dataTransfer.importFromText(e.target.result);
-
-                if (!result.imported) {
-                    alert(`Import rejected:\n${result.errors.slice(0, 8).join('\n')}`);
-                    return;
-                }
-
-                if (result.recovered > 0) {
-                    console.log(`Recovered ${result.recovered} unreferenced imported tab(s)`);
-                }
-                location.reload();
-            } catch (err) {
-                reportImportFailure(err);
-            }
-        };
-        reader.readAsText(file);
-    });
-
-    input.click();
+    importFileInput.value = '';
+    importFileInput.click();
 }
+
+importFileInput.addEventListener('change', handleImportFileSelection);
 
 const settingsMenu = createSettingsMenuController(document, {
     button: settingsButton,
@@ -510,9 +529,14 @@ browserApi.storage.onChanged.addListener(async changes => {
         const synchronized = await stateStorage.synchronize(changes);
         if (synchronized?.type === 'state') {
             console.log('Changes detected', changes);
-            if (changes.columnState && changes.animation) {
-                const column = document.getElementById(changes.animation.newValue.columnId);
-                if (changes.animation.newValue.minimized === true) {
+            const animation = changes.animation?.newValue;
+            if (changes.columnState && animation) {
+                const column = document.getElementById(animation.columnId);
+                if (!column) {
+                    displaySavedTabs(synchronized.state);
+                    return;
+                }
+                if (animation.minimized === true) {
                     minimizeColumn(column);
                 } else {
                     maximizeColumn(column);
@@ -537,7 +561,7 @@ browserApi.storage.onChanged.addListener(async changes => {
 });
 fetchOpenTabs();
 
-initializeStoredState();
+const initialization = initializeStoredState();
 
 document.querySelector('.minimize-sidebar').addEventListener('click', () => {
     setSidebarCollapsed(true);

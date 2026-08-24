@@ -25,7 +25,7 @@ export function createExportPayload(storageData, options = {}) {
  * live here.
  */
 export function createDataTransferService(options) {
-    const { storage, idFactory, now = () => Date.now() } = options;
+    const { storage, idFactory, now = () => Date.now(), removeBeforeImportSet = false } = options;
 
     if (!storage || typeof storage.get !== 'function' || typeof storage.set !== 'function') {
         throw new Error('A storage adapter with get and set methods is required.');
@@ -57,11 +57,15 @@ export function createDataTransferService(options) {
             return { imported: false, errors: prepared.errors };
         }
 
+        const importedData = { ...prepared.data };
+        TRANSIENT_EXPORT_KEYS.forEach(key => delete importedData[key]);
+
         await importStorageSafely({
             storage,
-            data: prepared.data,
+            data: importedData,
             backupKey: IMPORT_BACKUP_KEY,
-            now: () => new Date(now()).toISOString()
+            now: () => new Date(now()).toISOString(),
+            removeBeforeSet: removeBeforeImportSet
         });
 
         return { imported: true, errors: [], recovered: prepared.recovered };

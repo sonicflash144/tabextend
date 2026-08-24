@@ -74,13 +74,23 @@ function contrastRatio(firstColor, secondColor) {
 }
 
 test('the page markup the extension ships provides the containers the app needs', () => {
-    ['sidebar', 'open-tabs-list', 'main-content', 'space-container', 'columns-container'].forEach(
-        id => assert.ok(document.getElementById(id), `missing #${id}`)
-    );
+    [
+        'sidebar',
+        'open-tabs-list',
+        'main-content',
+        'space-container',
+        'columns-container',
+        'import-file-input'
+    ].forEach(id => assert.ok(document.getElementById(id), `missing #${id}`));
     assert.ok(document.querySelector('.settings-button'));
     assert.ok(document.querySelector('.minimize-sidebar'));
     assert.ok(document.querySelector('.maximize-sidebar'));
     assert.ok(document.getElementById('add-column'));
+
+    const importFileInput = document.getElementById('import-file-input');
+    assert.equal(importFileInput.type, 'file');
+    assert.equal(importFileInput.accept, 'application/json');
+    assert.equal(importFileInput.hidden, true);
 });
 
 test('the column strip scrolls horizontally without creating a secondary vertical scrollbar', () => {
