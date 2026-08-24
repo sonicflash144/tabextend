@@ -86,7 +86,8 @@ const releaseNotes = createReleaseService({
 const openFailures = createOpenFailureReporter({
     showAlert: message => alert(message),
     logError: (message, error) => console.error(message, error),
-    canOpenFileUrls: browserApi.capabilities.fileUrls
+    canOpenFileUrls: browserApi.capabilities.fileUrlNavigation,
+    hasFileUrlAccessSetting: browserApi.capabilities.fileUrlAccessSetting
 });
 const settingsButton = document.querySelector('.settings-button');
 const columnsContainer = document.getElementById('columns-container');

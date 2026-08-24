@@ -5,6 +5,7 @@ import {
     createBrowserApiAdapters,
     createBrowserApiFromGlobal,
     resolveWebExtensionApi,
+    supportsSafariFileUrls,
     supportsFileUrls
 } from '../../src/infrastructure/browser-api.mjs';
 
@@ -102,7 +103,7 @@ test('advertises tab grouping only when both required APIs are present', () => {
     assert.equal(api.capabilities.tabGroups, true);
 });
 
-test('advertises local file support only on Chromium', () => {
+test('distinguishes exposed file-tab URLs from Safari file navigation', () => {
     const chrome =
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ' +
         'Chrome/131.0.0.0 Safari/537.36';
@@ -128,13 +129,23 @@ test('advertises local file support only on Chromium', () => {
         assert.equal(supportsFileUrls(userAgent), true, `${name} should allow local files`);
     });
 
-    // Firefox blocks opening a local file in a tab, and Safari exposes none.
+    // Firefox blocks opening a local file in a tab, while Safari opens one but
+    // returns an empty URL for it through the tabs API.
     assert.equal(supportsFileUrls(firefox), false);
     assert.equal(supportsFileUrls(safari), false);
+    assert.equal(supportsSafariFileUrls(firefox), false);
+    assert.equal(supportsSafariFileUrls(safari), true);
     // Chrome on iOS is WebKit: it runs no extension and could not open a local
     // file for one, so its agent must not be mistaken for Chromium.
     assert.equal(
         supportsFileUrls(
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 ' +
+                '(KHTML, like Gecko) CriOS/131.0.0.0 Mobile/15E148 Safari/604.1'
+        ),
+        false
+    );
+    assert.equal(
+        supportsSafariFileUrls(
             'Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 ' +
                 '(KHTML, like Gecko) CriOS/131.0.0.0 Mobile/15E148 Safari/604.1'
         ),
@@ -156,7 +167,24 @@ test('reports the file capability it read from the global scope', () => {
         navigator: { userAgent: chrome }
     });
     assert.equal(api.capabilities.fileUrls, true);
+    assert.equal(api.capabilities.fileUrlNavigation, true);
+    assert.equal(api.capabilities.fileUrlContextMenu, true);
+    assert.equal(api.capabilities.fileUrlAccessSetting, true);
+
+    const safari =
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 ' +
+        '(KHTML, like Gecko) Version/17.6 Safari/605.1.15';
+    const safariApi = createBrowserApiFromGlobal({
+        browser: createPromiseApi(),
+        navigator: { userAgent: safari }
+    });
+    assert.equal(safariApi.capabilities.fileUrls, false);
+    assert.equal(safariApi.capabilities.fileUrlNavigation, true);
+    assert.equal(safariApi.capabilities.fileUrlContextMenu, true);
+    assert.equal(safariApi.capabilities.fileUrlAccessSetting, false);
 
     const withoutNavigator = createBrowserApiFromGlobal({ browser: createPromiseApi() });
     assert.equal(withoutNavigator.capabilities.fileUrls, false);
+    assert.equal(withoutNavigator.capabilities.fileUrlNavigation, false);
+    assert.equal(withoutNavigator.capabilities.fileUrlContextMenu, false);
 });

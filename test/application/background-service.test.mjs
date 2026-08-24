@@ -103,7 +103,7 @@ test('requires a browser API and a queue', () => {
     );
 });
 
-test('creates the save menu hidden on install', async () => {
+test('creates the page, selection, and tab-strip save menu hidden on install', async () => {
     const { browserApi } = createService();
 
     await browserApi.runtime.onInstalled.emit();
@@ -114,11 +114,19 @@ test('creates the save menu hidden on install', async () => {
             {
                 id: SAVE_TAB_MENU_ID,
                 title: 'Save to Tabs Magic',
-                contexts: ['page', 'selection'],
+                contexts: ['page', 'selection', 'tab'],
                 visible: false
             }
         ]
     ]);
+});
+
+test('creates the save menu visible when Safari cannot report the active file URL', async () => {
+    const { browserApi } = createService({ capabilities: { fileUrlContextMenu: true } });
+
+    await browserApi.runtime.onInstalled.emit();
+
+    assert.equal(browserApi.calls[0][1].visible, true);
 });
 
 test('shows the save menu only on savable pages', async () => {
@@ -147,6 +155,12 @@ test('offers to save a local file only where the browser can open one', async ()
     const withFileUrls = createService({ capabilities: { fileUrls: true } });
     await withFileUrls.browserApi.tabs.onUpdated.emit(1, {}, { url: 'file:///home/notes.html' });
     assert.deepEqual(withFileUrls.browserApi.calls, [
+        ['menuUpdate', SAVE_TAB_MENU_ID, { visible: true }]
+    ]);
+
+    const safari = createService({ capabilities: { fileUrlContextMenu: true } });
+    await safari.browserApi.tabs.onUpdated.emit(1, {}, {});
+    assert.deepEqual(safari.browserApi.calls, [
         ['menuUpdate', SAVE_TAB_MENU_ID, { visible: true }]
     ]);
 });
@@ -192,6 +206,49 @@ test('stores a null note when no text is selected and no queue exists yet', asyn
 
     assert.equal(storage.values[BACKGROUND_TABS_KEY].length, 1);
     assert.equal(storage.values[BACKGROUND_TABS_KEY][0].note, null);
+});
+
+test('saves a Safari local file from the context-menu page URL', async () => {
+    const { browserApi, storage } = createService({
+        capabilities: { fileUrlContextMenu: true },
+        tabs: [{ id: 7, title: 'Local notes', url: '' }]
+    });
+
+    await browserApi.contextMenus.onClicked.emit(
+        { menuItemId: SAVE_TAB_MENU_ID, pageUrl: 'file:///Users/sage/notes.html' },
+        { id: 7, title: 'Local notes', url: '' }
+    );
+
+    assert.deepEqual(storage.values[BACKGROUND_TABS_KEY], [
+        {
+            title: 'Local notes',
+            url: 'file:///Users/sage/notes.html',
+            favIconUrl: '',
+            id: 'id-1',
+            color: '#FFFFFF',
+            note: null
+        }
+    ]);
+    assert.deepEqual(browserApi.calls.at(-1), ['remove', 7]);
+});
+
+test('does not close a Safari tab when the context-menu event also hides its URL', async () => {
+    const { browserApi, errors, storage } = createService({
+        capabilities: { fileUrlContextMenu: true },
+        tabs: [{ id: 7, title: 'Hidden URL', url: '' }]
+    });
+
+    await browserApi.contextMenus.onClicked.emit(
+        { menuItemId: SAVE_TAB_MENU_ID },
+        { id: 7, title: 'Hidden URL', url: '' }
+    );
+
+    assert.equal(storage.values[BACKGROUND_TABS_KEY], undefined);
+    assert.equal(
+        browserApi.calls.some(call => call[0] === 'remove'),
+        false
+    );
+    assert.match(errors[0].message, /savable page URL/);
 });
 
 test('ignores clicks on other context menu entries', async () => {

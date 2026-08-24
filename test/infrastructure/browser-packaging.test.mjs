@@ -55,8 +55,9 @@ test('build configuration produces focused manifests for every browser', async (
     const firefox = await createTargetManifest('firefox');
     assert.deepEqual(firefox.background.scripts, ['dist/background.js']);
     assert.equal(firefox.background.service_worker, undefined);
-    assert.equal(firefox.permissions.includes('tabGroups'), false);
+    assert.equal(firefox.permissions.includes('tabGroups'), true);
     assert.equal(firefox.browser_specific_settings.gecko.id, 'sageywang@gmail.com');
+    assert.equal(firefox.browser_specific_settings.gecko.strict_min_version, '139.0');
 
     const safari = await createTargetManifest('safari');
     assert.deepEqual(safari.background.scripts, ['dist/background.js']);

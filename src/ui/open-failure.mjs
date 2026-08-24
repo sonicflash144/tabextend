@@ -12,11 +12,9 @@ export const LOCAL_FILE_ACCESS_MESSAGE =
     '"Allow access to file URLs". Then try again.';
 
 /**
- * Firefox and Safari cannot open a local file from an extension at all, so
- * there is no setting to point at and naming one would send the user looking
- * for a toggle that does not exist. Saved local files still reach those
- * browsers by importing an export made on Chromium, so this has to be
- * explained rather than treated as unreachable.
+ * Firefox cannot open a local file from an extension at all, so there is no
+ * setting to point at. Safari can open one without a setting and therefore
+ * needs no special explanation if an unrelated tab creation error occurs.
  */
 export const LOCAL_FILE_UNSUPPORTED_MESSAGE =
     'Opening local files is not supported on this browser.';
@@ -29,9 +27,8 @@ export const LOCAL_FILE_UNSUPPORTED_MESSAGE =
  */
 export function openFailureMessage(urls, options = {}) {
     if (!(Array.isArray(urls) ? urls : []).some(isFileUrl)) return null;
-    return options.canOpenFileUrls === true
-        ? LOCAL_FILE_ACCESS_MESSAGE
-        : LOCAL_FILE_UNSUPPORTED_MESSAGE;
+    if (options.canOpenFileUrls !== true) return LOCAL_FILE_UNSUPPORTED_MESSAGE;
+    return options.hasFileUrlAccessSetting === false ? null : LOCAL_FILE_ACCESS_MESSAGE;
 }
 
 /**
@@ -41,7 +38,12 @@ export function openFailureMessage(urls, options = {}) {
  * turn. Every failure is still logged; only the explanation is pooled.
  */
 export function createOpenFailureReporter(options = {}) {
-    const { showAlert, logError = () => {}, canOpenFileUrls = false } = options;
+    const {
+        showAlert,
+        logError = () => {},
+        canOpenFileUrls = false,
+        hasFileUrlAccessSetting
+    } = options;
     if (typeof showAlert !== 'function') throw new Error('An alert function is required.');
 
     let depth = 0;
@@ -51,7 +53,10 @@ export function createOpenFailureReporter(options = {}) {
 
     function report(message, error, urls) {
         logError(message, error);
-        const explanation = openFailureMessage(urls, { canOpenFileUrls });
+        const explanation = openFailureMessage(urls, {
+            canOpenFileUrls,
+            hasFileUrlAccessSetting
+        });
         if (!explanation) return;
         if (depth === 0) showAlert(explanation);
         else pending = explanation;

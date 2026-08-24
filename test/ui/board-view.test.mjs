@@ -195,7 +195,7 @@ test('a link the page opened itself is not followed by the browser as well', () 
     );
 
     const link = document.querySelector('#tab-alpha .tab-title');
-    assert.equal(link.href, 'file:///home/notes.html');
+    assert.equal(link.hasAttribute('href'), false);
     const event = clickLink(link);
 
     assert.deepEqual(calls, [['tabOpen', 'alpha', 'file:///home/notes.html']]);

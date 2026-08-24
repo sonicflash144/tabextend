@@ -1,3 +1,5 @@
+import { isFileUrl } from '../domain/browser-tabs.mjs';
+
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 const ICON_DEFINITIONS = {
     'chevron-down': [['path', { d: 'm6 9 6 6 6-6' }]],
@@ -292,12 +294,16 @@ export function createSavedTabView(document, options) {
     titleDisplay.id = `title-display-${tab.id}`;
     titleDisplay.style.textDecoration = 'none';
     titleDisplay.textContent = typeof tab.title === 'string' ? tab.title : '';
-    if (navigableUrl) titleDisplay.href = navigableUrl;
+    // Local files already have to open through the tabs API. Leaving their
+    // `file://` URL on an anchor lets Safari claim the gesture as a native
+    // link drag before the draggable row can receive it.
+    if (navigableUrl && !isFileUrl(navigableUrl)) titleDisplay.href = navigableUrl;
     // The row is the drag source, never the link inside it. A link with an
     // href is a drag source by default and would be found first, which puts
     // the browser's own link drag in charge: Firefox then refuses to drag a
     // `file://` target from an extension page and the row cannot be moved at
-    // all. Same reason the favicon opts out.
+    // all. Local links omit the href as well because Safari can still claim
+    // that gesture before the row. Same reason the favicon opts out.
     titleDisplay.draggable = false;
     const titleInput = document.createElement('input');
     titleInput.type = 'text';

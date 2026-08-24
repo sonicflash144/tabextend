@@ -423,10 +423,12 @@ test('links inside a row never become the drag source', () => {
     const local = savedTabView({ navigableUrl: 'file:///home/notes.html' });
     assert.equal(local.item.draggable, true);
     assert.equal(local.titleDisplay.draggable, false);
+    assert.equal(local.titleDisplay.hasAttribute('href'), false);
 
-    // Not conditional on the scheme: the row owns the drag either way.
+    // A web link keeps its native destination while the row owns its drag.
     const remote = savedTabView({ navigableUrl: 'https://example.com/page' });
     assert.equal(remote.titleDisplay.draggable, false);
+    assert.equal(remote.titleDisplay.href, 'https://example.com/page');
 
     const preview = createSubgroupPreview(document, {
         tab: { id: 'alpha', title: 'Notes' },

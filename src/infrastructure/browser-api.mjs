@@ -9,18 +9,16 @@ export function resolveWebExtensionApi(scope = globalThis) {
 }
 
 /**
- * Whether this browser lets an extension list and open `file://` URLs, which
- * only Chromium does. Chrome gates it further behind the per-extension "Allow
- * access to file URLs" setting that no manifest key can request, so even here
- * an individual open can still be refused and has to be reported.
+ * Whether this browser exposes `file://` URLs in tab metadata. Chromium does;
+ * Safari can navigate to a local file but returns an empty URL for that tab.
+ * Chrome gates the metadata and navigation further behind the per-extension
+ * "Allow access to file URLs" setting that no manifest key can request.
  *
  * Firefox blocks opening a local file in a tab outright: the capability is
  * unimplemented rather than unrequested (Bugzilla 1617594, still open), so
  * declaring `file:///*` would only add an "Access local files on your
- * computer" permission to the listing without making the feature work. Safari
- * does not expose local files to a web extension at all. Anything
- * unrecognized is treated as unable, so local files stay hidden rather than
- * being listed and then failing to open.
+ * computer" permission to the listing without making the feature work.
+ * Anything unrecognized is treated as unable, so local files stay hidden.
  *
  * There is nothing on the API surface to feature-detect this from, so it
  * reads the user agent the way the page already picks its browser class.
@@ -35,6 +33,15 @@ export function supportsFileUrls(userAgent = '') {
     return /chrome|chromium/.test(String(userAgent).toLowerCase());
 }
 
+/** Safari can navigate to file URLs even though its tabs API hides their URLs. */
+export function supportsSafariFileUrls(userAgent = '') {
+    const normalized = String(userAgent).toLowerCase();
+    return (
+        normalized.includes('safari') &&
+        !/(chrome|chromium|crios|fxios|edgios|opios)/.test(normalized)
+    );
+}
+
 /** Build the browser-neutral API boundary used by both extension entry points. */
 export function createBrowserApiAdapters(extensionApi, options = {}) {
     if (!extensionApi) throw new Error('A WebExtension browser API is required.');
@@ -43,11 +50,18 @@ export function createBrowserApiAdapters(extensionApi, options = {}) {
     const runtime = extensionApi.runtime;
     const storageRepository = createStorageRepository(extensionApi, methodOptions);
     const supportsTabGroups = Boolean(extensionApi.tabs?.group && extensionApi.tabGroups?.update);
+    const exposesFileTabUrls = supportsFileUrls(options.userAgent);
+    const supportsSafariFiles = supportsSafariFileUrls(options.userAgent);
 
     return {
         capabilities: {
             tabGroups: supportsTabGroups,
-            fileUrls: supportsFileUrls(options.userAgent)
+            // Kept separate because Safari can navigate and receive a context
+            // menu gesture on a file page while tabs.query() hides its URL.
+            fileUrls: exposesFileTabUrls,
+            fileUrlNavigation: exposesFileTabUrls || supportsSafariFiles,
+            fileUrlContextMenu: exposesFileTabUrls || supportsSafariFiles,
+            fileUrlAccessSetting: exposesFileTabUrls
         },
         storage: {
             local: storageRepository,

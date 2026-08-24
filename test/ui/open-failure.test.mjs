@@ -32,6 +32,16 @@ test('names the file-access setting only where the browser has one', () => {
     assert.doesNotMatch(LOCAL_FILE_UNSUPPORTED_MESSAGE, /Allow access to file URLs/);
 });
 
+test('does not claim Safari lacks file navigation or a Chrome-only setting', () => {
+    assert.equal(
+        openFailureMessage(['file:///Users/sage/notes.html'], {
+            canOpenFileUrls: true,
+            hasFileUrlAccessSetting: false
+        }),
+        null
+    );
+});
+
 test('explains a mixed batch whenever any of it was a local file', () => {
     const urls = ['https://example.com', 'FILE:///C:/notes.html'];
 
@@ -72,6 +82,18 @@ test('alerts immediately outside a batch', () => {
     reporter.report('Could not open:', new Error('refused'), ['file:///a.html']);
 
     assert.deepEqual(alerts, [LOCAL_FILE_UNSUPPORTED_MESSAGE]);
+    assert.deepEqual(logged, [['Could not open:', 'refused']]);
+});
+
+test('logs a Safari file-open failure without showing a misleading explanation', () => {
+    const { alerts, logged, reporter } = createReporter({
+        canOpenFileUrls: true,
+        hasFileUrlAccessSetting: false
+    });
+
+    reporter.report('Could not open:', new Error('refused'), ['file:///a.html']);
+
+    assert.deepEqual(alerts, []);
     assert.deepEqual(logged, [['Could not open:', 'refused']]);
 });
 
