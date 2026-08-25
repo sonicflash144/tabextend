@@ -80,7 +80,9 @@ export function createDragController(document, options = {}) {
         const { scrollX } = autoScrollSpeeds(event, containerRect);
 
         const column = event.target.closest('.column');
-        const scrollY = column ? autoScrollSpeeds(event, column.getBoundingClientRect()).scrollY : 0;
+        const scrollY = column
+            ? autoScrollSpeeds(event, column.getBoundingClientRect()).scrollY
+            : 0;
 
         scrollAnimation.scrollX = scrollX;
         scrollAnimation.scrollY = scrollY;
